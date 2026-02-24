@@ -1,0 +1,26 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/assets/*", "/manifest.webmanifest", "/service-worker.js"]
+  },
+  "routes": [
+    { "route": "/login",  "redirect": "/.auth/login/aad?post_login_redirect_uri=.referrer", "statusCode": 302 },
+    { "route": "/logout", "redirect": "/.auth/logout?post_logout_redirect_uri=/", "statusCode": 302 },
+
+    // Kun Entra — blokér GitHub-login (valgfrit men ofte ønsket)
+    { "route": "/.auth/login/github", "statusCode": 404 },
+
+    // Beskyt admin
+    { "route": "/admin.html", "allowedRoles": ["portal_admin"] },
+    { "route": "/assets/admin.js", "allowedRoles": ["portal_admin"] },
+
+    // Alt andet kræver login (hvis du vil have portalen lukket)
+    { "route": "/*", "allowedRoles": ["authenticated"] }
+  ],
+  "responseOverrides": {
+    "401": {
+      "redirect": "/.auth/login/aad?post_login_redirect_uri=.referrer",
+      "statusCode": 302
+    }
+  }
+}
