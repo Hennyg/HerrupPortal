@@ -1,112 +1,127 @@
-<!doctype html>
-<html lang="da">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin – Herrup Portal</title>
-  <link rel="stylesheet" href="/assets/app.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo">Herrup<br>Portal</div>
-      <div class="title">
-        <h1>Admin</h1>
-        <div class="subtitle">Tilføj / redigér / fjern apps og links</div>
+async function getMe() {
+  const r = await fetch("/.auth/me");
+  if (!r.ok) return null;
+  const j = await r.json();
+  return j?.clientPrincipal || null;
+}
+const normRoles = (roles) => (roles || []).map(r => String(r).toLowerCase());
+const hasRole = (roles, role) => roles.includes(String(role).toLowerCase());
+
+function parseAllowedRoles(s) {
+  if (Array.isArray(s)) return s.map(x => String(x).trim()).filter(Boolean);
+  return String(s || "").split(";").map(x => x.trim()).filter(Boolean);
+}
+function matchesRoles(itemRoles, userRoles) {
+  if (!itemRoles || !itemRoles.length) return true;
+  const set = new Set(userRoles);
+  return itemRoles.some(r => set.has(String(r).toLowerCase()));
+}
+
+async function loadLinks() {
+  try {
+    const r = await fetch("/api/links");
+    if (!r.ok) throw new Error("api_not_ok");
+    return await r.json();
+  } catch {
+    return [
+      { id:"1", title:"Flyveborde", url:"https://example.com", category:"Static Apps", group:"Lely", icon:"🪑", allowedRoles:["authenticated"], enabled:true, sort:10, openMode:"newTab" }
+    ];
+  }
+}
+
+function uniq(arr) {
+  return Array.from(new Set(arr.filter(Boolean).map(x => String(x).trim()))).sort((a,b)=>a.localeCompare(b));
+}
+function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="Alle" } = {}) {
+  selectEl.innerHTML = "";
+  if (includeEmpty) {
+    const o = document.createElement("option");
+    o.value = "";
+    o.textContent = emptyText;
+    selectEl.appendChild(o);
+  }
+  options.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = v;
+    selectEl.appendChild(o);
+  });
+}
+
+function renderGrid(items) {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  items.forEach(it => {
+    const a = document.createElement("a");
+    a.className = "tile";
+    a.href = it.url;
+    a.target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
+    a.rel = "noopener";
+    a.innerHTML = `
+      <div class="tileTop">
+        <div class="icon">${it.icon || "🔗"}</div>
+        <div class="badge">${it.category || ""}</div>
       </div>
-    </div>
+      <div class="tileTitle">${it.title || "Uden titel"}</div>
+      <div class="tileUrl">${it.url || ""}</div>
+    `;
+    grid.appendChild(a);
+  });
+}
 
-    <div class="user">
-      <div class="actions">
-        <a class="btn" href="/">⬅ Til portal</a>
-        <a class="btn" href="/logout">Log ud</a>
-      </div>
-    </div>
-  </header>
+(async function init(){
+  const me = await getMe();
+  const roles = normRoles(me?.userRoles || []);
+  document.getElementById("userLine").textContent = me ? `${me.userDetails}` : "Ikke logget ind";
 
-  <main class="container">
-    <section class="card">
-      <h2>Opret / redigér link</h2>
-      <form id="form" class="form">
-        <input type="hidden" id="id" />
+  if (hasRole(roles, "portal_admin")) {
+    document.getElementById("adminLink").classList.remove("hidden");
+  }
 
-        <label>Titel
-          <input class="input" id="title" required />
-        </label>
+  const raw = await loadLinks();
+  const items = (raw || [])
+    .map(x => ({
+      ...x,
+      allowedRoles: parseAllowedRoles(x.allowedRoles),
+      enabled: x.enabled !== false
+    }))
+    .filter(x => x.enabled)
+    .filter(x => matchesRoles(normRoles(x.allowedRoles), roles))
+    .sort((a,b)=> (a.sort ?? 1000) - (b.sort ?? 1000));
 
-        <label>URL
-          <input class="input" id="url" required placeholder="https://..." />
-        </label>
+  const categories = uniq(items.map(x => x.category));
+  const groups = uniq(items.map(x => x.group));
 
-        <!-- Kategori dropdown -->
-        <label>Kategori
-          <select class="input" id="category"></select>
-        </label>
-        
-        <!-- Group dropdown (lch_group) -->
-        <label>Gruppe (lch_group)
-          <select class="input" id="group"></select>
-        </label>
-        
-        <!-- Parent dropdown (lch_parent) -->
-        <label>Parent (lch_parent)
-          <select class="input" id="parent"></select>
-        </label>
-        
-        <!-- Ikon + preview + forslag -->
-        <label>Ikon (emoji eller tekst)
-          <div style="display:flex; gap:10px; align-items:center;">
-            <input class="input" id="icon" list="iconList" placeholder="🧩" style="flex:1" />
-            <div id="iconPreview" style="font-size:26px; width:36px; text-align:center;">🔗</div>
-          </div>
-          <datalist id="iconList"></datalist>
-        </label>
+  const catSel = document.getElementById("categoryFilter");
+  const grpSel = document.getElementById("groupFilter");
+  setSelectOptions(catSel, categories, { includeEmpty:true, emptyText:"Alle kategorier" });
+  setSelectOptions(grpSel, groups, { includeEmpty:true, emptyText:"Alle grupper" });
 
+  const q = document.getElementById("q");
+  const qx = document.getElementById("qx");
+  function syncClearBtn(){
+    qx.style.visibility = q.value ? "visible" : "hidden";
+  }
+  q.addEventListener("input", () => { syncClearBtn(); render(); });
+  qx.addEventListener("click", () => { q.value=""; syncClearBtn(); render(); });
+  catSel.addEventListener("change", render);
+  grpSel.addEventListener("change", render);
+  syncClearBtn();
 
-        <label>Allowed roles (semikolon-separeret)
-          <input class="input" id="roles" placeholder="portal_user;portal_admin" />
-        </label>
+  function render() {
+    const qq = (q.value || "").toLowerCase();
+    const cat = catSel.value;
+    const grp = grpSel.value;
 
-        <div class="row">
-          <label class="inline"><input type="checkbox" id="enabled" checked /> Aktiv</label>
-          <label>Sort order
-            <input class="input" id="sort" type="number" value="100" />
-          </label>
-          <label>Åbn
-            <select class="input" id="openMode">
-              <option value="newTab">Ny fane</option>
-              <option value="sameTab">Samme fane</option>
-            </select>
-          </label>
-        </div>
+    const filtered = items.filter(x => {
+      if (cat && (x.category || "") !== cat) return false;
+      if (grp && (x.group || "") !== grp) return false;
+      if (!qq) return true;
+      return (x.title||"").toLowerCase().includes(qq) || (x.url||"").toLowerCase().includes(qq);
+    });
 
-        <div class="actions">
-          <button class="btn primary" type="submit">Gem</button>
-          <button class="btn" id="resetBtn" type="button">Nulstil</button>
-        </div>
-        <div id="msg" class="muted"></div>
-      </form>
-    </section>
+    renderGrid(filtered);
+  }
 
-    <section class="card">
-      <h2>Links</h2>
-      <div class="tableWrap">
-        <table class="table" id="tbl">
-          <thead>
-            <tr>
-              <th>Titel</th>
-              <th>Kategori</th>
-              <th>Aktiv</th>
-              <th>Roles</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-
-  <script src="/assets/admin.js"></script>
-</body>
-</html>
+  render();
+})();
