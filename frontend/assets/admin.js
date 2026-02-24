@@ -10,22 +10,16 @@ async function api(method, url, body) {
   if (!r.ok) throw { status: r.status, data };
   return data;
 }
+
 function $(id){ return document.getElementById(id); }
 
 function uniq(arr) {
-  return Array.from(new Set(arr.filter(Boolean).map(x => String(x).trim()))).sort((a,b)=>a.localeCompare(b));
-}
-
-function setDatalistOptions(datalistEl, options) {
-  datalistEl.innerHTML = "";
-  options.forEach(v => {
-    const opt = document.createElement("option");
-    opt.value = v;
-    datalistEl.appendChild(opt);
-  });
+  return Array.from(new Set((arr||[]).filter(Boolean).map(x => String(x).trim())))
+    .sort((a,b)=>a.localeCompare(b));
 }
 
 function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="(ingen)" } = {}) {
+  if (!selectEl) return;
   selectEl.innerHTML = "";
   if (includeEmpty) {
     const o = document.createElement("option");
@@ -33,7 +27,7 @@ function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="(in
     o.textContent = emptyText;
     selectEl.appendChild(o);
   }
-  options.forEach(v => {
+  (options||[]).forEach(v => {
     const o = document.createElement("option");
     o.value = v;
     o.textContent = v;
@@ -42,8 +36,9 @@ function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="(in
 }
 
 function updateIconPreview() {
-  const v = $("icon").value?.trim();
-  $("iconPreview").textContent = v || "🔗";
+  const v = $("icon")?.value?.trim();
+  const p = $("iconPreview");
+  if (p) p.textContent = v || "🔗";
 }
 
 function readForm() {
@@ -63,18 +58,18 @@ function readForm() {
 }
 
 function fillForm(x) {
-  $("id").value = x.id || "";
-  $("title").value = x.title || "";
-  $("url").value = x.url || "";
-  $("category").value = x.category || "";
-  $("group").value = x.group || "";
-  $("parent").value = x.parent || "";
-  $("icon").value = x.icon || "";
+  $("id").value = x?.id || "";
+  $("title").value = x?.title || "";
+  $("url").value = x?.url || "";
+  $("category").value = x?.category || "";
+  $("group").value = x?.group || "";
+  $("parent").value = x?.parent || "";
+  $("icon").value = x?.icon || "";
   updateIconPreview();
-  $("roles").value = Array.isArray(x.allowedRoles) ? x.allowedRoles.join(";") : (x.allowedRoles || "");
-  $("enabled").checked = x.enabled !== false;
-  $("sort").value = x.sort ?? 100;
-  $("openMode").value = x.openMode || "newTab";
+  $("roles").value = Array.isArray(x?.allowedRoles) ? x.allowedRoles.join(";") : (x?.allowedRoles || "");
+  $("enabled").checked = x?.enabled !== false;
+  $("sort").value = x?.sort ?? 100;
+  $("openMode").value = x?.openMode || "newTab";
 }
 
 function resetForm() {
@@ -82,29 +77,43 @@ function resetForm() {
   $("msg").textContent = "";
 }
 
-function buildPickers(rows) {
-  const fixedCats  = ["Static Apps", "Favoritter", "Værktøjer", "Administration", "Andet"];
-  const fixedGroups = ["Lely", "Salg", "Tekniker", "FMS", "Administration"];
+function seedPickersNow() {
+  setSelectOptions($("category"),
+    ["Static Apps","Favoritter","Værktøjer","Administration","Andet"],
+    { includeEmpty:true, emptyText:"(vælg kategori)" }
+  );
+
+  setSelectOptions($("group"),
+    ["Lely","Salg","Tekniker","FMS","Administration"],
+    { includeEmpty:true, emptyText:"(ingen gruppe)" }
+  );
+
+  const p = $("parent");
+  if (p) p.innerHTML = `<option value="">(ingen parent)</option>`;
+
   const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
+  const dl = document.getElementById("iconList");
+  if (dl) {
+    dl.innerHTML = "";
+    fixedIcons.forEach(ic => {
+      const opt = document.createElement("option");
+      opt.value = ic;
+      dl.appendChild(opt);
+    });
+  }
+}
 
-  // Category suggestions (datalist)
-  const categories = uniq([...fixedCats, ...rows.map(r => r.category).filter(Boolean)]);
-  setDatalistOptions(document.getElementById("categoryList"), categories);
+function buildPickers(rows) {
+  // opdatér dropdowns med værdier fundet i data
+  const cats = uniq(["Static Apps","Favoritter","Værktøjer","Administration","Andet", ...rows.map(r => r.category)]);
+  const grps = uniq(["Lely","Salg","Tekniker","FMS","Administration", ...rows.map(r => r.group)]);
 
-  // Group suggestions (datalist)
-  const groups = uniq([...fixedGroups, ...rows.map(r => r.group).filter(Boolean)]);
-  setDatalistOptions(document.getElementById("groupList"), groups);
+  setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
+  setSelectOptions($("group"), grps, { includeEmpty:true, emptyText:"(ingen gruppe)" });
 
-  // Parent dropdown (kun kandidater uden URL)
   const parentCandidates = rows.filter(r => !r.url).map(r => ({ id:r.id, title:r.title }));
   const parentSelect = $("parent");
-  parentSelect.innerHTML = "";
-
-  const empty = document.createElement("option");
-  empty.value = "";
-  empty.textContent = "(ingen parent)";
-  parentSelect.appendChild(empty);
-
+  parentSelect.innerHTML = `<option value="">(ingen parent)</option>`;
   parentCandidates.forEach(p => {
     const o = document.createElement("option");
     o.value = p.id;
@@ -112,7 +121,8 @@ function buildPickers(rows) {
     parentSelect.appendChild(o);
   });
 
-  // Icon suggestions
+  // Ikon forslag ud fra data + faste
+  const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
   const icons = uniq([...fixedIcons, ...rows.map(r => r.icon).filter(Boolean)]);
   const dl = document.getElementById("iconList");
   dl.innerHTML = "";
@@ -122,7 +132,6 @@ function buildPickers(rows) {
     dl.appendChild(opt);
   });
 }
-
 
 function renderTable(rows) {
   const byId = new Map(rows.map(r => [r.id, r]));
@@ -155,77 +164,51 @@ function renderTable(rows) {
   });
 }
 
-function seedPickersNow() {
-  // Kategori (fast)
-  setSelectOptions($("category"),
-    ["Static Apps","Favoritter","Værktøjer","Administration","Andet"],
-    { includeEmpty:true, emptyText:"(vælg kategori)" }
-  );
-
-  // Gruppe (fast)
-  setSelectOptions($("group"),
-    ["Lely","Salg","Tekniker","FMS","Administration"],
-    { includeEmpty:true, emptyText:"(ingen gruppe)" }
-  );
-
-  // Parent (kun ingen)
-  const p = $("parent");
-  p.innerHTML = `<option value="">(ingen parent)</option>`;
-
-  // Ikoner (fast)
-  const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
-  const dl = document.getElementById("iconList");
-  dl.innerHTML = "";
-  fixedIcons.forEach(ic => {
-    const opt = document.createElement("option");
-    opt.value = ic;
-    dl.appendChild(opt);
-  });
-}
-
 async function refresh() {
-    console.log("refresh() starter");
+  console.log("refresh() starter");
   const rows = await api("GET", "/api/links-admin");
   console.log("refresh() rows:", rows);
-  const rows = await api("GET", "/api/links-admin");
   const list = (rows || []).sort((a,b) => (a.sort ?? 1000) - (b.sort ?? 1000));
   buildPickers(list);
   renderTable(list);
 }
 
 (async function init(){
-  seedPickersNow();
   console.log("admin.js loaded");
+
+  // Fyld dropdowns NU (uanset API)
+  seedPickersNow();
+
   $("icon").addEventListener("input", updateIconPreview);
   updateIconPreview();
 
-  // ✅ Vis forslag med det samme (selv uden API)
-  buildPickers([]);
+  $("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("msg").textContent = "Gemmer...";
+    const x = readForm();
 
-  $("form").addEventListener("submit", async (e) => { ... });
+    try {
+      if (x.id) await api("PUT", "/api/links-admin", x);
+      else await api("POST", "/api/links-admin", x);
+
+      $("msg").textContent = "Gemt ✅";
+      await refresh();
+      resetForm();
+    } catch (err) {
+      $("msg").textContent =
+        `Fejl (${err?.status || "?"}): ` + (err?.data?.message || JSON.stringify(err?.data || err));
+    }
+  });
 
   $("resetBtn").addEventListener("click", resetForm);
 
   resetForm();
+
   try {
     await refresh();
   } catch (err) {
-    // ✅ behold stadig pickers
-    $("msg").textContent =
-      "Kan ikke hente links endnu. (Dropdowns virker stadig). Fejl: " +
-      `(${err?.status || "?"})`;
-  }
-})();
-
-
-  $("resetBtn").addEventListener("click", resetForm);
-
-  resetForm();
-  try {
-    await refresh();
-  } catch (err) {
-    $("msg").textContent =
-      "Kan ikke hente links endnu. Mangler du /api/links-admin endpoint? " +
+    $("msg").textContent = "API /api/links-admin virker ikke endnu (dropdowns virker stadig). " +
       `Fejl (${err?.status || "?"}).`;
+    console.warn("refresh() fejlede:", err);
   }
 })();
