@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Genvej – Herrup Portal</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">Herrup<br>Portal</div>
+      <div class="title">
+        <h1>Genvej på telefon</h1>
+        <div class="subtitle">iOS + Android (PWA)</div>
+      </div>
+    </div>
+    <div class="user">
+      <div class="actions">
+        <a class="btn" href="/">⬅ Til portal</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>QR-kode</h2>
+      <p class="muted">Scan QR-koden og åbn portalen. Tilføj derefter som genvej på hjemmeskærmen.</p>
+      <div class="qrWrap">
+        <img id="qr" alt="QR" />
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>iPhone / iPad (Safari)</h2>
+      <ol>
+        <li>Åbn portalen i <b>Safari</b></li>
+        <li>Tryk på <b>Del</b>-ikonet</li>
+        <li>Vælg <b>Føj til hjemmeskærm</b></li>
+        <li>Bekræft navnet “Herrup Portal”</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Android (Chrome)</h2>
+      <ol>
+        <li>Åbn portalen i <b>Chrome</b></li>
+        <li>Tryk på menuen (⋮)</li>
+        <li>Vælg <b>Installér app</b> eller <b>Føj til startskærm</b></li>
+      </ol>
+    </section>
+  </main>
+
+  <script>
+    const url = location.origin + "/";
+    const img = document.getElementById("qr");
+    // Quick QR via public endpoint (ingen tracking-kode her) – hvis du hellere vil hoste din egen, siger du til.
+    img.src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(url);
+  </script>
+</body>
+</html>
