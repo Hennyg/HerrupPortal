@@ -155,6 +155,34 @@ function renderTable(rows) {
   });
 }
 
+function seedPickersNow() {
+  // Kategori (fast)
+  setSelectOptions($("category"),
+    ["Static Apps","Favoritter","Værktøjer","Administration","Andet"],
+    { includeEmpty:true, emptyText:"(vælg kategori)" }
+  );
+
+  // Gruppe (fast)
+  setSelectOptions($("group"),
+    ["Lely","Salg","Tekniker","FMS","Administration"],
+    { includeEmpty:true, emptyText:"(ingen gruppe)" }
+  );
+
+  // Parent (kun ingen)
+  const p = $("parent");
+  p.innerHTML = `<option value="">(ingen parent)</option>`;
+
+  // Ikoner (fast)
+  const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
+  const dl = document.getElementById("iconList");
+  dl.innerHTML = "";
+  fixedIcons.forEach(ic => {
+    const opt = document.createElement("option");
+    opt.value = ic;
+    dl.appendChild(opt);
+  });
+}
+
 async function refresh() {
     console.log("refresh() starter");
   const rows = await api("GET", "/api/links-admin");
@@ -166,6 +194,7 @@ async function refresh() {
 }
 
 (async function init(){
+  seedPickersNow();
   console.log("admin.js loaded");
   $("icon").addEventListener("input", updateIconPreview);
   updateIconPreview();
