@@ -15,7 +15,7 @@
 
     { "route": "/.auth/login/github", "statusCode": 404 },
 
-    { "route": "/admin.html", "allowedRoles": ["portal_admin"] },
+    { "route": "/admin.html", "allowedRoles": ["authenticated"] },
 
     { "route": "/assets/*", "allowedRoles": ["authenticated"] },
     { "route": "/*", "allowedRoles": ["authenticated"] }
