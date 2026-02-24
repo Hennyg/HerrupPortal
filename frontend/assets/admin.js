@@ -156,6 +156,9 @@ function renderTable(rows) {
 }
 
 async function refresh() {
+    console.log("refresh() starter");
+  const rows = await api("GET", "/api/links-admin");
+  console.log("refresh() rows:", rows);
   const rows = await api("GET", "/api/links-admin");
   const list = (rows || []).sort((a,b) => (a.sort ?? 1000) - (b.sort ?? 1000));
   buildPickers(list);
@@ -163,6 +166,7 @@ async function refresh() {
 }
 
 (async function init(){
+  console.log("admin.js loaded");
   $("icon").addEventListener("input", updateIconPreview);
   updateIconPreview();
 
