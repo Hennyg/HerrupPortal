@@ -18,15 +18,9 @@ function matchesRoles(itemRoles, userRoles) {
 }
 
 async function loadLinks() {
-  try {
-    const r = await fetch("/api/links");
-    if (!r.ok) throw new Error("api_not_ok");
-    return await r.json();
-  } catch {
-    return [
-      { id:"1", title:"Flyveborde", url:"https://example.com", category:"Static Apps", group:"Lely", icon:"🪑", allowedRoles:["authenticated"], enabled:true, sort:10, openMode:"newTab" }
-    ];
-  }
+  const r = await fetch("/api/links-admin");
+  if (!r.ok) throw new Error("api_not_ok");
+  return await r.json();
 }
 
 function uniq(arr) {
