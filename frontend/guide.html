@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="da">
 <head>
@@ -8,55 +7,57 @@
   <link rel="stylesheet" href="/assets/app.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo">Herrup<br>Portal</div>
-      <div class="title">
+
+  <div class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <div class="logo">Herrup<br>Portal</div>
+        <div>Genvej</div>
+      </div>
+      <div class="nav">
+        <a href="/">← Til portal</a>
+      </div>
+    </div>
+    <div class="nav-accent"></div>
+  </div>
+
+  <div class="container">
+    <div class="hero" style="padding:0 0 1rem">
+      <div>
         <h1>Genvej på telefon</h1>
-        <div class="subtitle">iOS + Android (PWA)</div>
+        <div class="muted" style="text-align:center">iOS + Android (PWA)</div>
       </div>
     </div>
-    <div class="user">
-      <div class="actions">
-        <a class="btn" href="/">⬅ Til portal</a>
-      </div>
+
+    <div class="panel">
+      <strong>QR-kode</strong>
+      <div class="muted">Scan og åbn portalen, og vælg derefter “Føj til hjemmeskærm”.</div>
+      <div class="qrWrap"><img id="qr" alt="QR" /></div>
     </div>
-  </header>
 
-  <main class="container">
-    <section class="card">
-      <h2>QR-kode</h2>
-      <p class="muted">Scan QR-koden og åbn portalen. Tilføj derefter som genvej på hjemmeskærmen.</p>
-      <div class="qrWrap">
-        <img id="qr" alt="QR" />
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>iPhone / iPad (Safari)</h2>
+    <div class="panel">
+      <strong>iPhone / iPad (Safari)</strong>
       <ol>
         <li>Åbn portalen i <b>Safari</b></li>
-        <li>Tryk på <b>Del</b>-ikonet</li>
+        <li>Tryk <b>Del</b></li>
         <li>Vælg <b>Føj til hjemmeskærm</b></li>
-        <li>Bekræft navnet “Herrup Portal”</li>
       </ol>
-    </section>
+    </div>
 
-    <section class="card">
-      <h2>Android (Chrome)</h2>
+    <div class="panel">
+      <strong>Android (Chrome)</strong>
       <ol>
         <li>Åbn portalen i <b>Chrome</b></li>
-        <li>Tryk på menuen (⋮)</li>
-        <li>Vælg <b>Installér app</b> eller <b>Føj til startskærm</b></li>
+        <li>Menu (⋮)</li>
+        <li><b>Installér app</b> / <b>Føj til startskærm</b></li>
       </ol>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <script>
     const url = location.origin + "/";
-    const img = document.getElementById("qr");
-    // Quick QR via public endpoint (ingen tracking-kode her) – hvis du hellere vil hoste din egen, siger du til.
-    img.src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(url);
+    document.getElementById("qr").src =
+      "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(url);
   </script>
 </body>
 </html>
