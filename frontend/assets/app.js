@@ -1,3 +1,4 @@
+
 async function getMe() {
   const r = await fetch("/.auth/me");
   if (!r.ok) return null;
