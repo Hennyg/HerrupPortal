@@ -1,65 +1,50 @@
-
 async function getMe() {
   const r = await fetch("/.auth/me");
   if (!r.ok) return null;
   const j = await r.json();
   return j?.clientPrincipal || null;
 }
+const normRoles = (roles) => (roles || []).map(r => String(r).toLowerCase());
+const hasRole = (roles, role) => roles.includes(String(role).toLowerCase());
 
-function normRoleList(roles) {
-  return (roles || []).map(r => String(r).toLowerCase());
+function parseAllowedRoles(s) {
+  if (Array.isArray(s)) return s.map(x => String(x).trim()).filter(Boolean);
+  return String(s || "").split(";").map(x => x.trim()).filter(Boolean);
 }
-
-function hasRole(roles, role) {
-  return roles.includes(String(role).toLowerCase());
-}
-
 function matchesRoles(itemRoles, userRoles) {
-  if (!itemRoles || !itemRoles.length) return true; // hvis tom => vis for alle authenticated
+  if (!itemRoles || !itemRoles.length) return true;
   const set = new Set(userRoles);
   return itemRoles.some(r => set.has(String(r).toLowerCase()));
 }
 
 async function loadLinks() {
-  // Forventet API: /api/links -> [{ id,title,url,category,icon,allowedRoles,enabled,sort,openMode }]
   try {
     const r = await fetch("/api/links");
     if (!r.ok) throw new Error("api_not_ok");
     return await r.json();
   } catch {
-    // Fallback demo-data (så siden virker med det samme)
     return [
-      { id:"1", title:"CHR Portal", url:"https://example.com/chr", category:"Static Apps", icon:"🐄", allowedRoles:["portal_user"], enabled:true, sort:10, openMode:"newTab" },
-      { id:"2", title:"Flyveborde", url:"https://example.com/flyveborde", category:"Static Apps", icon:"🪑", allowedRoles:["portal_user"], enabled:true, sort:20, openMode:"newTab" },
-      { id:"3", title:"Admin", url:"/admin.html", category:"Værktøjer", icon:"⚙️", allowedRoles:["portal_admin"], enabled:true, sort:999, openMode:"sameTab" }
+      { id:"1", title:"Flyveborde", url:"https://example.com", category:"Static Apps", group:"Lely", icon:"🪑", allowedRoles:["authenticated"], enabled:true, sort:10, openMode:"newTab" }
     ];
   }
 }
 
-function parseAllowedRoles(s) {
-  if (Array.isArray(s)) return s.map(x => String(x).trim()).filter(Boolean);
-  return String(s || "")
-    .split(";")
-    .map(x => x.trim())
-    .filter(Boolean);
+function uniq(arr) {
+  return Array.from(new Set(arr.filter(Boolean).map(x => String(x).trim()))).sort((a,b)=>a.localeCompare(b));
 }
-
-function renderCats(cats, state) {
-  const wrap = document.getElementById("cats");
-  wrap.innerHTML = "";
-
-  const all = document.createElement("button");
-  all.className = "chip" + (!state.cat ? " active" : "");
-  all.textContent = "Alle";
-  all.onclick = () => { state.cat = ""; renderAll(state); };
-  wrap.appendChild(all);
-
-  cats.forEach(c => {
-    const b = document.createElement("button");
-    b.className = "chip" + (state.cat === c ? " active" : "");
-    b.textContent = c;
-    b.onclick = () => { state.cat = c; renderAll(state); };
-    wrap.appendChild(b);
+function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="Alle" } = {}) {
+  selectEl.innerHTML = "";
+  if (includeEmpty) {
+    const o = document.createElement("option");
+    o.value = "";
+    o.textContent = emptyText;
+    selectEl.appendChild(o);
+  }
+  options.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = v;
+    selectEl.appendChild(o);
   });
 }
 
@@ -72,7 +57,6 @@ function renderGrid(items) {
     a.href = it.url;
     a.target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
     a.rel = "noopener";
-
     a.innerHTML = `
       <div class="tileTop">
         <div class="icon">${it.icon || "🔗"}</div>
@@ -85,55 +69,59 @@ function renderGrid(items) {
   });
 }
 
-function renderAll(state) {
-  const q = (state.q || "").toLowerCase();
-  const filtered = state.items
-    .filter(x => !state.cat || (x.category || "") === state.cat)
-    .filter(x => {
-      const t = (x.title || "").toLowerCase();
-      const u = (x.url || "").toLowerCase();
-      return !q || t.includes(q) || u.includes(q);
-    })
-    .sort((a,b) => (a.sort ?? 1000) - (b.sort ?? 1000));
-
-  renderGrid(filtered);
-}
-
-(async function init() {
+(async function init(){
   const me = await getMe();
-  const userLine = document.getElementById("userLine");
-  const adminBtn = document.getElementById("adminBtn");
+  const roles = normRoles(me?.userRoles || []);
+  document.getElementById("userLine").textContent = me ? `${me.userDetails}` : "Ikke logget ind";
 
-  const roles = normRoleList(me?.userRoles || []);
-  userLine.textContent = me
-    ? `${me.userDetails} (${roles.join(", ")})`
-    : "Ikke logget ind";
-
-  adminBtn.classList.remove("hidden");
+  if (hasRole(roles, "portal_admin")) {
+    document.getElementById("adminLink").classList.remove("hidden");
+  }
 
   const raw = await loadLinks();
-  const items = raw
+  const items = (raw || [])
     .map(x => ({
       ...x,
       allowedRoles: parseAllowedRoles(x.allowedRoles),
       enabled: x.enabled !== false
     }))
     .filter(x => x.enabled)
-    .filter(x => matchesRoles(normRoleList(x.allowedRoles), roles));
+    .filter(x => matchesRoles(normRoles(x.allowedRoles), roles))
+    .sort((a,b)=> (a.sort ?? 1000) - (b.sort ?? 1000));
 
-  const cats = Array.from(new Set(items.map(x => x.category).filter(Boolean))).sort();
+  const categories = uniq(items.map(x => x.category));
+  const groups = uniq(items.map(x => x.group));
 
-  const state = { items, cat:"", q:"" };
-  renderCats(cats, state);
-  renderAll(state);
+  const catSel = document.getElementById("categoryFilter");
+  const grpSel = document.getElementById("groupFilter");
+  setSelectOptions(catSel, categories, { includeEmpty:true, emptyText:"Alle kategorier" });
+  setSelectOptions(grpSel, groups, { includeEmpty:true, emptyText:"Alle grupper" });
 
-  document.getElementById("q").addEventListener("input", (e) => {
-    state.q = e.target.value || "";
-    renderAll(state);
-  });
-
-  // PWA: registrér service worker (stille og roligt)
-  if ("serviceWorker" in navigator) {
-    try { await navigator.serviceWorker.register("/service-worker.js"); } catch {}
+  const q = document.getElementById("q");
+  const qx = document.getElementById("qx");
+  function syncClearBtn(){
+    qx.style.visibility = q.value ? "visible" : "hidden";
   }
+  q.addEventListener("input", () => { syncClearBtn(); render(); });
+  qx.addEventListener("click", () => { q.value=""; syncClearBtn(); render(); });
+  catSel.addEventListener("change", render);
+  grpSel.addEventListener("change", render);
+  syncClearBtn();
+
+  function render() {
+    const qq = (q.value || "").toLowerCase();
+    const cat = catSel.value;
+    const grp = grpSel.value;
+
+    const filtered = items.filter(x => {
+      if (cat && (x.category || "") !== cat) return false;
+      if (grp && (x.group || "") !== grp) return false;
+      if (!qq) return true;
+      return (x.title||"").toLowerCase().includes(qq) || (x.url||"").toLowerCase().includes(qq);
+    });
+
+    renderGrid(filtered);
+  }
+
+  render();
 })();
