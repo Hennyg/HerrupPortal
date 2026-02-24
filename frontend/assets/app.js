@@ -72,6 +72,7 @@ document.getElementById("adminLink").classList.remove("hidden");
 
 
   const raw = await loadLinks();
+  console.log("links fra API:", raw);
   const items = (raw || [])
     .map(x => ({
       ...x,
@@ -79,7 +80,7 @@ document.getElementById("adminLink").classList.remove("hidden");
       enabled: x.enabled !== false
     }))
     .filter(x => x.enabled)
-    .filter(x => matchesRoles(normRoles(x.allowedRoles), roles))
+    // .filter(x => matchesRoles(normRoles(x.allowedRoles), roles))
     .sort((a,b)=> (a.sort ?? 1000) - (b.sort ?? 1000));
 
   const categories = uniq(items.map(x => x.category));
