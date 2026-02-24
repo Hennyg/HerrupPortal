@@ -15,6 +15,16 @@ function $(id){ return document.getElementById(id); }
 function uniq(arr) {
   return Array.from(new Set(arr.filter(Boolean).map(x => String(x).trim()))).sort((a,b)=>a.localeCompare(b));
 }
+
+function setDatalistOptions(datalistEl, options) {
+  datalistEl.innerHTML = "";
+  options.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v;
+    datalistEl.appendChild(opt);
+  });
+}
+
 function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="(ingen)" } = {}) {
   selectEl.innerHTML = "";
   if (includeEmpty) {
@@ -73,23 +83,28 @@ function resetForm() {
 }
 
 function buildPickers(rows) {
-  const fixedCats = ["Static Apps", "Favoritter", "Værktøjer", "Administration", "Andet"];
+  const fixedCats  = ["Static Apps", "Favoritter", "Værktøjer", "Administration", "Andet"];
+  const fixedGroups = ["Lely", "Salg", "Tekniker", "FMS", "Administration"];
   const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
 
-  const categories = uniq([...fixedCats, ...rows.map(r => r.category)]);
-  setSelectOptions($("category"), categories, { includeEmpty:true, emptyText:"(vælg kategori)" });
+  // Category suggestions (datalist)
+  const categories = uniq([...fixedCats, ...rows.map(r => r.category).filter(Boolean)]);
+  setDatalistOptions(document.getElementById("categoryList"), categories);
 
-  const groups = uniq(rows.map(r => r.group));
-  setSelectOptions($("group"), groups, { includeEmpty:true, emptyText:"(ingen gruppe)" });
+  // Group suggestions (datalist)
+  const groups = uniq([...fixedGroups, ...rows.map(r => r.group).filter(Boolean)]);
+  setDatalistOptions(document.getElementById("groupList"), groups);
 
-  // Parent: kun kandidater uden URL
+  // Parent dropdown (kun kandidater uden URL)
   const parentCandidates = rows.filter(r => !r.url).map(r => ({ id:r.id, title:r.title }));
   const parentSelect = $("parent");
   parentSelect.innerHTML = "";
+
   const empty = document.createElement("option");
   empty.value = "";
   empty.textContent = "(ingen parent)";
   parentSelect.appendChild(empty);
+
   parentCandidates.forEach(p => {
     const o = document.createElement("option");
     o.value = p.id;
@@ -97,7 +112,7 @@ function buildPickers(rows) {
     parentSelect.appendChild(o);
   });
 
-  // Ikon forslag
+  // Icon suggestions
   const icons = uniq([...fixedIcons, ...rows.map(r => r.icon).filter(Boolean)]);
   const dl = document.getElementById("iconList");
   dl.innerHTML = "";
@@ -107,6 +122,7 @@ function buildPickers(rows) {
     dl.appendChild(opt);
   });
 }
+
 
 function renderTable(rows) {
   const byId = new Map(rows.map(r => [r.id, r]));
@@ -150,23 +166,24 @@ async function refresh() {
   $("icon").addEventListener("input", updateIconPreview);
   updateIconPreview();
 
-  $("form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    $("msg").textContent = "Gemmer...";
-    const x = readForm();
+  // ✅ Vis forslag med det samme (selv uden API)
+  buildPickers([]);
 
-    try {
-      if (x.id) await api("PUT", "/api/links-admin", x);
-      else await api("POST", "/api/links-admin", x);
+  $("form").addEventListener("submit", async (e) => { ... });
 
-      $("msg").textContent = "Gemt ✅";
-      await refresh();
-      resetForm();
-    } catch (err) {
-      $("msg").textContent =
-        `Fejl (${err?.status || "?"}): ` + (err?.data?.message || JSON.stringify(err?.data || err));
-    }
-  });
+  $("resetBtn").addEventListener("click", resetForm);
+
+  resetForm();
+  try {
+    await refresh();
+  } catch (err) {
+    // ✅ behold stadig pickers
+    $("msg").textContent =
+      "Kan ikke hente links endnu. (Dropdowns virker stadig). Fejl: " +
+      `(${err?.status || "?"})`;
+  }
+})();
+
 
   $("resetBtn").addEventListener("click", resetForm);
 
