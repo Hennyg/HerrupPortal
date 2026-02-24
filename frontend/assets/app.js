@@ -109,7 +109,7 @@ function renderAll(state) {
     ? `${me.userDetails} (${roles.join(", ")})`
     : "Ikke logget ind";
 
-  if (hasRole(roles, "portal_admin")) adminBtn.classList.remove("hidden");
+  adminBtn.classList.remove("hidden");
 
   const raw = await loadLinks();
   const items = raw
