@@ -1,49 +1,87 @@
-const crypto = require("crypto");
+const { dvFetch } = require("../_dv");
 
-let links = [];
+const TABLE = "lch_portallinks"; // Dataverse entity set name (ofte plural!)
+const IDCOL = "lch_portallinkid"; // primærnøgle (tjek i Dataverse)
+function json(context, status, body){
+  context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
+}
+
+// Hjælper: map DV -> frontend
+function mapOut(r){
+  return {
+    id: r[IDCOL],
+    title: r.lch_title || "",
+    url: r.lch_url || "",
+    icon: r.lch_icon || "",
+    category: r.lch_category || "",
+    group: r.lch_group || "",
+    parent: r.lch_parent || null,
+    allowedRoles: r.lch_allowedroles || "",
+    enabled: r.lch_enabled !== false,
+    sort: r.lch_sortorder ?? 1000,
+    openMode: r.lch_openmode || "newTab"
+  };
+}
 
 module.exports = async function (context, req) {
-  const method = (req.method || "GET").toUpperCase();
+  try {
+    const m = (req.method || "GET").toUpperCase();
 
-  // CORS-ish / preflight
-  if (method === "OPTIONS") {
-    context.res = { status: 204, headers: { "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS" } };
-    return;
-  }
-
-  if (method === "GET") {
-    context.res = { status: 200, headers: { "Content-Type": "application/json; charset=utf-8" }, body: links };
-    return;
-  }
-
-  if (method === "POST") {
-    const item = req.body || {};
-    item.id = crypto.randomUUID();
-    links.push(item);
-    context.res = { status: 200, headers: { "Content-Type": "application/json; charset=utf-8" }, body: item };
-    return;
-  }
-
-  if (method === "PUT") {
-    const item = req.body || {};
-    if (!item.id) {
-      context.res = { status: 400, body: { error: "missing_id" } };
-      return;
+    if (m === "GET") {
+      const data = await dvFetch(`${TABLE}?$select=${IDCOL},lch_title,lch_url,lch_icon,lch_category,lch_group,lch_parent,lch_allowedroles,lch_enabled,lch_sortorder,lch_openmode`);
+      return json(context, 200, (data.value || []).map(mapOut));
     }
-    const i = links.findIndex(x => x.id === item.id);
-    if (i === -1) links.push(item);
-    else links[i] = item;
 
-    context.res = { status: 200, headers: { "Content-Type": "application/json; charset=utf-8" }, body: item };
-    return;
+    if (m === "POST") {
+      const b = req.body || {};
+      const payload = {
+        lch_title: b.title || "",
+        lch_url: b.url || "",
+        lch_icon: b.icon || "",
+        lch_category: b.category || "",
+        lch_group: b.group || "",
+        lch_parent: b.parent || null,
+        lch_allowedroles: b.allowedRoles || "",
+        lch_enabled: b.enabled !== false,
+        lch_sortorder: Number(b.sort ?? 1000),
+        lch_openmode: b.openMode || "newTab"
+      };
+      await dvFetch(`${TABLE}`, { method: "POST", body: payload });
+      // hent igen (simpelt)
+      const data = await dvFetch(`${TABLE}?$top=1&$orderby=createdon desc&$select=${IDCOL},lch_title,lch_url,lch_icon,lch_category,lch_group,lch_parent,lch_allowedroles,lch_enabled,lch_sortorder,lch_openmode`);
+      return json(context, 200, mapOut(data.value[0]));
+    }
+
+    if (m === "PUT") {
+      const b = req.body || {};
+      if (!b.id) return json(context, 400, { error:"missing_id" });
+
+      const payload = {
+        lch_title: b.title || "",
+        lch_url: b.url || "",
+        lch_icon: b.icon || "",
+        lch_category: b.category || "",
+        lch_group: b.group || "",
+        lch_parent: b.parent || null,
+        lch_allowedroles: b.allowedRoles || "",
+        lch_enabled: b.enabled !== false,
+        lch_sortorder: Number(b.sort ?? 1000),
+        lch_openmode: b.openMode || "newTab"
+      };
+
+      await dvFetch(`${TABLE}(${b.id})`, { method: "PATCH", body: payload });
+      return json(context, 200, { ok:true });
+    }
+
+    if (m === "DELETE") {
+      const id = req.query?.id;
+      if (!id) return json(context, 400, { error:"missing_id" });
+      await dvFetch(`${TABLE}(${id})`, { method: "DELETE" });
+      return json(context, 200, { ok:true });
+    }
+
+    return json(context, 405, { error:"method_not_allowed" });
+  } catch (e) {
+    return json(context, e.status || 500, { error:"server_error", message: e.message, data: e.data });
   }
-
-  if (method === "DELETE") {
-    const id = req.query?.id;
-    links = links.filter(x => x.id !== id);
-    context.res = { status: 200, body: { ok: true } };
-    return;
-  }
-
-  context.res = { status: 405, body: { error: "method_not_allowed" } };
 };
