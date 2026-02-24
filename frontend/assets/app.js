@@ -74,9 +74,8 @@ function renderGrid(items) {
   const roles = normRoles(me?.userRoles || []);
   document.getElementById("userLine").textContent = me ? `${me.userDetails}` : "Ikke logget ind";
 
-  if (hasRole(roles, "portal_admin")) {
-    document.getElementById("adminLink").classList.remove("hidden");
-  }
+document.getElementById("adminLink").classList.remove("hidden");
+
 
   const raw = await loadLinks();
   const items = (raw || [])
