@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin – Herrup Portal</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">Herrup<br>Portal</div>
+      <div class="title">
+        <h1>Admin</h1>
+        <div class="subtitle">Tilføj / redigér / fjern apps og links</div>
+      </div>
+    </div>
+
+    <div class="user">
+      <div class="actions">
+        <a class="btn" href="/">⬅ Til portal</a>
+        <a class="btn" href="/logout">Log ud</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Opret / redigér link</h2>
+      <form id="form" class="form">
+        <input type="hidden" id="id" />
+
+        <label>Titel
+          <input class="input" id="title" required />
+        </label>
+
+        <label>URL
+          <input class="input" id="url" required placeholder="https://..." />
+        </label>
+
+        <label>Kategori
+          <input class="input" id="category" placeholder="Static Apps / Favoritter / Andet" />
+        </label>
+
+        <label>Ikon (emoji eller tekst)
+          <input class="input" id="icon" placeholder="🧩" />
+        </label>
+
+        <label>Allowed roles (semikolon-separeret)
+          <input class="input" id="roles" placeholder="portal_user;portal_admin" />
+        </label>
+
+        <div class="row">
+          <label class="inline"><input type="checkbox" id="enabled" checked /> Aktiv</label>
+          <label>Sort order
+            <input class="input" id="sort" type="number" value="100" />
+          </label>
+          <label>Åbn
+            <select class="input" id="openMode">
+              <option value="newTab">Ny fane</option>
+              <option value="sameTab">Samme fane</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" type="submit">Gem</button>
+          <button class="btn" id="resetBtn" type="button">Nulstil</button>
+        </div>
+        <div id="msg" class="muted"></div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Links</h2>
+      <div class="tableWrap">
+        <table class="table" id="tbl">
+          <thead>
+            <tr>
+              <th>Titel</th>
+              <th>Kategori</th>
+              <th>Aktiv</th>
+              <th>Roles</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/assets/admin.js"></script>
+</body>
+</html>
