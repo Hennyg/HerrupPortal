@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Herrup Portal</title>
+
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#C30A14">
+
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">Herrup<br>Portal</div>
+      <div class="title">
+        <h1>Herrup Portal</h1>
+        <div class="subtitle">Din hub til Static Apps, favoritter og værktøjer</div>
+      </div>
+    </div>
+
+    <div class="user">
+      <div id="userLine" class="muted">Henter bruger...</div>
+      <div class="actions">
+        <a class="btn" href="/guide.html">📱 Genvej</a>
+        <a id="adminBtn" class="btn hidden" href="/admin.html">⚙️ Admin</a>
+        <a class="btn" href="/logout">Log ud</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="controls card">
+      <input id="q" class="input" type="search" placeholder="Søg i apps/links..." autocomplete="off">
+      <div id="cats" class="chips"></div>
+    </section>
+
+    <section id="grid" class="grid"></section>
+
+    <footer class="footer muted">
+      <span>Tip: Åbn på telefon og brug “Føj til hjemmeskærm” for ikon.</span>
+    </footer>
+  </main>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>
