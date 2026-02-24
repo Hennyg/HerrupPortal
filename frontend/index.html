@@ -1,48 +1,57 @@
-
 <!doctype html>
 <html lang="da">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Herrup Portal</title>
-
   <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#C30A14">
-
   <link rel="stylesheet" href="/assets/app.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo">Herrup<br>Portal</div>
-      <div class="title">
-        <h1>Herrup Portal</h1>
-        <div class="subtitle">Din hub til Static Apps, favoritter og værktøjer</div>
+
+  <div class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <div class="logo">Herrup<br>Portal</div>
+        <div>Herrup Portal</div>
+      </div>
+
+      <div class="nav">
+        <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+        <span class="sep">|</span>
+        <a href="/guide.html">Genvej</a>
+        <a id="adminLink" class="hidden" href="/admin.html">Admin</a>
+        <a href="/logout">Log ud</a>
+      </div>
+    </div>
+    <div class="nav-accent"></div>
+  </div>
+
+  <div class="container">
+    <div class="hero">
+      <div>
+        <h1>Velkommen</h1>
+        <div class="muted" style="text-align:center">Din hub til Static Apps, favoritter og værktøjer</div>
       </div>
     </div>
 
-    <div class="user">
-      <div id="userLine" class="muted">Henter bruger...</div>
-      <div class="actions">
-        <a class="btn" href="/guide.html">📱 Genvej</a>
-        <a id="adminBtn" class="btn hidden" href="/admin.html">⚙️ Admin</a>
-        <a class="btn" href="/logout">Log ud</a>
+    <div class="accent-bar">Favoritter</div>
+
+    <div class="panel">
+      <div class="filters">
+        <div class="clearable">
+          <input id="q" type="search" placeholder="Søg..." autocomplete="off">
+          <button class="x" id="qx" type="button">×</button>
+        </div>
+
+        <select id="categoryFilter"></select>
+        <select id="groupFilter"></select>
       </div>
+
+      <div id="grid" class="grid"></div>
+      <div class="muted" style="margin-top:12px">Tip: Åbn på telefon og vælg “Føj til hjemmeskærm”.</div>
     </div>
-  </header>
-
-  <main class="container">
-    <section class="controls card">
-      <input id="q" class="input" type="search" placeholder="Søg i apps/links..." autocomplete="off">
-      <div id="cats" class="chips"></div>
-    </section>
-
-    <section id="grid" class="grid"></section>
-
-    <footer class="footer muted">
-      <span>Tip: Åbn på telefon og brug “Føj til hjemmeskærm” for ikon.</span>
-    </footer>
-  </main>
+  </div>
 
   <script src="/assets/app.js"></script>
 </body>
