@@ -1,8 +1,12 @@
 // /api/links-admin/index.js
 const { dvFetch } = require("../_dv");
 
-const TABLE = "cr175_lch_portallinks";          // EntitySetName
-const IDCOL = "cr175_lch_portallinkid";         // Primary key
+const TABLE = "cr175_lch_portallinks";      // EntitySetName
+const IDCOL = "cr175_lch_portallinkid";     // Primary key
+
+// Sæt denne til det logiske navn på dit NYE tekstfelt (ikke Choice-feltet)
+// Eksempel: "cr175_lch_platformhinttext" eller "cr175_lch_platformhint_text"
+const PLATFORM_COL = "cr175_lch_platformhinttext";
 
 function json(context, status, body) {
   context.res = {
@@ -19,6 +23,16 @@ function isGuid(s) {
   return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(s || ""));
 }
 
+// Normaliser platform-hint til "All" | "Desktop" | "Mobile"
+function normPlatformHint(v) {
+  const x = norm(v).toLowerCase();
+  if (!x) return "All";
+  if (x === "all") return "All";
+  if (x === "desktop" || x === "pc") return "Desktop";
+  if (x === "mobile" || x === "telefon" || x === "phone") return "Mobile";
+  return "All";
+}
+
 // DV -> frontend
 function mapOut(r) {
   return {
@@ -28,20 +42,18 @@ function mapOut(r) {
     url: r?.cr175_lch_url || "",
     icon: r?.cr175_lch_icon || "",
 
-    // Tekstfelter (portal)
     category: r?.cr175_lch_categorytext || "",
     group: r?.cr175_lch_grouptext || "",
 
-    // lookup: Dataverse returnerer _<lookup>_value
     parent: r?._cr175_lch_parent_value || null,
 
     allowedRoles: r?.cr175_lch_allowedroles || "",
     enabled: r?.cr175_lch_enabled !== false,
     sort: r?.cr175_lch_sortorder ?? 1000,
 
-    // Tekstfelt (portal) - OBS: lille m i logical name
-    openMode: r?.cr175_lch_openmodetext || "newTab"
-    platformHint: r?.cr175_lch_platformhinttext || "All",
+    openMode: r?.cr175_lch_openmodetext || "newTab",
+
+    platformHint: r?.[PLATFORM_COL] || "All"
   };
 }
 
@@ -62,8 +74,10 @@ function mapIn(b) {
     cr175_lch_categorytext: category,
     cr175_lch_grouptext: group,
 
-    // NY: openMode som tekst (lille m)
     cr175_lch_openmodetext: norm(b.openMode ?? b.cr175_lch_openmodetext ?? "newTab"),
+
+    // NYT: platform hint (tekstfelt)
+    [PLATFORM_COL]: normPlatformHint(b.platformHint ?? b.platformhint),
 
     cr175_lch_allowedroles: norm(b.allowedRoles ?? b.cr175_lch_allowedroles ?? ""),
     cr175_lch_enabled: (b.enabled ?? b.cr175_lch_enabled) !== false,
@@ -75,7 +89,6 @@ function mapIn(b) {
   // parent (lookup)
   const parentId = b.parent ?? b.cr175_lch_parent ?? null;
   if (parentId === null || parentId === "" || parentId === undefined) {
-    // Nulstil relation (tilladt ved PATCH)
     payload["cr175_lch_parent@odata.bind"] = null;
   } else if (isGuid(parentId)) {
     payload["cr175_lch_parent@odata.bind"] = `/${TABLE}(${parentId})`;
@@ -95,10 +108,12 @@ module.exports = async function (context, req) {
         "cr175_lch_url",
         "cr175_lch_icon",
 
-        // tekstfelter (portal)
         "cr175_lch_categorytext",
         "cr175_lch_grouptext",
         "cr175_lch_openmodetext",
+
+        // platform hint tekstfelt
+        PLATFORM_COL,
 
         // lookup value
         "_cr175_lch_parent_value",
@@ -118,7 +133,7 @@ module.exports = async function (context, req) {
 
       const created = await dvFetch(`${TABLE}`, { method: "POST", body: payload });
 
-      // hvis dvFetch returnerer objektet direkte
+      // Hvis dvFetch returnerer objektet direkte
       if (created && created[IDCOL]) return json(context, 200, mapOut(created));
 
       // fallback: hent nyeste
@@ -126,7 +141,8 @@ module.exports = async function (context, req) {
         IDCOL,
         "cr175_lch_title","cr175_lch_url","cr175_lch_icon",
         "cr175_lch_categorytext","cr175_lch_grouptext","cr175_lch_openmodetext",
-        "_cr175_lch_parent_value","cr175_lch_platformhinttext",
+        PLATFORM_COL,
+        "_cr175_lch_parent_value",
         "cr175_lch_allowedroles","cr175_lch_enabled","cr175_lch_sortorder"
       ].join(",");
 
