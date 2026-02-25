@@ -1,3 +1,40 @@
+// assets/app.js
+
+function safeUrl(u) {
+  // Undgå at logge alt muligt persondata i querystring.
+  // Returnér gerne kun origin+path, eller begræns querystring.
+  try {
+    const url = new URL(u, location.origin);
+    return url.origin + url.pathname + (url.search ? url.search.substring(0, 200) : "");
+  } catch {
+    return String(u || "").substring(0, 500);
+  }
+}
+
+async function track(eventType, extra = {}) {
+  try {
+    await fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventType,
+        pageUrl: safeUrl(location.href),
+        path: location.pathname,
+        referrer: safeUrl(document.referrer || ""),
+        tsLocal: new Date().toISOString(),
+        ...extra
+      })
+    });
+  } catch (e) {
+    // Tracking må aldrig ødelægge UX – så vi ignorerer fejl.
+  }
+}
+
+// Log ét "PageView" når siden åbnes
+document.addEventListener("DOMContentLoaded", () => {
+  track("PageView");
+});
+
 function detectPlatform(){
   const ua = navigator.userAgent.toLowerCase();
   const isMobileUA = /iphone|ipad|android|mobile/.test(ua);
