@@ -39,8 +39,8 @@ function mapOut(r) {
     enabled: r?.cr175_lch_enabled !== false,
     sort: r?.cr175_lch_sortorder ?? 1000,
 
-    // Tekstfelt (portal)
-    openMode: r?.cr175_lch_openModetext || "newTab"
+    // Tekstfelt (portal) - OBS: lille m i logical name
+    openMode: r?.cr175_lch_openmodetext || "newTab"
   };
 }
 
@@ -61,8 +61,8 @@ function mapIn(b) {
     cr175_lch_categorytext: category,
     cr175_lch_grouptext: group,
 
-    // NY: openMode som tekst
-    cr175_lch_openModetext: norm(b.openMode ?? b.cr175_lch_openModetext ?? "newTab"),
+    // NY: openMode som tekst (lille m)
+    cr175_lch_openmodetext: norm(b.openMode ?? b.cr175_lch_openmodetext ?? "newTab"),
 
     cr175_lch_allowedroles: norm(b.allowedRoles ?? b.cr175_lch_allowedroles ?? ""),
     cr175_lch_enabled: (b.enabled ?? b.cr175_lch_enabled) !== false,
@@ -78,9 +78,6 @@ function mapIn(b) {
     payload["cr175_lch_parent@odata.bind"] = null;
   } else if (isGuid(parentId)) {
     payload["cr175_lch_parent@odata.bind"] = `/${TABLE}(${parentId})`;
-  } else {
-    // hvis der kommer noget andet end guid, så lad være med at sende det
-    // (alternativt: returnér 400)
   }
 
   return payload;
@@ -100,7 +97,7 @@ module.exports = async function (context, req) {
         // tekstfelter (portal)
         "cr175_lch_categorytext",
         "cr175_lch_grouptext",
-        "cr175_lch_openModetext",
+        "cr175_lch_openmodetext",
 
         // lookup value
         "_cr175_lch_parent_value",
@@ -127,7 +124,7 @@ module.exports = async function (context, req) {
       const select = [
         IDCOL,
         "cr175_lch_title","cr175_lch_url","cr175_lch_icon",
-        "cr175_lch_categorytext","cr175_lch_grouptext","cr175_lch_openModetext",
+        "cr175_lch_categorytext","cr175_lch_grouptext","cr175_lch_openmodetext",
         "_cr175_lch_parent_value",
         "cr175_lch_allowedroles","cr175_lch_enabled","cr175_lch_sortorder"
       ].join(",");
