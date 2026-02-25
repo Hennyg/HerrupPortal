@@ -13,6 +13,8 @@ async function api(method, url, body) {
 
 function $(id){ return document.getElementById(id); }
 
+let lastRows = []; // seneste rows fra refresh()
+
 function uniq(arr) {
   return Array.from(new Set((arr||[]).filter(Boolean).map(x => String(x).trim())))
     .sort((a,b)=>a.localeCompare(b, "da"));
@@ -48,6 +50,7 @@ function updateGroupVisibility() {
   const isFav = cat === "favoritter";
   if (row) row.style.display = isFav ? "" : "none";
   if (!isFav && $("group")) $("group").value = "";
+  if (isFav) $("sort").value = "";
 }
 
 function readForm() {
@@ -200,13 +203,38 @@ function renderTable(rows) {
   });
 }
 
+function maybeAutoSortForFavGroup() {
+  const cat = ($("category")?.value || "").trim().toLowerCase();
+  if (cat !== "favoritter") return;
+
+  const grp = ($("group")?.value || "").trim();
+  if (!grp) return;
+
+  // hvis brugeren allerede har skrevet et tal, så respekter det
+  const cur = String($("sort")?.value || "").trim();
+  if (cur && cur !== "0") return;
+
+  const maxSort = Math.max(
+    0,
+    ...lastRows
+      .filter(r => (r.category || "").toLowerCase() === "favoritter")
+      .filter(r => (r.group || "").trim() === grp)
+      .map(r => Number(r.sort ?? 0))
+      .filter(n => Number.isFinite(n))
+  );
+
+  $("sort").value = String(maxSort + 10);
+}
+
 async function refresh() {
   console.log("refresh() starter");
   const rows = await api("GET", "/api/links-admin");
   console.log("refresh() rows:", rows);
   const list = (rows || []).sort((a,b) => (a.sort ?? 1000) - (b.sort ?? 1000));
+  lastRows = list; // <-- NYT
   buildPickers(list);
   renderTable(list);
+  maybeAutoSortForFavGroup(); // <-- NYT (hvis du står på favoritter+gruppe)
 }
 
 (async function init(){
@@ -217,7 +245,14 @@ async function refresh() {
   $("icon").addEventListener("input", updateIconPreview);
   updateIconPreview();
 
-  $("category").addEventListener("change", updateGroupVisibility);
+$("category").addEventListener("change", () => {
+  updateGroupVisibility();
+  maybeAutoSortForFavGroup();
+});
+
+$("group").addEventListener("change", () => {
+  maybeAutoSortForFavGroup();
+});  
 
   $("form").addEventListener("submit", async (e) => {
     e.preventDefault();
