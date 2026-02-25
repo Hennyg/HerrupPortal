@@ -2,7 +2,7 @@
 const { dvFetch } = require("../_dv");
 
 const TABLE = "cr175_lch_portallinks";          // EntitySetName
-const IDCOL = "cr175_lch_portallinkid";         // Primary key column
+const IDCOL = "cr175_lch_portallinkid";         // Primary key
 
 function json(context, status, body) {
   context.res = {
@@ -12,46 +12,79 @@ function json(context, status, body) {
   };
 }
 
-// Map DV -> frontend
+function norm(s) {
+  return String(s ?? "").trim();
+}
+function isGuid(s) {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(s || ""));
+}
+
+// DV -> frontend
 function mapOut(r) {
   return {
     id: r?.[IDCOL],
+
     title: r?.cr175_lch_title || "",
     url: r?.cr175_lch_url || "",
     icon: r?.cr175_lch_icon || "",
-    category: r?.cr175_lch_category || "",
-    group: r?.cr175_lch_group || "",
-    parent: r?.cr175_lch_parent || null, // hvis lookup: se note nederst
+
+    // NYE tekstfelter
+    category: r?.cr175_lch_categorytext || "",
+    group: r?.cr175_lch_grouptext || "",
+
+    // lookup: Dataverse returnerer _<lookup>_value
+    parent: r?._cr175_lch_parent_value || null,
+
     allowedRoles: r?.cr175_lch_allowedroles || "",
     enabled: r?.cr175_lch_enabled !== false,
     sort: r?.cr175_lch_sortorder ?? 1000,
-    openMode: r?.cr175_lch_openmode || "newTab"
+
+    // behold evt. choice openMode hvis du stadig bruger den (ellers kan du lave openModetext senere)
+    openMode: r?.cr175_lch_openMode ?? r?.cr175_lch_openmode ?? null
   };
 }
 
-// Map frontend -> DV payload
+// frontend -> DV payload
 function mapIn(b) {
-  const category = (b.category ?? b.cr175_lch_category ?? "").trim();
+  const category = norm(b.category ?? b.cr175_lch_categorytext ?? b.cr175_lch_category ?? "");
+  const isFav = category.toLowerCase() === "favoritter";
 
-  // group er kun relevant for "favoritter" (eller hvad du nu kalder kategorien)
-  // Hvis du vil gemme group alligevel, så fjern denne nulstilling.
-  const group =
-    (category.toLowerCase() === "favoritter")
-      ? (b.group ?? b.cr175_lch_group ?? "")
-      : "";
+  const group = isFav
+    ? norm(b.group ?? b.cr175_lch_grouptext ?? "")
+    : "";
 
-  return {
-    cr175_lch_title: b.title ?? b.cr175_lch_title ?? "",
-    cr175_lch_url: b.url ?? b.cr175_lch_url ?? "",
-    cr175_lch_icon: b.icon ?? b.cr175_lch_icon ?? "",
-    cr175_lch_category: category,
-    cr175_lch_group: group,
-    cr175_lch_parent: b.parent ?? b.cr175_lch_parent ?? null,
-    cr175_lch_allowedroles: b.allowedRoles ?? b.cr175_lch_allowedroles ?? "",
+  const payload = {
+    cr175_lch_title: norm(b.title ?? b.cr175_lch_title ?? ""),
+    cr175_lch_url: norm(b.url ?? b.cr175_lch_url ?? ""),
+    cr175_lch_icon: norm(b.icon ?? b.cr175_lch_icon ?? ""),
+
+    cr175_lch_categorytext: category,
+    cr175_lch_grouptext: group,
+
+    cr175_lch_allowedroles: norm(b.allowedRoles ?? b.cr175_lch_allowedroles ?? ""),
     cr175_lch_enabled: (b.enabled ?? b.cr175_lch_enabled) !== false,
-    cr175_lch_sortorder: Number(b.sort ?? b.cr175_lch_sortorder ?? 1000),
-    cr175_lch_openmode: b.openMode ?? b.cr175_lch_openmode ?? "newTab"
+    cr175_lch_sortorder: Number.isFinite(Number(b.sort ?? b.cr175_lch_sortorder))
+      ? Number(b.sort ?? b.cr175_lch_sortorder)
+      : 1000
   };
+
+  // parent (lookup)
+  const parentId = b.parent ?? b.cr175_lch_parent ?? null;
+  if (parentId === null || parentId === "" || parentId === undefined) {
+    // Nulstil relation (tilladt ved PATCH)
+    payload["cr175_lch_parent@odata.bind"] = null;
+  } else if (isGuid(parentId)) {
+    payload["cr175_lch_parent@odata.bind"] = `/${TABLE}(${parentId})`;
+  } else {
+    // hvis der kommer noget andet end guid, så lad være med at sende det
+    // (alternativt: returnér 400)
+  }
+
+  // Hvis du stadig bruger openMode choice og sender tal:
+  // payload.cr175_lch_openMode = Number(b.openMode ?? b.cr175_lch_openMode);
+  // (Hvis du laver openModetext senere, så skifter vi til cr175_lch_openModetext)
+
+  return payload;
 }
 
 module.exports = async function (context, req) {
@@ -64,13 +97,20 @@ module.exports = async function (context, req) {
         "cr175_lch_title",
         "cr175_lch_url",
         "cr175_lch_icon",
-        "cr175_lch_category",
-        "cr175_lch_group",
-        "cr175_lch_parent",
+
+        // nye tekstfelter
+        "cr175_lch_categorytext",
+        "cr175_lch_grouptext",
+
+        // lookup skal ud som _cr175_lch_parent_value (ingen select nødvendig, men ok at have lookup column med)
+        "_cr175_lch_parent_value",
+
         "cr175_lch_allowedroles",
         "cr175_lch_enabled",
         "cr175_lch_sortorder",
-        "cr175_lch_openmode"
+
+        // hvis du har choice openMode:
+        "cr175_lch_openMode"
       ].join(",");
 
       const data = await dvFetch(`${TABLE}?$select=${select}&$orderby=cr175_lch_sortorder asc`);
@@ -83,11 +123,19 @@ module.exports = async function (context, req) {
 
       const created = await dvFetch(`${TABLE}`, { method: "POST", body: payload });
 
-      // dvFetch returnerer ofte objektet direkte
+      // hvis dvFetch returnerer objektet direkte
       if (created && created[IDCOL]) return json(context, 200, mapOut(created));
 
-      // fallback: hent nyeste (hvis din dvFetch ikke returnerer record)
-      const select = [IDCOL, "cr175_lch_title", "cr175_lch_url", "cr175_lch_icon", "cr175_lch_category", "cr175_lch_group", "cr175_lch_parent", "cr175_lch_allowedroles", "cr175_lch_enabled", "cr175_lch_sortorder", "cr175_lch_openmode"].join(",");
+      // fallback: hent nyeste
+      const select = [
+        IDCOL,
+        "cr175_lch_title","cr175_lch_url","cr175_lch_icon",
+        "cr175_lch_categorytext","cr175_lch_grouptext",
+        "_cr175_lch_parent_value",
+        "cr175_lch_allowedroles","cr175_lch_enabled","cr175_lch_sortorder",
+        "cr175_lch_openMode"
+      ].join(",");
+
       const data = await dvFetch(`${TABLE}?$top=1&$orderby=createdon desc&$select=${select}`);
       return json(context, 200, mapOut((data.value || [])[0]));
     }
@@ -98,7 +146,6 @@ module.exports = async function (context, req) {
 
       const payload = mapIn(b);
       await dvFetch(`${TABLE}(${b.id})`, { method: "PATCH", body: payload });
-
       return json(context, 200, { ok: true });
     }
 
