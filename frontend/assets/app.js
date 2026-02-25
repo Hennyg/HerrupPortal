@@ -1,3 +1,10 @@
+function detectPlatform(){
+  const ua = navigator.userAgent.toLowerCase();
+  const isMobileUA = /iphone|ipad|android|mobile/.test(ua);
+  const isSmallScreen = window.matchMedia("(max-width: 900px)").matches;
+  return (isMobileUA || isSmallScreen) ? "mobile" : "desktop";
+}
+
 async function getMe() {
   const r = await fetch("/.auth/me");
   if (!r.ok) return null;
@@ -171,15 +178,22 @@ function renderSections(items) {
   document.getElementById("adminLink").classList.remove("hidden");
 
   const raw = await loadLinks();
-  const itemsAll = (raw || [])
-    .map(x => ({
-      ...x,
-      allowedRoles: parseAllowedRoles(x.allowedRoles),
-      enabled: x.enabled !== false
-    }))
-    .filter(x => x.enabled)
-    // .filter(x => matchesRoles(normRoles(x.allowedRoles), roles))
-    .sort((a,b)=> (a.sort ?? 1000) - (b.sort ?? 1000));
+const platform = detectPlatform();
+console.log("Platform detected:", platform);
+
+const itemsAll = (raw || [])
+  .map(x => ({
+    ...x,
+    allowedRoles: parseAllowedRoles(x.allowedRoles),
+    enabled: x.enabled !== false,
+    platformHint: (x.platformHint || "All").toLowerCase()
+  }))
+  .filter(x => x.enabled)
+  .filter(x => {
+    if (!x.platformHint || x.platformHint === "all") return true;
+    return x.platformHint === platform;
+  })
+  .sort((a,b)=> (a.sort ?? 1000) - (b.sort ?? 1000));
 
   // Filters (samme som før)
   const categories = uniq(itemsAll.map(x => x.category));
