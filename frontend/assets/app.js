@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
   track("PageView");
 });
 
-function detectPlatform(){
+function detectPlatform() {
   const ua = navigator.userAgent.toLowerCase();
   const isMobileUA = /iphone|ipad|android|mobile/.test(ua);
   const isSmallScreen = window.matchMedia("(max-width: 900px)").matches;
@@ -48,6 +48,7 @@ async function getMe() {
   const j = await r.json();
   return j?.clientPrincipal || null;
 }
+
 const normRoles = (roles) => (roles || []).map(r => String(r).toLowerCase());
 const hasRole = (roles, role) => roles.includes(String(role).toLowerCase());
 
@@ -55,6 +56,7 @@ function parseAllowedRoles(s) {
   if (Array.isArray(s)) return s.map(x => String(x).trim()).filter(Boolean);
   return String(s || "").split(";").map(x => x.trim()).filter(Boolean);
 }
+
 function matchesRoles(itemRoles, userRoles) {
   if (!itemRoles || !itemRoles.length) return true;
   const set = new Set(userRoles);
@@ -69,9 +71,10 @@ async function loadLinks() {
 
 function uniq(arr) {
   return Array.from(new Set((arr || []).filter(Boolean).map(x => String(x).trim())))
-    .sort((a,b)=>a.localeCompare(b, "da"));
+    .sort((a, b) => a.localeCompare(b, "da"));
 }
-function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="Alle" } = {}) {
+
+function setSelectOptions(selectEl, options, { includeEmpty = true, emptyText = "Alle" } = {}) {
   selectEl.innerHTML = "";
   if (includeEmpty) {
     const o = document.createElement("option");
@@ -87,13 +90,17 @@ function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="All
   });
 }
 
-function esc(s){
-  return String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
 }
-function sortLinks(arr){
-  return (arr || []).slice().sort((a,b)=> (a.sort ?? 1000) - (b.sort ?? 1000));
+
+function sortLinks(arr) {
+  return (arr || []).slice().sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 }
-function groupBy(arr, keyFn){
+
+function groupBy(arr, keyFn) {
   const m = new Map();
   for (const x of (arr || [])) {
     const k = (keyFn(x) ?? "").toString();
@@ -103,10 +110,18 @@ function groupBy(arr, keyFn){
   return m;
 }
 
-function renderTileHTML(it){
+function renderTileHTML(it) {
   const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
   return `
-    <a class="tile" href="${esc(it.url)}" target="${target}" rel="noopener">
+    <a class="tile"
+       href="${esc(it.url)}"
+       target="${target}"
+       rel="noopener"
+       data-track="tile"
+       data-title="${esc(it.title || "")}"
+       data-url="${esc(it.url || "")}"
+       data-category="${esc(it.category || "")}"
+       data-group="${esc(it.group || "")}">
       <div class="tileTop">
         <div class="icon">${esc(it.icon || "🔗")}</div>
         <div class="badge">${esc(it.category || "")}</div>
@@ -148,7 +163,7 @@ function renderCategorySectionHTML(categoryName, links, sectionIndex) {
 
   if (isFav) {
     const byGroup = groupBy(links, x => (x.group || "").trim() || "Uden gruppe");
-    const groups = Array.from(byGroup.entries()).sort((a,b)=>a[0].localeCompare(b[0], "da"));
+    const groups = Array.from(byGroup.entries()).sort((a, b) => a[0].localeCompare(b[0], "da"));
 
     return `
       <section class="section" style="margin:18px 0 26px;">
@@ -172,9 +187,9 @@ function renderCategorySectionHTML(categoryName, links, sectionIndex) {
   `;
 }
 
-function wireAccordions(root){
-  root.querySelectorAll("[data-toggle]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
+function wireAccordions(root) {
+  root.querySelectorAll("[data-toggle]").forEach(btn => {
+    btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-toggle");
       const body = document.getElementById(id);
       const isOpen = btn.getAttribute("aria-expanded") === "true";
@@ -189,13 +204,32 @@ function wireAccordions(root){
   });
 }
 
+// ✅ Track clicks på tiles (hvilket link brugte de?)
+function wireTileTracking(root) {
+  root.querySelectorAll('a.tile[data-track="tile"]').forEach(a => {
+    a.addEventListener("click", () => {
+      const targetUrl = a.getAttribute("data-url") || a.href || "";
+      const title = a.getAttribute("data-title") || a.textContent || "";
+      const category = a.getAttribute("data-category") || "";
+      const group = a.getAttribute("data-group") || "";
+
+      track("Click", {
+        targetUrl: safeUrl(targetUrl),
+        targetTitle: title.substring(0, 200),
+        targetCategory: category.substring(0, 100),
+        targetGroup: group.substring(0, 100)
+      });
+    }, { passive: true });
+  });
+}
+
 function renderSections(items) {
   const root = document.getElementById("sections");
   if (!root) return;
 
   // Favoritter først, resten alfabetisk
   const byCat = groupBy(items, x => (x.category || "Andet").trim() || "Andet");
-  const entries = Array.from(byCat.entries()).sort((a,b)=>{
+  const entries = Array.from(byCat.entries()).sort((a, b) => {
     const an = a[0].toLowerCase(), bn = b[0].toLowerCase();
     if (an === "favoritter" && bn !== "favoritter") return -1;
     if (bn === "favoritter" && an !== "favoritter") return 1;
@@ -204,9 +238,10 @@ function renderSections(items) {
 
   root.innerHTML = entries.map(([cat, links], i) => renderCategorySectionHTML(cat, links, i)).join("");
   wireAccordions(root);
+  wireTileTracking(root); // ✅ vigtigt: efter HTML er sat ind
 }
 
-(async function init(){
+(async function init() {
   const me = await getMe();
   const roles = normRoles(me?.userRoles || []);
   document.getElementById("userLine").textContent = me ? `${me.userDetails}` : "Ikke logget ind";
@@ -215,22 +250,22 @@ function renderSections(items) {
   document.getElementById("adminLink").classList.remove("hidden");
 
   const raw = await loadLinks();
-const platform = detectPlatform();
-console.log("Platform detected:", platform);
+  const platform = detectPlatform();
+  console.log("Platform detected:", platform);
 
-const itemsAll = (raw || [])
-  .map(x => ({
-    ...x,
-    allowedRoles: parseAllowedRoles(x.allowedRoles),
-    enabled: x.enabled !== false,
-    platformHint: (x.platformHint || "All").toLowerCase()
-  }))
-  .filter(x => x.enabled)
-  .filter(x => {
-    if (!x.platformHint || x.platformHint === "all") return true;
-    return x.platformHint === platform;
-  })
-  .sort((a,b)=> (a.sort ?? 1000) - (b.sort ?? 1000));
+  const itemsAll = (raw || [])
+    .map(x => ({
+      ...x,
+      allowedRoles: parseAllowedRoles(x.allowedRoles),
+      enabled: x.enabled !== false,
+      platformHint: (x.platformHint || "All").toLowerCase()
+    }))
+    .filter(x => x.enabled)
+    .filter(x => {
+      if (!x.platformHint || x.platformHint === "all") return true;
+      return x.platformHint === platform;
+    })
+    .sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 
   // Filters (samme som før)
   const categories = uniq(itemsAll.map(x => x.category));
@@ -238,18 +273,18 @@ const itemsAll = (raw || [])
 
   const catSel = document.getElementById("categoryFilter");
   const grpSel = document.getElementById("groupFilter");
-  setSelectOptions(catSel, categories, { includeEmpty:true, emptyText:"Alle kategorier" });
-  setSelectOptions(grpSel, groups, { includeEmpty:true, emptyText:"Alle grupper" });
+  setSelectOptions(catSel, categories, { includeEmpty: true, emptyText: "Alle kategorier" });
+  setSelectOptions(grpSel, groups, { includeEmpty: true, emptyText: "Alle grupper" });
 
   const q = document.getElementById("q");
   const qx = document.getElementById("qx");
 
-  function syncClearBtn(){
+  function syncClearBtn() {
     qx.style.visibility = q.value ? "visible" : "hidden";
   }
 
   q.addEventListener("input", () => { syncClearBtn(); render(); });
-  qx.addEventListener("click", () => { q.value=""; syncClearBtn(); render(); });
+  qx.addEventListener("click", () => { q.value = ""; syncClearBtn(); render(); });
   catSel.addEventListener("change", render);
   grpSel.addEventListener("change", render);
   syncClearBtn();
@@ -266,7 +301,7 @@ const itemsAll = (raw || [])
       if (grp && (x.group || "") !== grp) return false;
 
       if (!qq) return true;
-      return (x.title||"").toLowerCase().includes(qq) || (x.url||"").toLowerCase().includes(qq);
+      return (x.title || "").toLowerCase().includes(qq) || (x.url || "").toLowerCase().includes(qq);
     });
 
     renderSections(filtered);
