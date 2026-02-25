@@ -1,16 +1,25 @@
+const { dvFetch } = require("../_dv");
+
 module.exports = async function (context, req) {
   try {
-    const mod = require("../_dv"); // <- kun load
+    const data = await dvFetch(`WhoAmI`);
     context.res = {
       status: 200,
       headers: { "Content-Type": "application/json; charset=utf-8" },
-      body: { ok: true, dvLoaded: !!mod, keys: Object.keys(mod || {}) }
+      body: { ok: true, whoami: data }
     };
   } catch (e) {
     context.res = {
-      status: 500,
+      status: e.status || 500,
       headers: { "Content-Type": "application/json; charset=utf-8" },
-      body: { ok: false, where: "require(_dv)", message: e.message, stack: e.stack }
+      body: {
+        ok: false,
+        where: "dvFetch(WhoAmI)",
+        message: e.message,
+        status: e.status,
+        data: e.data,
+        stack: e.stack
+      }
     };
   }
 };
