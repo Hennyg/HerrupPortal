@@ -1,25 +1,17 @@
 const { dvFetch } = require("../_dv");
 
+function json(context, status, body) {
+  context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
+}
+function esc(s) { return String(s ?? "").replace(/'/g, "''"); }
+
 module.exports = async function (context, req) {
   try {
-    const data = await dvFetch(`WhoAmI`);
-    context.res = {
-      status: 200,
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-      body: { ok: true, whoami: data }
-    };
+    const logical = (req.query?.logical || "cr175_lch_portallink").trim();
+    const q = `EntityDefinitions?$select=LogicalName,EntitySetName&$filter=LogicalName eq '${esc(logical)}'`;
+    const data = await dvFetch(q);
+    return json(context, 200, data);
   } catch (e) {
-    context.res = {
-      status: e.status || 500,
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-      body: {
-        ok: false,
-        where: "dvFetch(WhoAmI)",
-        message: e.message,
-        status: e.status,
-        data: e.data,
-        stack: e.stack
-      }
-    };
+    return json(context, e.status || 500, { ok:false, message: e.message, status: e.status, data: e.data, stack: e.stack });
   }
 };
