@@ -1,5 +1,7 @@
 // /api/track/index.js
 
+const { dvFetch } = require("../_dataverse");
+
 function json(context, status, body) {
   context.res = {
     status,
@@ -20,64 +22,65 @@ function getClientPrincipal(req) {
   }
 }
 
-function pickUser(cp) {
-  if (!cp) return { isAuthenticated: false };
+function pickEmail(cp) {
+  if (!cp) return "";
 
-  // cp.userDetails er ofte e-mail / UPN
-  const userDetails = cp.userDetails || "";
   const claims = Array.isArray(cp.claims) ? cp.claims : [];
 
   const getClaim = (t) => claims.find(c => c.typ === t)?.val;
 
-  return {
-    isAuthenticated: true,
-    userDetails,
-    name: getClaim("name") || "",
-    email:
-      getClaim("preferred_username") ||
-      getClaim("upn") ||
-      userDetails ||
-      "",
-    oid: getClaim("http://schemas.microsoft.com/identity/claims/objectidentifier") || getClaim("oid") || "",
-    tid: getClaim("http://schemas.microsoft.com/identity/claims/tenantid") || getClaim("tid") || ""
-  };
+  return (
+    getClaim("preferred_username") ||
+    getClaim("upn") ||
+    cp.userDetails ||
+    ""
+  );
 }
 
 module.exports = async function (context, req) {
   try {
     const cp = getClientPrincipal(req);
-    const user = pickUser(cp);
+    const userEmail = pickEmail(cp);
 
-    // Hvis du vil kræve login for tracking:
-    // if (!user.isAuthenticated) return json(context, 401, { error: "not_authenticated" });
+    const body = req.body || {};
 
-    const b = req.body || {};
-    const entry = {
-      eventType: String(b.eventType || "Unknown").substring(0, 50),
-      pageUrl: String(b.pageUrl || "").substring(0, 1000),
-      path: String(b.path || "").substring(0, 300),
-      referrer: String(b.referrer || "").substring(0, 1000),
-      tsLocal: String(b.tsLocal || ""),
-      tsUtc: new Date().toISOString(),
+    const pageUrl = String(body.pageUrl || "").substring(0, 1000);
+    const path = String(body.path || "").substring(0, 300);
+    const referrer = String(body.referrer || "").substring(0, 1000);
 
-      // user info
-      userEmail: String(user.email || "").substring(0, 200),
-      userName: String(user.name || "").substring(0, 200),
-      userOid: String(user.oid || "").substring(0, 100),
-      tenantId: String(user.tid || "").substring(0, 100),
+    let queryString = "";
+    try {
+      const u = new URL(pageUrl);
+      queryString = (u.search || "").substring(0, 1000);
+    } catch { }
 
-      // valgfrit (GDPR-vurdering): IP og UA
-      // clientIp: (req.headers["x-forwarded-for"] || "").split(",")[0].trim(),
-      userAgent: String(req.headers["user-agent"] || "").substring(0, 300)
-    };
+    const clientIp =
+      (req.headers["x-forwarded-for"] || "")
+        .split(",")[0]
+        .trim()
+        .substring(0, 100);
 
-    // TODO: Gem i Dataverse / App Insights / Storage
-    // Lige nu: log til function logs (kan bruges midlertidigt)
-    context.log("TRACK:", entry);
+    const userAgent =
+      String(req.headers["user-agent"] || "").substring(0, 500);
+
+    const timestampUtc = new Date().toISOString();
+
+    // 🔵 Opret række i Dataverse
+    await dvFetch("POST", "cr175_lch_accesslogs", {
+      cr175_lch_UserEmail: userEmail,
+      cr175_lch_timestamputc: timestampUtc,
+      cr175_lch_url: pageUrl,
+      cr175_lch_path: path,
+      cr175_lch_queryString: queryString,
+      cr175_lch_referrer: referrer,
+      cr175_lch_clientIp: clientIp,
+      cr175_lch_useragent: userAgent
+    });
 
     return json(context, 200, { ok: true });
+
   } catch (e) {
-    context.log("track error", e);
+    context.log("TRACK ERROR", e);
     return json(context, 500, { error: "track_failed" });
   }
 };
