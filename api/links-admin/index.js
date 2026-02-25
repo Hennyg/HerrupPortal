@@ -1,252 +1,162 @@
-async function api(method, url, body) {
-  const r = await fetch(url, {
-    method,
+// /api/links-admin/index.js
+const { dvFetch } = require("../_dv");
+
+const TABLE = "cr175_lch_portallinks";
+const IDCOL = "cr175_lch_portallinkid";
+
+// Dit tekstfelt (bekræftet på billedet)
+const PLATFORM_COL = "cr175_lch_platformhinttext";
+
+function json(context, status, body) {
+  context.res = {
+    status,
     headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const txt = await r.text();
-  let data = null;
-  try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
-  if (!r.ok) throw { status: r.status, data };
-  return data;
-}
-
-function $(id){ return document.getElementById(id); }
-
-function uniq(arr) {
-  return Array.from(new Set((arr||[]).filter(Boolean).map(x => String(x).trim())))
-    .sort((a,b)=>a.localeCompare(b, "da"));
-}
-
-function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="(ingen)" } = {}) {
-  if (!selectEl) return;
-  selectEl.innerHTML = "";
-  if (includeEmpty) {
-    const o = document.createElement("option");
-    o.value = "";
-    o.textContent = emptyText;
-    selectEl.appendChild(o);
-  }
-  (options||[]).forEach(v => {
-    const o = document.createElement("option");
-    o.value = v;
-    o.textContent = v;
-    selectEl.appendChild(o);
-  });
-}
-
-function updateIconPreview() {
-  const v = $("icon")?.value?.trim();
-  const p = $("iconPreview");
-  if (p) p.textContent = v || "🔗";
-}
-
-// Gruppe kun for Favoritter
-function updateGroupVisibility() {
-  const cat = ($("category")?.value || "").trim().toLowerCase();
-  const row = $("groupRow"); // kræver id="groupRow" på label/wrapper i admin.html
-  const isFav = cat === "favoritter";
-  if (row) row.style.display = isFav ? "" : "none";
-  if (!isFav && $("group")) $("group").value = "";
-}
-
-function readForm() {
-  const category = $("category").value || "";
-  const isFav = category.trim().toLowerCase() === "favoritter";
-
-  return {
-    id: $("id").value || null,
-    title: $("title").value.trim(),
-    url: $("url").value.trim(),
-    category: category,
-    group: isFav ? $("group").value : "",
-    parent: $("parent").value || null,
-    icon: $("icon").value.trim(),
-    allowedRoles: $("roles").value.trim(),
-    enabled: $("enabled").checked,
-    sort: Number($("sort").value || 100),
-    openMode: $("openMode").value,
-
-    // NYT felt
-    platformHint: $("platformHint")?.value || "All"
+    body
   };
 }
 
-function fillForm(x) {
-  $("id").value = x?.id || "";
-  $("title").value = x?.title || "";
-  $("url").value = x?.url || "";
-  $("category").value = x?.category || "";
-  $("group").value = x?.group || "";
-  $("parent").value = x?.parent || "";
-  $("icon").value = x?.icon || "";
-  updateIconPreview();
-  $("roles").value = Array.isArray(x?.allowedRoles) ? x.allowedRoles.join(";") : (x?.allowedRoles || "");
-  $("enabled").checked = x?.enabled !== false;
-  $("sort").value = x?.sort ?? 100;
-  $("openMode").value = x?.openMode || "newTab";
-
-  if ($("platformHint")) $("platformHint").value = x?.platformHint || "All";
-
-  updateGroupVisibility();
+function norm(s) { return String(s ?? "").trim(); }
+function isGuid(s) {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(s || ""));
 }
 
-function resetForm() {
-  fillForm({ enabled:true, sort:100, openMode:"newTab", platformHint:"All" });
-  $("msg").textContent = "";
+function normPlatformHint(v) {
+  const x = norm(v).toLowerCase();
+  if (!x) return "All";
+  if (x === "all") return "All";
+  if (x === "desktop" || x === "pc") return "Desktop";
+  if (x === "mobile" || x === "telefon" || x === "phone") return "Mobile";
+  return "All";
 }
 
-function seedPickersNow() {
-  setSelectOptions($("category"),
-    ["Static Apps","Favoritter","Værktøjer","Administration","Andet"],
-    { includeEmpty:true, emptyText:"(vælg kategori)" }
-  );
+// DV -> frontend
+function mapOut(r) {
+  return {
+    id: r?.[IDCOL],
 
-  setSelectOptions($("group"),
-    ["Lely","Salg","Tekniker","FMS","Administration"],
-    { includeEmpty:true, emptyText:"(ingen gruppe)" }
-  );
+    title: r?.cr175_lch_title || "",
+    url: r?.cr175_lch_url || "",
+    icon: r?.cr175_lch_icon || "",
 
-  // NYT: platform hint
-  setSelectOptions($("platformHint"),
-    ["All","Desktop","Mobile"],
-    { includeEmpty:false }
-  );
+    category: r?.cr175_lch_categorytext || "",
+    group: r?.cr175_lch_grouptext || "",
 
-  const p = $("parent");
-  if (p) p.innerHTML = `<option value="">(ingen parent)</option>`;
+    parent: r?._cr175_lch_parent_value || null,
 
-  const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
-  const dl = document.getElementById("iconList");
-  if (dl) {
-    dl.innerHTML = "";
-    fixedIcons.forEach(ic => {
-      const opt = document.createElement("option");
-      opt.value = ic;
-      dl.appendChild(opt);
+    allowedRoles: r?.cr175_lch_allowedroles || "",
+    enabled: r?.cr175_lch_enabled !== false,
+    sort: r?.cr175_lch_sortorder ?? 1000,
+
+    openMode: r?.cr175_lch_openmodetext || "newTab",
+
+    platformHint: r?.[PLATFORM_COL] || "All"
+  };
+}
+
+// frontend -> DV payload
+function mapIn(b) {
+  const category = norm(b.category ?? b.cr175_lch_categorytext ?? "");
+  const isFav = category.toLowerCase() === "favoritter";
+  const group = isFav ? norm(b.group ?? b.cr175_lch_grouptext ?? "") : "";
+
+  const payload = {
+    cr175_lch_title: norm(b.title ?? b.cr175_lch_title ?? ""),
+    cr175_lch_url: norm(b.url ?? b.cr175_lch_url ?? ""),
+    cr175_lch_icon: norm(b.icon ?? b.cr175_lch_icon ?? ""),
+
+    cr175_lch_categorytext: category,
+    cr175_lch_grouptext: group,
+
+    cr175_lch_openmodetext: norm(b.openMode ?? b.cr175_lch_openmodetext ?? "newTab"),
+
+    [PLATFORM_COL]: normPlatformHint(b.platformHint ?? b.platformhint ?? b[PLATFORM_COL]),
+
+    cr175_lch_allowedroles: norm(b.allowedRoles ?? b.cr175_lch_allowedroles ?? ""),
+    cr175_lch_enabled: (b.enabled ?? b.cr175_lch_enabled) !== false,
+    cr175_lch_sortorder: Number.isFinite(Number(b.sort ?? b.cr175_lch_sortorder))
+      ? Number(b.sort ?? b.cr175_lch_sortorder)
+      : 1000
+  };
+
+  // parent (lookup)
+  const parentId = b.parent ?? b.cr175_lch_parent ?? null;
+  if (parentId === null || parentId === "" || parentId === undefined) {
+    payload["cr175_lch_parent@odata.bind"] = null;
+  } else if (isGuid(parentId)) {
+    payload["cr175_lch_parent@odata.bind"] = `/${TABLE}(${parentId})`;
+  }
+
+  return payload;
+}
+
+module.exports = async function (context, req) {
+  try {
+    const m = (req.method || "GET").toUpperCase();
+
+    if (m === "GET") {
+      const select = [
+        IDCOL,
+        "cr175_lch_title",
+        "cr175_lch_url",
+        "cr175_lch_icon",
+        "cr175_lch_categorytext",
+        "cr175_lch_grouptext",
+        "cr175_lch_openmodetext",
+        PLATFORM_COL,
+        "_cr175_lch_parent_value",
+        "cr175_lch_allowedroles",
+        "cr175_lch_enabled",
+        "cr175_lch_sortorder"
+      ].join(",");
+
+      const data = await dvFetch(`${TABLE}?$select=${select}&$orderby=cr175_lch_sortorder asc`);
+      return json(context, 200, (data.value || []).map(mapOut));
+    }
+
+    if (m === "POST") {
+      const payload = mapIn(req.body || {});
+      const created = await dvFetch(`${TABLE}`, { method: "POST", body: payload });
+      if (created && created[IDCOL]) return json(context, 200, mapOut(created));
+
+      // fallback: hent nyeste
+      const select = [
+        IDCOL,
+        "cr175_lch_title","cr175_lch_url","cr175_lch_icon",
+        "cr175_lch_categorytext","cr175_lch_grouptext","cr175_lch_openmodetext",
+        PLATFORM_COL,
+        "_cr175_lch_parent_value",
+        "cr175_lch_allowedroles","cr175_lch_enabled","cr175_lch_sortorder"
+      ].join(",");
+
+      const data = await dvFetch(`${TABLE}?$top=1&$orderby=createdon desc&$select=${select}`);
+      return json(context, 200, mapOut((data.value || [])[0]));
+    }
+
+    if (m === "PUT" || m === "PATCH") {
+      const b = req.body || {};
+      if (!b.id) return json(context, 400, { error: "missing_id" });
+
+      const payload = mapIn(b);
+      await dvFetch(`${TABLE}(${b.id})`, { method: "PATCH", body: payload });
+      return json(context, 200, { ok: true });
+    }
+
+    if (m === "DELETE") {
+      const id = req.query?.id;
+      if (!id) return json(context, 400, { error: "missing_id" });
+
+      await dvFetch(`${TABLE}(${id})`, { method: "DELETE" });
+      return json(context, 200, { ok: true });
+    }
+
+    return json(context, 405, { error: "method_not_allowed" });
+  } catch (e) {
+    return json(context, e.status || 500, {
+      error: "server_error",
+      message: e.message,
+      status: e.status,
+      data: e.data,
+      stack: e.stack
     });
   }
-
-  updateGroupVisibility();
-}
-
-function buildPickers(rows) {
-  const cats = uniq(["Static Apps","Favoritter","Værktøjer","Administration","Andet", ...rows.map(r => r.category)]);
-
-  const grps = uniq([
-    "Lely","Salg","Tekniker","FMS","Administration",
-    ...rows.filter(r => (r.category || "").toLowerCase() === "favoritter").map(r => r.group)
-  ]);
-
-  setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
-  setSelectOptions($("group"), grps, { includeEmpty:true, emptyText:"(ingen gruppe)" });
-
-  // Platform hint – hold fast i 3 værdier, men tillad også værdier fra data
-  const hints = uniq(["All","Desktop","Mobile", ...rows.map(r => r.platformHint)]);
-  setSelectOptions($("platformHint"), hints, { includeEmpty:false });
-
-  const parentCandidates = rows.filter(r => !r.url).map(r => ({ id:r.id, title:r.title }));
-  const parentSelect = $("parent");
-  parentSelect.innerHTML = `<option value="">(ingen parent)</option>`;
-  parentCandidates.forEach(p => {
-    const o = document.createElement("option");
-    o.value = p.id;
-    o.textContent = p.title;
-    parentSelect.appendChild(o);
-  });
-
-  const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
-  const icons = uniq([...fixedIcons, ...rows.map(r => r.icon).filter(Boolean)]);
-  const dl = document.getElementById("iconList");
-  dl.innerHTML = "";
-  icons.forEach(ic => {
-    const opt = document.createElement("option");
-    opt.value = ic;
-    dl.appendChild(opt);
-  });
-
-  updateGroupVisibility();
-}
-
-function renderTable(rows) {
-  const byId = new Map(rows.map(r => [r.id, r]));
-  const tb = $("tbl").querySelector("tbody");
-  tb.innerHTML = "";
-
-  rows.forEach(x => {
-    const parentTitle = x.parent ? (byId.get(x.parent)?.title || x.parent) : "";
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${x.title || ""}</td>
-      <td>${x.category || ""}</td>
-      <td>${x.group || ""}</td>
-      <td>${x.platformHint || ""}</td>
-      <td>${parentTitle}</td>
-      <td>${x.enabled !== false ? "Ja" : "Nej"}</td>
-      <td>${Array.isArray(x.allowedRoles) ? x.allowedRoles.join(";") : (x.allowedRoles || "")}</td>
-      <td style="white-space:nowrap">
-        <button class="btn" data-act="edit">Redigér</button>
-        <button class="btn" data-act="del">Slet</button>
-      </td>
-    `;
-    tr.querySelector('[data-act="edit"]').onclick = () => fillForm(x);
-    tr.querySelector('[data-act="del"]').onclick = async () => {
-      if (!confirm(`Slet "${x.title}"?`)) return;
-      await api("DELETE", `/api/links-admin?id=${encodeURIComponent(x.id)}`);
-      await refresh();
-      resetForm();
-    };
-    tb.appendChild(tr);
-  });
-}
-
-async function refresh() {
-  console.log("refresh() starter");
-  const rows = await api("GET", "/api/links-admin");
-  console.log("refresh() rows:", rows);
-  const list = (rows || []).sort((a,b) => (a.sort ?? 1000) - (b.sort ?? 1000));
-  buildPickers(list);
-  renderTable(list);
-}
-
-(async function init(){
-  console.log("admin.js loaded");
-
-  seedPickersNow();
-
-  $("icon").addEventListener("input", updateIconPreview);
-  updateIconPreview();
-
-  $("category").addEventListener("change", updateGroupVisibility);
-
-  $("form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    $("msg").textContent = "Gemmer...";
-    const x = readForm();
-
-    try {
-      if (x.id) await api("PUT", "/api/links-admin", x);
-      else await api("POST", "/api/links-admin", x);
-
-      $("msg").textContent = "Gemt ✅";
-      await refresh();
-      resetForm();
-    } catch (err) {
-      $("msg").textContent =
-        `Fejl (${err?.status || "?"}): ` + (err?.data?.message || JSON.stringify(err?.data || err));
-      console.warn("save fejl:", err);
-    }
-  });
-
-  $("resetBtn").addEventListener("click", resetForm);
-
-  resetForm();
-
-  try {
-    await refresh();
-  } catch (err) {
-    $("msg").textContent = "API /api/links-admin virker ikke endnu. " +
-      `Fejl (${err?.status || "?"}).`;
-    console.warn("refresh() fejlede:", err);
-  }
-})();
+};
