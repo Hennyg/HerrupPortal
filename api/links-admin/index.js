@@ -28,7 +28,7 @@ function mapOut(r) {
     url: r?.cr175_lch_url || "",
     icon: r?.cr175_lch_icon || "",
 
-    // NYE tekstfelter
+    // Tekstfelter (portal)
     category: r?.cr175_lch_categorytext || "",
     group: r?.cr175_lch_grouptext || "",
 
@@ -39,14 +39,14 @@ function mapOut(r) {
     enabled: r?.cr175_lch_enabled !== false,
     sort: r?.cr175_lch_sortorder ?? 1000,
 
-    // behold evt. choice openMode hvis du stadig bruger den (ellers kan du lave openModetext senere)
-    openMode: r?.cr175_lch_openMode ?? r?.cr175_lch_openmode ?? null
+    // Tekstfelt (portal)
+    openMode: r?.cr175_lch_openModetext || "newTab"
   };
 }
 
 // frontend -> DV payload
 function mapIn(b) {
-  const category = norm(b.category ?? b.cr175_lch_categorytext ?? b.cr175_lch_category ?? "");
+  const category = norm(b.category ?? b.cr175_lch_categorytext ?? "");
   const isFav = category.toLowerCase() === "favoritter";
 
   const group = isFav
@@ -60,6 +60,9 @@ function mapIn(b) {
 
     cr175_lch_categorytext: category,
     cr175_lch_grouptext: group,
+
+    // NY: openMode som tekst
+    cr175_lch_openModetext: norm(b.openMode ?? b.cr175_lch_openModetext ?? "newTab"),
 
     cr175_lch_allowedroles: norm(b.allowedRoles ?? b.cr175_lch_allowedroles ?? ""),
     cr175_lch_enabled: (b.enabled ?? b.cr175_lch_enabled) !== false,
@@ -80,10 +83,6 @@ function mapIn(b) {
     // (alternativt: returnér 400)
   }
 
-  // Hvis du stadig bruger openMode choice og sender tal:
-  // payload.cr175_lch_openMode = Number(b.openMode ?? b.cr175_lch_openMode);
-  // (Hvis du laver openModetext senere, så skifter vi til cr175_lch_openModetext)
-
   return payload;
 }
 
@@ -98,19 +97,17 @@ module.exports = async function (context, req) {
         "cr175_lch_url",
         "cr175_lch_icon",
 
-        // nye tekstfelter
+        // tekstfelter (portal)
         "cr175_lch_categorytext",
         "cr175_lch_grouptext",
+        "cr175_lch_openModetext",
 
-        // lookup skal ud som _cr175_lch_parent_value (ingen select nødvendig, men ok at have lookup column med)
+        // lookup value
         "_cr175_lch_parent_value",
 
         "cr175_lch_allowedroles",
         "cr175_lch_enabled",
-        "cr175_lch_sortorder",
-
-        // hvis du har choice openMode:
-        "cr175_lch_openMode"
+        "cr175_lch_sortorder"
       ].join(",");
 
       const data = await dvFetch(`${TABLE}?$select=${select}&$orderby=cr175_lch_sortorder asc`);
@@ -130,10 +127,9 @@ module.exports = async function (context, req) {
       const select = [
         IDCOL,
         "cr175_lch_title","cr175_lch_url","cr175_lch_icon",
-        "cr175_lch_categorytext","cr175_lch_grouptext",
+        "cr175_lch_categorytext","cr175_lch_grouptext","cr175_lch_openModetext",
         "_cr175_lch_parent_value",
-        "cr175_lch_allowedroles","cr175_lch_enabled","cr175_lch_sortorder",
-        "cr175_lch_openMode"
+        "cr175_lch_allowedroles","cr175_lch_enabled","cr175_lch_sortorder"
       ].join(",");
 
       const data = await dvFetch(`${TABLE}?$top=1&$orderby=createdon desc&$select=${select}`);
