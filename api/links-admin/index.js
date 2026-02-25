@@ -41,6 +41,7 @@ function mapOut(r) {
 
     // Tekstfelt (portal) - OBS: lille m i logical name
     openMode: r?.cr175_lch_openmodetext || "newTab"
+    platformHint: r?.cr175_lch_platformhinttext || "All",
   };
 }
 
@@ -125,7 +126,7 @@ module.exports = async function (context, req) {
         IDCOL,
         "cr175_lch_title","cr175_lch_url","cr175_lch_icon",
         "cr175_lch_categorytext","cr175_lch_grouptext","cr175_lch_openmodetext",
-        "_cr175_lch_parent_value",
+        "_cr175_lch_parent_value","cr175_lch_platformhinttext",
         "cr175_lch_allowedroles","cr175_lch_enabled","cr175_lch_sortorder"
       ].join(",");
 
