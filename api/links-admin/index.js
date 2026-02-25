@@ -3,12 +3,10 @@ const { dvFetch } = require("../_dv");
 function json(context, status, body) {
   context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
 }
-function esc(s) { return String(s ?? "").replace(/'/g, "''"); }
 
 module.exports = async function (context, req) {
   try {
-    const logical = (req.query?.logical || "cr175_lch_portallink").trim();
-    const q = `EntityDefinitions?$select=LogicalName,EntitySetName&$filter=LogicalName eq '${esc(logical)}'`;
+    const q = `EntityDefinitions?$select=LogicalName,EntitySetName,DisplayName&$filter=contains(LogicalName,'portallink')`;
     const data = await dvFetch(q);
     return json(context, 200, data);
   } catch (e) {
