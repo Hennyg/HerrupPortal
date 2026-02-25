@@ -15,7 +15,7 @@ function $(id){ return document.getElementById(id); }
 
 function uniq(arr) {
   return Array.from(new Set((arr||[]).filter(Boolean).map(x => String(x).trim())))
-    .sort((a,b)=>a.localeCompare(b));
+    .sort((a,b)=>a.localeCompare(b, "da"));
 }
 
 function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="(ingen)" } = {}) {
@@ -44,35 +44,31 @@ function updateIconPreview() {
 // Gruppe kun for Favoritter
 function updateGroupVisibility() {
   const cat = ($("category")?.value || "").trim().toLowerCase();
-  const row = $("groupRow"); // kræver id="groupRow" i admin.html (label eller wrapper)
+  const row = $("groupRow"); // kræver id="groupRow" på label/wrapper i admin.html
   const isFav = cat === "favoritter";
-
   if (row) row.style.display = isFav ? "" : "none";
   if (!isFav && $("group")) $("group").value = "";
 }
 
 function readForm() {
-  const cat = ($("category").value || "").trim();
-  const isFav = cat.toLowerCase() === "favoritter";
+  const category = $("category").value || "";
+  const isFav = category.trim().toLowerCase() === "favoritter";
 
   return {
     id: $("id").value || null,
     title: $("title").value.trim(),
     url: $("url").value.trim(),
-    category: cat,
-
-    // kun relevant ved favoritter
+    category: category,
     group: isFav ? $("group").value : "",
-
     parent: $("parent").value || null,
     icon: $("icon").value.trim(),
     allowedRoles: $("roles").value.trim(),
     enabled: $("enabled").checked,
     sort: Number($("sort").value || 100),
+    openMode: $("openMode").value,
 
-    // ⚠️ Dataverse lch_openMode er Choice (Int32), så vi sender den ikke som tekst her.
-    // Hvis du laver cr175_lch_openModetext senere, kan vi sende den igen.
-    openMode: null
+    // NYT felt
+    platformHint: $("platformHint")?.value || "All"
   };
 }
 
@@ -88,16 +84,15 @@ function fillForm(x) {
   $("roles").value = Array.isArray(x?.allowedRoles) ? x.allowedRoles.join(";") : (x?.allowedRoles || "");
   $("enabled").checked = x?.enabled !== false;
   $("sort").value = x?.sort ?? 100;
-
-  // UI: openMode dropdown kan stadig bruges visuelt,
-  // men bliver ikke sendt til Dataverse pt.
   $("openMode").value = x?.openMode || "newTab";
+
+  if ($("platformHint")) $("platformHint").value = x?.platformHint || "All";
 
   updateGroupVisibility();
 }
 
 function resetForm() {
-  fillForm({ enabled:true, sort:100, openMode:"newTab" });
+  fillForm({ enabled:true, sort:100, openMode:"newTab", platformHint:"All" });
   $("msg").textContent = "";
 }
 
@@ -110,6 +105,12 @@ function seedPickersNow() {
   setSelectOptions($("group"),
     ["Lely","Salg","Tekniker","FMS","Administration"],
     { includeEmpty:true, emptyText:"(ingen gruppe)" }
+  );
+
+  // NYT: platform hint
+  setSelectOptions($("platformHint"),
+    ["All","Desktop","Mobile"],
+    { includeEmpty:false }
   );
 
   const p = $("parent");
@@ -130,10 +131,8 @@ function seedPickersNow() {
 }
 
 function buildPickers(rows) {
-  // opdatér dropdowns med værdier fundet i data
   const cats = uniq(["Static Apps","Favoritter","Værktøjer","Administration","Andet", ...rows.map(r => r.category)]);
 
-  // grupper kun fra favoritter + defaults
   const grps = uniq([
     "Lely","Salg","Tekniker","FMS","Administration",
     ...rows.filter(r => (r.category || "").toLowerCase() === "favoritter").map(r => r.group)
@@ -141,6 +140,10 @@ function buildPickers(rows) {
 
   setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
   setSelectOptions($("group"), grps, { includeEmpty:true, emptyText:"(ingen gruppe)" });
+
+  // Platform hint – hold fast i 3 værdier, men tillad også værdier fra data
+  const hints = uniq(["All","Desktop","Mobile", ...rows.map(r => r.platformHint)]);
+  setSelectOptions($("platformHint"), hints, { includeEmpty:false });
 
   const parentCandidates = rows.filter(r => !r.url).map(r => ({ id:r.id, title:r.title }));
   const parentSelect = $("parent");
@@ -152,7 +155,6 @@ function buildPickers(rows) {
     parentSelect.appendChild(o);
   });
 
-  // Ikon forslag ud fra data + faste
   const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
   const icons = uniq([...fixedIcons, ...rows.map(r => r.icon).filter(Boolean)]);
   const dl = document.getElementById("iconList");
@@ -178,6 +180,7 @@ function renderTable(rows) {
       <td>${x.title || ""}</td>
       <td>${x.category || ""}</td>
       <td>${x.group || ""}</td>
+      <td>${x.platformHint || ""}</td>
       <td>${parentTitle}</td>
       <td>${x.enabled !== false ? "Ja" : "Nej"}</td>
       <td>${Array.isArray(x.allowedRoles) ? x.allowedRoles.join(";") : (x.allowedRoles || "")}</td>
@@ -209,7 +212,6 @@ async function refresh() {
 (async function init(){
   console.log("admin.js loaded");
 
-  // Fyld dropdowns NU (uanset API)
   seedPickersNow();
 
   $("icon").addEventListener("input", updateIconPreview);
@@ -243,7 +245,7 @@ async function refresh() {
   try {
     await refresh();
   } catch (err) {
-    $("msg").textContent = "API /api/links-admin virker ikke endnu (dropdowns virker stadig). " +
+    $("msg").textContent = "API /api/links-admin virker ikke endnu. " +
       `Fejl (${err?.status || "?"}).`;
     console.warn("refresh() fejlede:", err);
   }
