@@ -41,19 +41,38 @@ function updateIconPreview() {
   if (p) p.textContent = v || "🔗";
 }
 
+// Gruppe kun for Favoritter
+function updateGroupVisibility() {
+  const cat = ($("category")?.value || "").trim().toLowerCase();
+  const row = $("groupRow"); // kræver id="groupRow" i admin.html (label eller wrapper)
+  const isFav = cat === "favoritter";
+
+  if (row) row.style.display = isFav ? "" : "none";
+  if (!isFav && $("group")) $("group").value = "";
+}
+
 function readForm() {
+  const cat = ($("category").value || "").trim();
+  const isFav = cat.toLowerCase() === "favoritter";
+
   return {
     id: $("id").value || null,
     title: $("title").value.trim(),
     url: $("url").value.trim(),
-    category: $("category").value,
-    group: $("group").value,
+    category: cat,
+
+    // kun relevant ved favoritter
+    group: isFav ? $("group").value : "",
+
     parent: $("parent").value || null,
     icon: $("icon").value.trim(),
     allowedRoles: $("roles").value.trim(),
     enabled: $("enabled").checked,
     sort: Number($("sort").value || 100),
-    openMode: $("openMode").value
+
+    // ⚠️ Dataverse lch_openMode er Choice (Int32), så vi sender den ikke som tekst her.
+    // Hvis du laver cr175_lch_openModetext senere, kan vi sende den igen.
+    openMode: null
   };
 }
 
@@ -69,7 +88,12 @@ function fillForm(x) {
   $("roles").value = Array.isArray(x?.allowedRoles) ? x.allowedRoles.join(";") : (x?.allowedRoles || "");
   $("enabled").checked = x?.enabled !== false;
   $("sort").value = x?.sort ?? 100;
+
+  // UI: openMode dropdown kan stadig bruges visuelt,
+  // men bliver ikke sendt til Dataverse pt.
   $("openMode").value = x?.openMode || "newTab";
+
+  updateGroupVisibility();
 }
 
 function resetForm() {
@@ -101,12 +125,19 @@ function seedPickersNow() {
       dl.appendChild(opt);
     });
   }
+
+  updateGroupVisibility();
 }
 
 function buildPickers(rows) {
   // opdatér dropdowns med værdier fundet i data
   const cats = uniq(["Static Apps","Favoritter","Værktøjer","Administration","Andet", ...rows.map(r => r.category)]);
-  const grps = uniq(["Lely","Salg","Tekniker","FMS","Administration", ...rows.map(r => r.group)]);
+
+  // grupper kun fra favoritter + defaults
+  const grps = uniq([
+    "Lely","Salg","Tekniker","FMS","Administration",
+    ...rows.filter(r => (r.category || "").toLowerCase() === "favoritter").map(r => r.group)
+  ]);
 
   setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
   setSelectOptions($("group"), grps, { includeEmpty:true, emptyText:"(ingen gruppe)" });
@@ -131,6 +162,8 @@ function buildPickers(rows) {
     opt.value = ic;
     dl.appendChild(opt);
   });
+
+  updateGroupVisibility();
 }
 
 function renderTable(rows) {
@@ -182,6 +215,8 @@ async function refresh() {
   $("icon").addEventListener("input", updateIconPreview);
   updateIconPreview();
 
+  $("category").addEventListener("change", updateGroupVisibility);
+
   $("form").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("msg").textContent = "Gemmer...";
@@ -197,6 +232,7 @@ async function refresh() {
     } catch (err) {
       $("msg").textContent =
         `Fejl (${err?.status || "?"}): ` + (err?.data?.message || JSON.stringify(err?.data || err));
+      console.warn("save fejl:", err);
     }
   });
 
