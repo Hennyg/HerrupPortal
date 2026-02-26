@@ -53,20 +53,14 @@
     <div class="panel">
       <strong>Android (Chrome)</strong>
       <ol>
-        <li>Åbn portalen i <b>Chrome</b></li>
-        <li>Menu (⋮)</li>
-        <li><b>Installér app</b> / <b>Føj til startskærm</b></li>
+        <li>Scan QR koden på din telefon</li>
+        <li>Samsung internet:</li>
+        <li>Klik på de 3 streger nederst til højre</li>
+        <li><b>Føj til</b></li>
+        <li>Vælg startskærm</li>
+        <li><b>Vælg tilføj</b></li>
       </ol>
     </div>
-
-    <!-- ✅ Hjælpetekst for Android -->
-    <div id="a2hsHint" class="panel" style="display:none;">
-      <strong>Tip:</strong><br>
-      Hvis du ikke kan finde “Føj til startskærm” i Chrome,
-      så åbner du siden i <b>Samsung Internet</b> eller <b>Microsoft Edge</b>
-      og vælger <i>Tilføj til startskærm</i>.
-    </div>
-
   </div> <!-- SLUT container -->
 
   <!-- Scripts -->
@@ -76,21 +70,6 @@
     document.getElementById("qr").src =
       "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" +
       encodeURIComponent(url);
-  </script>
-
-  <script>
-    // Vis Android-hjælp hvis Android
-    (function(){
-      const ua = navigator.userAgent || "";
-      const isAndroid = /Android/i.test(ua);
-      const isChrome = /Chrome\/\d+/i.test(ua) &&
-                       !/EdgA\//i.test(ua) &&
-                       !/SamsungBrowser/i.test(ua);
-
-      if (isAndroid && isChrome) {
-        document.getElementById("a2hsHint").style.display = "block";
-      }
-    })();
   </script>
 
 </body>
