@@ -101,7 +101,7 @@ function resetForm() {
 
 function seedPickersNow() {
   setSelectOptions($("category"),
-    ["Static Apps","Favoritter","Værktøjer","Administration","Andet"],
+    ["Static Apps","Favoritter","Værktøjer","PowerApps","Andet"],
     { includeEmpty:true, emptyText:"(vælg kategori)" }
   );
 
