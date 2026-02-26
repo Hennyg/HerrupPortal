@@ -6,6 +6,7 @@
   <title>Genvej – Herrup Portal</title>
   <link rel="stylesheet" href="/assets/app.css" />
 </head>
+
 <body>
 
   <div class="navbar">
@@ -22,6 +23,7 @@
   </div>
 
   <div class="container">
+
     <div class="hero" style="padding:0 0 1rem">
       <div>
         <h1>Genvej på telefon</h1>
@@ -31,8 +33,12 @@
 
     <div class="panel">
       <strong>QR-kode</strong>
-      <div class="muted">Scan og åbn portalen, og vælg derefter “Føj til hjemmeskærm”.</div>
-      <div class="qrWrap"><img id="qr" alt="QR" /></div>
+      <div class="muted">
+        Scan og åbn portalen, og vælg derefter “Føj til hjemmeskærm”.
+      </div>
+      <div class="qrWrap">
+        <img id="qr" alt="QR" />
+      </div>
     </div>
 
     <div class="panel">
@@ -52,29 +58,40 @@
         <li><b>Installér app</b> / <b>Føj til startskærm</b></li>
       </ol>
     </div>
-  </div>
 
-  <div id="a2hsHint" class="panel" style="display:none;margin-top:12px">
-  <strong>Tip:</strong> Hvis du ikke kan finde “Føj til startskærm” i Chrome,
-  så åbner du siden i <b>Samsung Internet</b> eller <b>Microsoft Edge</b> og vælger:
-  <i>Tilføj til startskærm</i>.
-</div>
+    <!-- ✅ Hjælpetekst for Android -->
+    <div id="a2hsHint" class="panel" style="display:none;">
+      <strong>Tip:</strong><br>
+      Hvis du ikke kan finde “Føj til startskærm” i Chrome,
+      så åbner du siden i <b>Samsung Internet</b> eller <b>Microsoft Edge</b>
+      og vælger <i>Tilføj til startskærm</i>.
+    </div>
 
-<script>
-  (function(){
-    const ua = navigator.userAgent || "";
-    const isAndroid = /Android/i.test(ua);
-    const isChrome = /Chrome\/\d+/i.test(ua) && !/EdgA\//i.test(ua) && !/SamsungBrowser/i.test(ua);
-    if (isAndroid && isChrome) {
-      document.getElementById("a2hsHint").style.display = "block";
-    }
-  })();
-</script>
+  </div> <!-- SLUT container -->
 
+  <!-- Scripts -->
   <script>
+    // QR-kode
     const url = location.origin + "/";
     document.getElementById("qr").src =
-      "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(url);
+      "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" +
+      encodeURIComponent(url);
   </script>
+
+  <script>
+    // Vis Android-hjælp hvis Android
+    (function(){
+      const ua = navigator.userAgent || "";
+      const isAndroid = /Android/i.test(ua);
+      const isChrome = /Chrome\/\d+/i.test(ua) &&
+                       !/EdgA\//i.test(ua) &&
+                       !/SamsungBrowser/i.test(ua);
+
+      if (isAndroid && isChrome) {
+        document.getElementById("a2hsHint").style.display = "block";
+      }
+    })();
+  </script>
+
 </body>
 </html>
