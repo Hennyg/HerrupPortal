@@ -254,9 +254,7 @@ function renderSections(items) {
   console.log("Platform detected:", platform);
 
   const itemsAll = (raw || [])
-    .map(x => ({
-      ...x,
-      allowedRoles: parseAllowedRoles(x.allowedRoles),
+    .map(x :contentReference[oaicite:9]{index=9}   allowedRoles: parseAllowedRoles(x.allowedRoles),
       enabled: x.enabled !== false,
       platformHint: (x.platformHint || "All").toLowerCase()
     }))
@@ -265,6 +263,7 @@ function renderSections(items) {
       if (!x.platformHint || x.platformHint === "all") return true;
       return x.platformHint === platform;
     })
+    .filter(x => matchesRoles(x.allowedRoles, roles))
     .sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 
   // Filters (samme som før)
