@@ -6,7 +6,8 @@
       "/guide.html",
       "/assets/*",
       "/manifest.webmanifest",
-      "/service-worker.js"
+      "/sw.js",
+      "/icons/*"
     ]
   },
   "routes": [
