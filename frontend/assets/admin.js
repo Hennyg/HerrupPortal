@@ -134,7 +134,7 @@ function seedPickersNow() {
 }
 
 function buildPickers(rows) {
-  const cats = uniq(["Static Apps","Favoritter","Værktøjer","Administration","Andet", ...rows.map(r => r.category)]);
+  const cats = uniq(["Static Apps","Favoritter","Værktøjer","PowerApps","Andet", ...rows.map(r => r.category)]);
 
   const grps = uniq([
     "Lely","Salg","Tekniker","FMS","Administration",
