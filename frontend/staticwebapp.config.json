@@ -5,7 +5,7 @@
       "/admin.html",
       "/guide.html",
       "/assets/*",
-      "/manifest.webmanifest",
+      "/manifest.json",
       "/sw.js",
       "/icons/*"
     ]
