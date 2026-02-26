@@ -59,11 +59,18 @@
   <script src="/assets/app.js"></script>
 
   <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/sw.js").catch(console.warn);
-      });
-    }
-  </script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", async () => {
+      try {
+        const reg = await navigator.serviceWorker.register("/sw.js");
+        console.log("SW registered scope:", reg.scope);
+        console.log("SW active:", !!reg.active);
+        console.log("controller:", navigator.serviceWorker.controller);
+      } catch (e) {
+        console.warn("SW register failed", e);
+      }
+    });
+  }
+</script>
 </body>
 </html>
