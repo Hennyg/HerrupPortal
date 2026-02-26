@@ -5,11 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Herrup Portalen</title>
 
-  <!-- ✅ PWA -->
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#c30a14">
 
-  <!-- CSS -->
   <link rel="stylesheet" href="/assets/app.css" />
 </head>
   
@@ -67,5 +65,13 @@
   </div>
 
   <script src="/assets/app.js"></script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(console.warn);
+      });
+    }
+  </script>
 </body>
 </html>
