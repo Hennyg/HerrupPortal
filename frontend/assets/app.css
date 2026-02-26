@@ -10,9 +10,14 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 .navbar-inner{max-width:var(--maxw);margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;gap:1rem}
 .brand{display:flex;align-items:center;gap:12px;font-size:1.35rem;font-weight:600;letter-spacing:.2px;white-space:nowrap}
 .brand .logo{
-  width:52px;height:52px;border-radius:999px;background:#c30a14;color:#fff;
-  display:flex;align-items:center;justify-content:center;text-align:center;
-  font-weight:800;line-height:1.05;font-size:.75rem;
+  width:52px;
+  height:52px;
+  border-radius:999px;
+  background: url("/icons/icon-192.png") center/cover no-repeat;
+  /* hvis du hellere vil bruge /assets/logo.png, så byt url() */
+  display:block;
+  flex:0 0 auto;
+  box-shadow: 0 1px 6px rgba(0,0,0,.18);
 }
 .nav{display:flex;gap:1.25rem;align-items:center;font-size:1rem;flex-wrap:wrap;justify-content:flex-end}
 .nav a{color:var(--text-on-dark);text-decoration:none;opacity:.95}
