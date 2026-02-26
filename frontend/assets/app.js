@@ -1,7 +1,11 @@
 // assets/app.js
 
+// Slå tracking til/fra (du har pt. ikke /api/track => hold den false)
 const TRACKING_ENABLED = false;
 
+// ---------------------------
+// Utils / tracking
+// ---------------------------
 function safeUrl(u) {
   // Undgå at logge alt muligt persondata i querystring.
   // Returnér gerne kun origin+path, eller begræns querystring.
@@ -29,8 +33,8 @@ async function track(eventType, extra = {}) {
         ...extra
       })
     });
-  } catch (e) {
-    // Ignorer fejl
+  } catch {
+    // Tracking må aldrig ødelægge UX – ignorér fejl.
   }
 }
 
@@ -46,16 +50,33 @@ function detectPlatform() {
   return (isMobileUA || isSmallScreen) ? "mobile" : "desktop";
 }
 
+// ---------------------------
+// Auth / roles
+// ---------------------------
 async function getMe() {
-  const r = await fetch("/.auth/me");
+  const r = await fetch("/.auth/me", { cache: "no-store" });
   if (!r.ok) return null;
   const j = await r.json();
+  // SWA: j.clientPrincipal indeholder userDetails + userRoles
   return j?.clientPrincipal || null;
 }
 
-const normRoles = (roles) => (roles || []).map(r => String(r).toLowerCase());
-const hasRole = (roles, role) => roles.includes(String(role).toLowerCase());
+function normRoles(roles) {
+  return (roles || []).map(r => String(r).toLowerCase());
+}
 
+function expandRoles(roles) {
+  const set = new Set(normRoles(roles));
+
+  // Hierarki: admin skal også have user
+  if (set.has("portal_admin")) set.add("portal_user");
+
+  return [...set];
+}
+
+// ---------------------------
+// Link filtering
+// ---------------------------
 function parseAllowedRoles(s) {
   if (Array.isArray(s)) {
     return s.map(x => String(x).trim().toLowerCase()).filter(Boolean);
@@ -67,30 +88,39 @@ function parseAllowedRoles(s) {
 }
 
 function matchesRoles(itemRoles, userRoles) {
-  if (!itemRoles || !itemRoles.length) return true; // ingen krav => alle må se
-  const set = new Set((userRoles || []).map(r => String(r).toLowerCase()));
+  // Ingen krav => vis for alle (authenticated siden er låst af SWA routes)
+  if (!itemRoles || itemRoles.length === 0) return true;
+
+  const set = new Set(normRoles(userRoles));
   return itemRoles.some(r => set.has(String(r).toLowerCase()));
 }
 
 async function loadLinks() {
-  const r = await fetch("/api/links-admin");
-  if (!r.ok) throw new Error("api_not_ok");
+  // Din løsning bruger /api/links-admin
+  const r = await fetch("/api/links-admin", { cache: "no-store" });
+  if (!r.ok) throw new Error(`api_not_ok_${r.status}`);
   return await r.json();
 }
 
+// ---------------------------
+// UI helpers
+// ---------------------------
 function uniq(arr) {
   return Array.from(new Set((arr || []).filter(Boolean).map(x => String(x).trim())))
     .sort((a, b) => a.localeCompare(b, "da"));
 }
 
 function setSelectOptions(selectEl, options, { includeEmpty = true, emptyText = "Alle" } = {}) {
+  if (!selectEl) return;
   selectEl.innerHTML = "";
+
   if (includeEmpty) {
     const o = document.createElement("option");
     o.value = "";
     o.textContent = emptyText;
     selectEl.appendChild(o);
   }
+
   options.forEach(v => {
     const o = document.createElement("option");
     o.value = v;
@@ -101,7 +131,7 @@ function setSelectOptions(selectEl, options, { includeEmpty = true, emptyText = 
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, m => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
 }
 
@@ -119,6 +149,9 @@ function groupBy(arr, keyFn) {
   return m;
 }
 
+// ---------------------------
+// Rendering
+// ---------------------------
 function renderTileHTML(it) {
   const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
   return `
@@ -206,14 +239,12 @@ function wireAccordions(root) {
       btn.setAttribute("aria-expanded", String(!isOpen));
       if (body) body.hidden = isOpen;
 
-      // chevron flip (inline style)
       const ch = btn.querySelector(".favChevron");
       if (ch) ch.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
     });
   });
 }
 
-// ✅ Track clicks på tiles (hvilket link brugte de?)
 function wireTileTracking(root) {
   root.querySelectorAll('a.tile[data-track="tile"]').forEach(a => {
     a.addEventListener("click", () => {
@@ -247,94 +278,76 @@ function renderSections(items) {
 
   root.innerHTML = entries.map(([cat, links], i) => renderCategorySectionHTML(cat, links, i)).join("");
   wireAccordions(root);
-  wireTileTracking(root); // ✅ vigtigt: efter HTML er sat ind
+  wireTileTracking(root);
 }
 
+// ---------------------------
+// Init
+// ---------------------------
 (async function init() {
-  // 1) Hent bruger (getMe() returnerer clientPrincipal)
-const me = await getMe();
-const roles = expandRoles(getRolesFromMe(me));
-
-  // 2) Vis brugerlinje
   const userLine = document.getElementById("userLine");
-  if (userLine) userLine.textContent = getUserDetailsFromMe(me) || "Ikke logget ind";
+  if (userLine) userLine.textContent = "Henter bruger...";
 
-  // 3) Admin-link kun hvis portal_admin
-  const adminLink = document.getElementById("adminLink");
-if (adminLink) adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
+  let me = null;
+  try {
+    me = await getMe();
+  } catch {
+    me = null;
   }
 
-  // 4) Hent links
-  const raw = await loadLinks();
-  const platform = detectPlatform();
+  const roles = expandRoles(me?.userRoles || []);
 
-  // 5) Map + filter (platform + roller)
+  // Vis bruger
+  if (userLine) userLine.textContent = me?.userDetails || "Ikke logget ind";
+
+  // Admin link i navbar
+  const adminLink = document.getElementById("adminLink");
+  if (adminLink) {
+    adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
+  }
+
+  // Hent links
+  let raw = [];
+  try {
+    raw = await loadLinks();
+  } catch (e) {
+    console.warn("Kunne ikke hente links:", e);
+    // Vis tomt (eller du kan vise en fejlbesked i UI hvis du vil)
+    renderSections([]);
+    return;
+  }
+
+  const platform = detectPlatform();
+  console.log("Platform detected:", platform);
+
   const itemsAll = (raw || [])
     .map(x => ({
       ...x,
       allowedRoles: parseAllowedRoles(x.allowedRoles),
       enabled: x.enabled !== false,
-      platformHint: (x.platformHint || "All").toLowerCase()
+      platformHint: (x.platformHint || "all").toLowerCase()
     }))
     .filter(x => x.enabled)
-    .filter(x => {
-      if (!x.platformHint || x.platformHint === "all") return true;
-      return x.platformHint === platform;
-    })
+    .filter(x => x.platformHint === "all" || x.platformHint === platform)
     .filter(x => matchesRoles(x.allowedRoles, roles))
     .sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 
-  // 6) Filters
+  // Filters
   const categories = uniq(itemsAll.map(x => x.category));
   const groups = uniq(itemsAll.map(x => x.group).filter(Boolean));
 
   const catSel = document.getElementById("categoryFilter");
   const grpSel = document.getElementById("groupFilter");
-  if (catSel) setSelectOptions(catSel, categories, { includeEmpty: true, emptyText: "Alle kategorier" });
-  if (grpSel) setSelectOptions(grpSel, groups, { includeEmpty: true, emptyText: "Alle grupper" });
+  setSelectOptions(catSel, categories, { includeEmpty: true, emptyText: "Alle kategorier" });
+  setSelectOptions(grpSel, groups, { includeEmpty: true, emptyText: "Alle grupper" });
 
   const q = document.getElementById("q");
   const qx = document.getElementById("qx");
 
   function syncClearBtn() {
-    if (qx) qx.style.visibility = (q && q.value) ? "visible" : "hidden";
+    if (!qx || !q) return;
+    qx.style.visibility = q.value ? "visible" : "hidden";
   }
-
-  function getRolesFromMe(me) {
-  // understøtter både:
-  //  A) me = { clientPrincipal: {...} }  (rå /.auth/me)
-  //  B) me = { userRoles: [...], userDetails: ... } (clientPrincipal direkte)
-  const cp = me?.clientPrincipal || me;
-  return (cp?.userRoles || []).map(r => String(r).toLowerCase());
-}
-
-function getUserDetailsFromMe(me) {
-  const cp = me?.clientPrincipal || me;
-  return cp?.userDetails || "";
-}
-
-function expandRoles(rawRoles) {
-  const set = new Set((rawRoles || []).map(r => String(r).toLowerCase()));
-
-  // Hierarki: admin skal også have user
-  if (set.has("portal_admin")) set.add("portal_user");
-
-  return [...set];
-}
-
-function parseAllowedRoles(s) {
-  if (Array.isArray(s)) return s.map(x => String(x).trim().toLowerCase()).filter(Boolean);
-  return String(s || "")
-    .split(";")
-    .map(x => x.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function matchesRoles(itemRoles, userRoles) {
-  if (!itemRoles || itemRoles.length === 0) return true; // ingen krav => vis
-  const set = new Set((userRoles || []).map(r => String(r).toLowerCase()));
-  return itemRoles.some(r => set.has(String(r).toLowerCase()));
-}
 
   function render() {
     const qq = (q?.value || "").toLowerCase();
@@ -344,6 +357,7 @@ function matchesRoles(itemRoles, userRoles) {
     const filtered = itemsAll.filter(x => {
       if (cat && (x.category || "") !== cat) return false;
       if (grp && (x.group || "") !== grp) return false;
+
       if (!qq) return true;
       return (x.title || "").toLowerCase().includes(qq) || (x.url || "").toLowerCase().includes(qq);
     });
