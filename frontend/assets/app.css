@@ -116,3 +116,37 @@ a.mapLink:hover { filter: brightness(0.9); }
 .favChevron { transition: transform .15s ease; }
 .favGroupHdr.open .favChevron { transform: rotate(180deg); }
 .favGroupBody { padding: 12px 14px; }
+
+/* ===== Mobil-tilpasning ===== */
+@media (max-width: 768px) {
+
+  body {
+    font-size: 18px;
+  }
+
+  .hero h1 {
+    font-size: 2.4rem;
+  }
+
+  .nav a {
+    font-size: 1.1rem;
+  }
+
+  .sectionTitle {
+    font-size: 1.3rem;
+  }
+
+  .tileTitle {
+    font-size: 1.1rem;
+  }
+
+  .favName {
+    font-size: 1.1rem;
+  }
+
+  .filters select,
+  .clearable input {
+    font-size: 1rem;
+  }
+
+}
