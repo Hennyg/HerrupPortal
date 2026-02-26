@@ -1,5 +1,7 @@
 // assets/app.js
 
+const TRACKING_ENABLED = false;
+
 function safeUrl(u) {
   // Undgå at logge alt muligt persondata i querystring.
   // Returnér gerne kun origin+path, eller begræns querystring.
@@ -12,6 +14,8 @@ function safeUrl(u) {
 }
 
 async function track(eventType, extra = {}) {
+  if (!TRACKING_ENABLED) return;
+
   try {
     await fetch("/api/track", {
       method: "POST",
@@ -26,7 +30,7 @@ async function track(eventType, extra = {}) {
       })
     });
   } catch (e) {
-    // Tracking må aldrig ødelægge UX – så vi ignorerer fejl.
+    // Ignorer fejl
   }
 }
 
@@ -248,17 +252,16 @@ function renderSections(items) {
 
 (async function init() {
   // 1) Hent bruger (getMe() returnerer clientPrincipal)
-  const me = await getMe(); // { userDetails, userRoles, ... } eller null
-  const roles = expandRoles(me?.userRoles || []);
+const me = await getMe();
+const roles = expandRoles(getRolesFromMe(me));
 
   // 2) Vis brugerlinje
   const userLine = document.getElementById("userLine");
-  if (userLine) userLine.textContent = me ? me.userDetails : "Ikke logget ind";
+  if (userLine) userLine.textContent = getUserDetailsFromMe(me) || "Ikke logget ind";
 
   // 3) Admin-link kun hvis portal_admin
   const adminLink = document.getElementById("adminLink");
-  if (adminLink) {
-    adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
+if (adminLink) adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
   }
 
   // 4) Hent links
@@ -296,6 +299,42 @@ function renderSections(items) {
   function syncClearBtn() {
     if (qx) qx.style.visibility = (q && q.value) ? "visible" : "hidden";
   }
+
+  function getRolesFromMe(me) {
+  // understøtter både:
+  //  A) me = { clientPrincipal: {...} }  (rå /.auth/me)
+  //  B) me = { userRoles: [...], userDetails: ... } (clientPrincipal direkte)
+  const cp = me?.clientPrincipal || me;
+  return (cp?.userRoles || []).map(r => String(r).toLowerCase());
+}
+
+function getUserDetailsFromMe(me) {
+  const cp = me?.clientPrincipal || me;
+  return cp?.userDetails || "";
+}
+
+function expandRoles(rawRoles) {
+  const set = new Set((rawRoles || []).map(r => String(r).toLowerCase()));
+
+  // Hierarki: admin skal også have user
+  if (set.has("portal_admin")) set.add("portal_user");
+
+  return [...set];
+}
+
+function parseAllowedRoles(s) {
+  if (Array.isArray(s)) return s.map(x => String(x).trim().toLowerCase()).filter(Boolean);
+  return String(s || "")
+    .split(";")
+    .map(x => x.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function matchesRoles(itemRoles, userRoles) {
+  if (!itemRoles || itemRoles.length === 0) return true; // ingen krav => vis
+  const set = new Set((userRoles || []).map(r => String(r).toLowerCase()));
+  return itemRoles.some(r => set.has(String(r).toLowerCase()));
+}
 
   function render() {
     const qq = (q?.value || "").toLowerCase();
