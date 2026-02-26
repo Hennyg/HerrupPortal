@@ -53,13 +53,18 @@ const normRoles = (roles) => (roles || []).map(r => String(r).toLowerCase());
 const hasRole = (roles, role) => roles.includes(String(role).toLowerCase());
 
 function parseAllowedRoles(s) {
-  if (Array.isArray(s)) return s.map(x => String(x).trim()).filter(Boolean);
-  return String(s || "").split(";").map(x => x.trim()).filter(Boolean);
+  if (Array.isArray(s)) {
+    return s.map(x => String(x).trim().toLowerCase()).filter(Boolean);
+  }
+  return String(s || "")
+    .split(";")
+    .map(x => x.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 function matchesRoles(itemRoles, userRoles) {
-  if (!itemRoles || !itemRoles.length) return true;
-  const set = new Set(userRoles);
+  if (!itemRoles || !itemRoles.length) return true; // ingen krav => alle må se
+  const set = new Set((userRoles || []).map(r => String(r).toLowerCase()));
   return itemRoles.some(r => set.has(String(r).toLowerCase()));
 }
 
@@ -242,65 +247,64 @@ function renderSections(items) {
 }
 
 (async function init() {
-  const me = await getMe();
-  const roles = normRoles(me?.userRoles || []);
-  document.getElementById("userLine").textContent = me ? `${me.userDetails}` : "Ikke logget ind";
+  // 1) Hent bruger (getMe() returnerer clientPrincipal)
+  const me = await getMe(); // { userDetails, userRoles, ... } eller null
+  const roles = expandRoles(me?.userRoles || []);
 
-  // (du kan senere gøre denne role-baseret igen)
-  document.getElementById("adminLink").classList.remove("hidden");
+  // 2) Vis brugerlinje
+  const userLine = document.getElementById("userLine");
+  if (userLine) userLine.textContent = me ? me.userDetails : "Ikke logget ind";
 
+  // 3) Admin-link kun hvis portal_admin
+  const adminLink = document.getElementById("adminLink");
+  if (adminLink) {
+    adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
+  }
+
+  // 4) Hent links
   const raw = await loadLinks();
   const platform = detectPlatform();
-  console.log("Platform detected:", platform);
 
+  // 5) Map + filter (platform + roller)
   const itemsAll = (raw || [])
     .map(x => ({
       ...x,
       allowedRoles: parseAllowedRoles(x.allowedRoles),
-    .map(x :contentReference[oaicite:9]{index=9}   allowedRoles: parseAllowedRoles(x.allowedRoles),
       enabled: x.enabled !== false,
       platformHint: (x.platformHint || "All").toLowerCase()
     }))
-@@ -265,47 +263,48 @@
+    .filter(x => x.enabled)
+    .filter(x => {
       if (!x.platformHint || x.platformHint === "all") return true;
       return x.platformHint === platform;
     })
     .filter(x => matchesRoles(x.allowedRoles, roles))
     .sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 
-  // Filters (samme som før)
+  // 6) Filters
   const categories = uniq(itemsAll.map(x => x.category));
   const groups = uniq(itemsAll.map(x => x.group).filter(Boolean));
 
   const catSel = document.getElementById("categoryFilter");
   const grpSel = document.getElementById("groupFilter");
-  setSelectOptions(catSel, categories, { includeEmpty: true, emptyText: "Alle kategorier" });
-  setSelectOptions(grpSel, groups, { includeEmpty: true, emptyText: "Alle grupper" });
+  if (catSel) setSelectOptions(catSel, categories, { includeEmpty: true, emptyText: "Alle kategorier" });
+  if (grpSel) setSelectOptions(grpSel, groups, { includeEmpty: true, emptyText: "Alle grupper" });
 
   const q = document.getElementById("q");
   const qx = document.getElementById("qx");
 
   function syncClearBtn() {
-    qx.style.visibility = q.value ? "visible" : "hidden";
+    if (qx) qx.style.visibility = (q && q.value) ? "visible" : "hidden";
   }
 
-  q.addEventListener("input", () => { syncClearBtn(); render(); });
-  qx.addEventListener("click", () => { q.value = ""; syncClearBtn(); render(); });
-  catSel.addEventListener("change", render);
-  grpSel.addEventListener("change", render);
-  syncClearBtn();
-
   function render() {
-    const qq = (q.value || "").toLowerCase();
-    const cat = catSel.value;
-    const grp = grpSel.value;
+    const qq = (q?.value || "").toLowerCase();
+    const cat = catSel?.value || "";
+    const grp = grpSel?.value || "";
 
     const filtered = itemsAll.filter(x => {
       if (cat && (x.category || "") !== cat) return false;
-
-      // gruppe-filter giver mest mening for Favoritter, men virker generelt
       if (grp && (x.group || "") !== grp) return false;
-
       if (!qq) return true;
       return (x.title || "").toLowerCase().includes(qq) || (x.url || "").toLowerCase().includes(qq);
     });
@@ -308,5 +312,11 @@ function renderSections(items) {
     renderSections(filtered);
   }
 
+  if (q) q.addEventListener("input", () => { syncClearBtn(); render(); });
+  if (qx) qx.addEventListener("click", () => { q.value = ""; syncClearBtn(); render(); });
+  if (catSel) catSel.addEventListener("change", render);
+  if (grpSel) grpSel.addEventListener("change", render);
+
+  syncClearBtn();
   render();
 })();
