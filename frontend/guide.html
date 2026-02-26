@@ -54,6 +54,23 @@
     </div>
   </div>
 
+  <div id="a2hsHint" class="panel" style="display:none;margin-top:12px">
+  <strong>Tip:</strong> Hvis du ikke kan finde “Føj til startskærm” i Chrome,
+  så åbner du siden i <b>Samsung Internet</b> eller <b>Microsoft Edge</b> og vælger:
+  <i>Tilføj til startskærm</i>.
+</div>
+
+<script>
+  (function(){
+    const ua = navigator.userAgent || "";
+    const isAndroid = /Android/i.test(ua);
+    const isChrome = /Chrome\/\d+/i.test(ua) && !/EdgA\//i.test(ua) && !/SamsungBrowser/i.test(ua);
+    if (isAndroid && isChrome) {
+      document.getElementById("a2hsHint").style.display = "block";
+    }
+  })();
+</script>
+
   <script>
     const url = location.origin + "/";
     document.getElementById("qr").src =
