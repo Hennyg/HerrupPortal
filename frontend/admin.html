@@ -7,16 +7,93 @@
 
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
+
   <link rel="stylesheet" href="/assets/app.css" />
+
+  <!-- Kun admin-layout (påvirker ikke index) -->
+  <style>
+    .adminPage .panel { padding: 22px; }
+    .adminTitle { text-align:center; margin: 0; font-size: 42px; color: var(--heading); }
+    .adminSub { text-align:center; margin: 6px 0 18px; }
+
+    /* Felt-layout */
+    .formGrid {
+      display: grid;
+      grid-template-columns: 1.1fr 1.3fr 1fr 1fr;
+      gap: 10px 12px;
+      align-items: end;
+    }
+    .formGrid label { display:grid; gap:6px; font-size:.9rem; color:#374151; }
+    .formGrid .span2 { grid-column: span 2; }
+    .formGrid .span3 { grid-column: span 3; }
+    .formGrid .span4 { grid-column: span 4; }
+
+    /* “Ikon + preview” */
+    .iconRow {
+      display:grid;
+      grid-template-columns: 1fr 110px;
+      gap: 12px;
+      align-items:end;
+    }
+    #iconPreview {
+      height: 38px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid #d1d5db;
+      border-radius:6px;
+      background:#fff;
+      font-size: 22px;
+    }
+
+    /* Nederste række */
+    .bottomRow {
+      display:grid;
+      grid-template-columns: 1.4fr 200px 170px 120px;
+      gap: 10px 12px;
+      align-items:end;
+      margin-top: 4px;
+    }
+    .inlineCheck {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      height: 38px;
+      padding: 0 6px;
+    }
+
+    .actionsRow {
+      display:flex;
+      gap:10px;
+      align-items:center;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    #msg { min-height: 18px; }
+
+    /* Responsiv */
+    @media (max-width: 980px) {
+      .formGrid { grid-template-columns: 1fr 1fr; }
+      .bottomRow { grid-template-columns: 1fr 1fr; }
+      .iconRow { grid-template-columns: 1fr 110px; }
+    }
+    @media (max-width: 520px) {
+      .formGrid { grid-template-columns: 1fr; }
+      .bottomRow { grid-template-columns: 1fr; }
+      .iconRow { grid-template-columns: 1fr; }
+      #iconPreview { width: 100%; }
+    }
+  </style>
 </head>
 
-<body>
+<body class="adminPage">
   <div class="navbar">
     <div class="navbar-inner">
       <div class="brand">
         <div class="logo" aria-label="Herrup Portal"></div>
         <div>Admin</div>
       </div>
+
       <div class="nav">
         <a href="/">← Til portal</a>
         <a href="/logout">Log ud</a>
@@ -26,85 +103,81 @@
   </div>
 
   <div class="container" style="padding-top:1.5rem">
-    <div class="hero" style="padding: 1rem 0 1.5rem;">
-      <div>
-        <h1>Opret / redigér link</h1>
-        <div class="muted" style="text-align:center">Tilføj / redigér / fjern apps og links</div>
-      </div>
-    </div>
+    <h1 class="adminTitle">Opret / redigér link</h1>
+    <div class="muted adminSub">Tilføj / redigér / fjern apps og links</div>
 
     <div class="panel">
-      <form id="form" class="form">
+      <form id="form">
         <input id="id" type="hidden" />
 
-        <div class="row">
-          <label style="flex:1">
+        <!-- ØVERSTE GRID -->
+        <div class="formGrid">
+          <label>
             Titel
             <input id="title" class="input" autocomplete="off" />
           </label>
 
-          <label style="flex:2">
+          <label>
             URL
             <input id="url" class="input" placeholder="https://..." autocomplete="off" />
           </label>
-        </div>
 
-        <div class="row">
-          <label style="flex:1">
+          <label>
             Kategori
             <select id="category" class="input"></select>
           </label>
 
-          <label id="groupRow" style="flex:1">
+          <!-- Gruppe (kun favoritter) -->
+          <label id="groupRow">
             Gruppe (favoritter)
             <select id="group" class="input"></select>
           </label>
 
-          <label id="subgroupRow" style="flex:1">
+          <!-- Undergruppe (kun favoritter) -->
+          <label id="subgroupRow" class="span2">
             Undergruppe (favoritter)
             <input id="subgroup" class="input" placeholder="fx Dokumentation" autocomplete="off" />
           </label>
-        </div>
 
-        <div class="row">
-          <label style="flex:1">
+          <label>
             Platform
             <select id="platformHint" class="input"></select>
           </label>
 
-          <label style="flex:1">
+          <label>
             Parent
             <select id="parent" class="input">
               <option value="">(ingen parent)</option>
             </select>
           </label>
-        </div>
 
-        <div class="row">
-          <label style="flex:1">
-            Ikon (emoji eller tekst)
-            <input id="icon" class="input" list="iconList" />
-            <datalist id="iconList"></datalist>
-          </label>
+          <div class="iconRow span2">
+            <label>
+              Ikon (emoji eller tekst)
+              <input id="icon" class="input" list="iconList" />
+              <datalist id="iconList"></datalist>
+            </label>
 
-          <label style="min-width:120px">
-            Preview
-            <div class="input" style="display:flex;align-items:center;justify-content:center;font-size:24px" id="iconPreview">🔗</div>
-          </label>
-        </div>
+            <label>
+              Preview
+              <div id="iconPreview">🔗</div>
+            </label>
+          </div>
 
-        <div class="row">
-          <label style="flex:2">
+          <label class="span4">
             Allowed roles (semikolon-separeret)
             <input id="roles" class="input" placeholder="portal_user;portal_admin" />
           </label>
+        </div>
 
-          <label style="width:160px">
+        <!-- NEDERSTE RÆKKE -->
+        <div class="bottomRow">
+          <label>
             Sort order
             <input id="sort" class="input" type="number" />
           </label>
 
-          <label style="width:170px">
+          <label>
             Åbn
             <select id="openMode" class="input">
               <option value="newTab">Ny fane</option>
@@ -112,13 +185,15 @@
             </select>
           </label>
 
-          <label class="inline" style="margin-top:28px">
+          <label class="inlineCheck">
             <input id="enabled" type="checkbox" checked />
             Aktiv
           </label>
+
+          <div></div>
         </div>
 
-        <div class="row">
+        <div class="actionsRow">
           <button class="btn primary" type="submit">Gem</button>
           <button class="btn" type="button" id="resetBtn">Nulstil</button>
           <span id="msg" class="muted"></span>
@@ -126,8 +201,8 @@
       </form>
     </div>
 
-    <div class="panel">
-      <div class="toolbar">
+    <div class="panel" style="margin-top:16px">
+      <div class="toolbar" style="margin-bottom:10px">
         <div class="left">
           <div class="sectionTitle" style="margin:0">Links</div>
         </div>
