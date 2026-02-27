@@ -43,14 +43,23 @@ function updateIconPreview() {
   if (p) p.textContent = v || "🔗";
 }
 
-// Gruppe kun for Favoritter
+// Gruppe/Undergruppe kun for Favoritter
 function updateGroupVisibility() {
   const cat = ($("category")?.value || "").trim().toLowerCase();
-  const row = $("groupRow"); // kræver id="groupRow" på label/wrapper i admin.html
+  const groupRow = $("groupRow");
+  const subgroupRow = $("subgroupRow");
   const isFav = cat === "favoritter";
-  if (row) row.style.display = isFav ? "" : "none";
-  if (!isFav && $("group")) $("group").value = "";
-  if (isFav) $("sort").value = "";
+
+  if (groupRow) groupRow.style.display = isFav ? "" : "none";
+  if (subgroupRow) subgroupRow.style.display = isFav ? "" : "none";
+
+  if (!isFav) {
+    if ($("group")) $("group").value = "";
+    if ($("subgroup")) $("subgroup").value = "";
+  }
+
+  // du havde den her før (tøm sort ved favoritter)
+  if (isFav && $("sort")) $("sort").value = "";
 }
 
 function readForm() {
@@ -63,6 +72,8 @@ function readForm() {
     url: $("url").value.trim(),
     category: category,
     group: isFav ? $("group").value : "",
+    // NYT:
+    subgroup: isFav ? ($("subgroup")?.value || "").trim() : "",
     parent: $("parent").value || null,
     icon: $("icon").value.trim(),
     allowedRoles: $("roles").value.trim(),
@@ -70,7 +81,6 @@ function readForm() {
     sort: Number($("sort").value || 100),
     openMode: $("openMode").value,
 
-    // NYT felt
     platformHint: $("platformHint")?.value || "All"
   };
 }
@@ -81,6 +91,9 @@ function fillForm(x) {
   $("url").value = x?.url || "";
   $("category").value = x?.category || "";
   $("group").value = x?.group || "";
+  // NYT:
+  if ($("subgroup")) $("subgroup").value = x?.subgroup || "";
+
   $("parent").value = x?.parent || "";
   $("icon").value = x?.icon || "";
   updateIconPreview();
@@ -92,10 +105,11 @@ function fillForm(x) {
   if ($("platformHint")) $("platformHint").value = x?.platformHint || "All";
 
   updateGroupVisibility();
+  maybeAutoSortForFavGroup(); // så den foreslår hvis sort er tom
 }
 
 function resetForm() {
-  fillForm({ enabled:true, sort:100, openMode:"newTab", platformHint:"All" });
+  fillForm({ enabled:true, sort:100, openMode:"newTab", platformHint:"All", subgroup:"" });
   $("msg").textContent = "";
 }
 
@@ -110,7 +124,7 @@ function seedPickersNow() {
     { includeEmpty:true, emptyText:"(ingen gruppe)" }
   );
 
-  // NYT: platform hint
+  // platform hint
   setSelectOptions($("platformHint"),
     ["All","Desktop","Mobile"],
     { includeEmpty:false }
@@ -144,7 +158,7 @@ function buildPickers(rows) {
   setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
   setSelectOptions($("group"), grps, { includeEmpty:true, emptyText:"(ingen gruppe)" });
 
-  // Platform hint – hold fast i 3 værdier, men tillad også værdier fra data
+  // platform hint – hold fast i 3 værdier, men tillad også værdier fra data
   const hints = uniq(["All","Desktop","Mobile", ...rows.map(r => r.platformHint)]);
   setSelectOptions($("platformHint"), hints, { includeEmpty:false });
 
@@ -183,6 +197,7 @@ function renderTable(rows) {
       <td>${x.title || ""}</td>
       <td>${x.category || ""}</td>
       <td>${x.group || ""}</td>
+      <td>${x.subgroup || ""}</td>
       <td>${x.platformHint || ""}</td>
       <td>${parentTitle}</td>
       <td>${x.enabled !== false ? "Ja" : "Nej"}</td>
@@ -192,6 +207,7 @@ function renderTable(rows) {
         <button class="btn" data-act="del">Slet</button>
       </td>
     `;
+
     tr.querySelector('[data-act="edit"]').onclick = () => fillForm(x);
     tr.querySelector('[data-act="del"]').onclick = async () => {
       if (!confirm(`Slet "${x.title}"?`)) return;
@@ -199,16 +215,20 @@ function renderTable(rows) {
       await refresh();
       resetForm();
     };
+
     tb.appendChild(tr);
   });
 }
 
+// Auto-sort for Favoritter: pr. gruppe + undergruppe
 function maybeAutoSortForFavGroup() {
   const cat = ($("category")?.value || "").trim().toLowerCase();
   if (cat !== "favoritter") return;
 
   const grp = ($("group")?.value || "").trim();
   if (!grp) return;
+
+  const sub = ($("subgroup")?.value || "").trim();
 
   // hvis brugeren allerede har skrevet et tal, så respekter det
   const cur = String($("sort")?.value || "").trim();
@@ -219,6 +239,7 @@ function maybeAutoSortForFavGroup() {
     ...lastRows
       .filter(r => (r.category || "").toLowerCase() === "favoritter")
       .filter(r => (r.group || "").trim() === grp)
+      .filter(r => String(r.subgroup || "").trim() === sub) // NYT: pr undergruppe
       .map(r => Number(r.sort ?? 0))
       .filter(n => Number.isFinite(n))
   );
@@ -227,32 +248,46 @@ function maybeAutoSortForFavGroup() {
 }
 
 async function refresh() {
-  console.log("refresh() starter");
   const rows = await api("GET", "/api/links-admin");
-  console.log("refresh() rows:", rows);
   const list = (rows || []).sort((a,b) => (a.sort ?? 1000) - (b.sort ?? 1000));
-  lastRows = list; // <-- NYT
+  lastRows = list;
   buildPickers(list);
   renderTable(list);
-  maybeAutoSortForFavGroup(); // <-- NYT (hvis du står på favoritter+gruppe)
+  maybeAutoSortForFavGroup();
 }
 
 (async function init(){
   console.log("admin.js loaded");
+
+  // Vis bruger / admin bar (samme mønster som dine andre sider)
+  try {
+    const r = await fetch("/.auth/me", { cache:"no-store" });
+    if (r.ok) {
+      const j = await r.json();
+      const me = j?.clientPrincipal;
+      if ($("userLine")) $("userLine").textContent = me?.userDetails || "Ukendt bruger";
+    }
+  } catch {}
 
   seedPickersNow();
 
   $("icon").addEventListener("input", updateIconPreview);
   updateIconPreview();
 
-$("category").addEventListener("change", () => {
-  updateGroupVisibility();
-  maybeAutoSortForFavGroup();
-});
+  $("category").addEventListener("change", () => {
+    updateGroupVisibility();
+    maybeAutoSortForFavGroup();
+  });
 
-$("group").addEventListener("change", () => {
-  maybeAutoSortForFavGroup();
-});  
+  $("group").addEventListener("change", () => {
+    maybeAutoSortForFavGroup();
+  });
+
+  if ($("subgroup")) {
+    $("subgroup").addEventListener("input", () => {
+      maybeAutoSortForFavGroup();
+    });
+  }
 
   $("form").addEventListener("submit", async (e) => {
     e.preventDefault();
