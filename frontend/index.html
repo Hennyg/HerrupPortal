@@ -49,7 +49,6 @@
         <select id="groupFilter"></select>
       </div>
 
-      <!-- NY: vi renderer sektioner i stedet for et fladt grid -->
       <div id="sections"></div>
 
       <div class="muted" style="margin-top:12px">Tip: Åbn på telefon og vælg “Føj til hjemmeskærm”.</div>
@@ -59,18 +58,18 @@
   <script src="/assets/app.js"></script>
 
   <script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", async () => {
-      try {
-        const reg = await navigator.serviceWorker.register("/sw.js");
-        console.log("SW registered scope:", reg.scope);
-        console.log("SW active:", !!reg.active);
-        console.log("controller:", navigator.serviceWorker.controller);
-      } catch (e) {
-        console.warn("SW register failed", e);
-      }
-    });
-  }
-</script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", async () => {
+        try {
+          const reg = await navigator.serviceWorker.register("/sw.js");
+          console.log("SW registered scope:", reg.scope);
+          console.log("SW active:", !!reg.active);
+          console.log("controller:", navigator.serviceWorker.controller);
+        } catch (e) {
+          console.warn("SW register failed", e);
+        }
+      });
+    }
+  </script>
 </body>
 </html>
