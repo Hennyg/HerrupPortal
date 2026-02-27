@@ -13,7 +13,7 @@ async function api(method, url, body) {
 
 function $(id){ return document.getElementById(id); }
 
-let lastRows = []; // seneste rows fra refresh()
+let lastRows = [];
 
 function uniq(arr) {
   return Array.from(new Set((arr||[]).filter(Boolean).map(x => String(x).trim())))
@@ -43,12 +43,12 @@ function updateIconPreview() {
   if (p) p.textContent = v || "🔗";
 }
 
-// Gruppe/Undergruppe kun for Favoritter
-function updateGroupVisibility() {
+function updateFavVisibility() {
   const cat = ($("category")?.value || "").trim().toLowerCase();
+  const isFav = cat === "favoritter";
+
   const groupRow = $("groupRow");
   const subgroupRow = $("subgroupRow");
-  const isFav = cat === "favoritter";
 
   if (groupRow) groupRow.style.display = isFav ? "" : "none";
   if (subgroupRow) subgroupRow.style.display = isFav ? "" : "none";
@@ -58,8 +58,7 @@ function updateGroupVisibility() {
     if ($("subgroup")) $("subgroup").value = "";
   }
 
-  // du havde den her før (tøm sort ved favoritter)
-  if (isFav && $("sort")) $("sort").value = "";
+  if (isFav) $("sort").value = ""; // samme adfærd som før
 }
 
 function readForm() {
@@ -70,9 +69,8 @@ function readForm() {
     id: $("id").value || null,
     title: $("title").value.trim(),
     url: $("url").value.trim(),
-    category: category,
-    group: isFav ? $("group").value : "",
-    // NYT:
+    category,
+    group: isFav ? ($("group").value || "") : "",
     subgroup: isFav ? ($("subgroup")?.value || "").trim() : "",
     parent: $("parent").value || null,
     icon: $("icon").value.trim(),
@@ -80,7 +78,6 @@ function readForm() {
     enabled: $("enabled").checked,
     sort: Number($("sort").value || 100),
     openMode: $("openMode").value,
-
     platformHint: $("platformHint")?.value || "All"
   };
 }
@@ -91,9 +88,7 @@ function fillForm(x) {
   $("url").value = x?.url || "";
   $("category").value = x?.category || "";
   $("group").value = x?.group || "";
-  // NYT:
   if ($("subgroup")) $("subgroup").value = x?.subgroup || "";
-
   $("parent").value = x?.parent || "";
   $("icon").value = x?.icon || "";
   updateIconPreview();
@@ -101,11 +96,9 @@ function fillForm(x) {
   $("enabled").checked = x?.enabled !== false;
   $("sort").value = x?.sort ?? 100;
   $("openMode").value = x?.openMode || "newTab";
-
   if ($("platformHint")) $("platformHint").value = x?.platformHint || "All";
-
-  updateGroupVisibility();
-  maybeAutoSortForFavGroup(); // så den foreslår hvis sort er tom
+  updateFavVisibility();
+  maybeAutoSort();
 }
 
 function resetForm() {
@@ -124,7 +117,6 @@ function seedPickersNow() {
     { includeEmpty:true, emptyText:"(ingen gruppe)" }
   );
 
-  // platform hint
   setSelectOptions($("platformHint"),
     ["All","Desktop","Mobile"],
     { includeEmpty:false }
@@ -144,21 +136,19 @@ function seedPickersNow() {
     });
   }
 
-  updateGroupVisibility();
+  updateFavVisibility();
 }
 
 function buildPickers(rows) {
   const cats = uniq(["Static Apps","Favoritter","Værktøjer","PowerApps","Andet", ...rows.map(r => r.category)]);
+  setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
 
   const grps = uniq([
     "Lely","Salg","Tekniker","FMS","Administration",
     ...rows.filter(r => (r.category || "").toLowerCase() === "favoritter").map(r => r.group)
   ]);
-
-  setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
   setSelectOptions($("group"), grps, { includeEmpty:true, emptyText:"(ingen gruppe)" });
 
-  // platform hint – hold fast i 3 værdier, men tillad også værdier fra data
   const hints = uniq(["All","Desktop","Mobile", ...rows.map(r => r.platformHint)]);
   setSelectOptions($("platformHint"), hints, { includeEmpty:false });
 
@@ -172,17 +162,7 @@ function buildPickers(rows) {
     parentSelect.appendChild(o);
   });
 
-  const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
-  const icons = uniq([...fixedIcons, ...rows.map(r => r.icon).filter(Boolean)]);
-  const dl = document.getElementById("iconList");
-  dl.innerHTML = "";
-  icons.forEach(ic => {
-    const opt = document.createElement("option");
-    opt.value = ic;
-    dl.appendChild(opt);
-  });
-
-  updateGroupVisibility();
+  updateFavVisibility();
 }
 
 function renderTable(rows) {
@@ -207,7 +187,6 @@ function renderTable(rows) {
         <button class="btn" data-act="del">Slet</button>
       </td>
     `;
-
     tr.querySelector('[data-act="edit"]').onclick = () => fillForm(x);
     tr.querySelector('[data-act="del"]').onclick = async () => {
       if (!confirm(`Slet "${x.title}"?`)) return;
@@ -215,13 +194,11 @@ function renderTable(rows) {
       await refresh();
       resetForm();
     };
-
     tb.appendChild(tr);
   });
 }
 
-// Auto-sort for Favoritter: pr. gruppe + undergruppe
-function maybeAutoSortForFavGroup() {
+function maybeAutoSort() {
   const cat = ($("category")?.value || "").trim().toLowerCase();
   if (cat !== "favoritter") return;
 
@@ -230,7 +207,6 @@ function maybeAutoSortForFavGroup() {
 
   const sub = ($("subgroup")?.value || "").trim();
 
-  // hvis brugeren allerede har skrevet et tal, så respekter det
   const cur = String($("sort")?.value || "").trim();
   if (cur && cur !== "0") return;
 
@@ -239,7 +215,7 @@ function maybeAutoSortForFavGroup() {
     ...lastRows
       .filter(r => (r.category || "").toLowerCase() === "favoritter")
       .filter(r => (r.group || "").trim() === grp)
-      .filter(r => String(r.subgroup || "").trim() === sub) // NYT: pr undergruppe
+      .filter(r => String(r.subgroup || "").trim() === sub)
       .map(r => Number(r.sort ?? 0))
       .filter(n => Number.isFinite(n))
   );
@@ -253,41 +229,22 @@ async function refresh() {
   lastRows = list;
   buildPickers(list);
   renderTable(list);
-  maybeAutoSortForFavGroup();
+  maybeAutoSort();
 }
 
 (async function init(){
-  console.log("admin.js loaded");
-
-  // Vis bruger / admin bar (samme mønster som dine andre sider)
-  try {
-    const r = await fetch("/.auth/me", { cache:"no-store" });
-    if (r.ok) {
-      const j = await r.json();
-      const me = j?.clientPrincipal;
-      if ($("userLine")) $("userLine").textContent = me?.userDetails || "Ukendt bruger";
-    }
-  } catch {}
-
   seedPickersNow();
 
   $("icon").addEventListener("input", updateIconPreview);
   updateIconPreview();
 
   $("category").addEventListener("change", () => {
-    updateGroupVisibility();
-    maybeAutoSortForFavGroup();
+    updateFavVisibility();
+    maybeAutoSort();
   });
 
-  $("group").addEventListener("change", () => {
-    maybeAutoSortForFavGroup();
-  });
-
-  if ($("subgroup")) {
-    $("subgroup").addEventListener("input", () => {
-      maybeAutoSortForFavGroup();
-    });
-  }
+  $("group").addEventListener("change", maybeAutoSort);
+  if ($("subgroup")) $("subgroup").addEventListener("input", maybeAutoSort);
 
   $("form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -315,8 +272,7 @@ async function refresh() {
   try {
     await refresh();
   } catch (err) {
-    $("msg").textContent = "API /api/links-admin virker ikke endnu. " +
-      `Fejl (${err?.status || "?"}).`;
+    $("msg").textContent = `API /api/links-admin virker ikke endnu. Fejl (${err?.status || "?"}).`;
     console.warn("refresh() fejlede:", err);
   }
 })();
