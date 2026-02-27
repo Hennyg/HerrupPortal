@@ -295,7 +295,19 @@ function renderSections(items) {
     me = null;
   }
 
-  const roles = expandRoles(me?.userRoles || []);
+  function rolesFromMe(me) {
+  if (!me) return [];
+
+  const fromUserRoles = (me.userRoles || []).map(r => r.toLowerCase());
+
+  const fromClaims = (me.claims || [])
+    .filter(c => String(c.typ).toLowerCase() === "roles")
+    .map(c => String(c.val).toLowerCase());
+
+  return Array.from(new Set([...fromUserRoles, ...fromClaims]));
+}
+
+const roles = expandRoles(rolesFromMe(me));
 
   // Vis bruger
   if (userLine) userLine.textContent = me?.userDetails || "Ikke logget ind";
