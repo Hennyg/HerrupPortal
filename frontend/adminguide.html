@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin-guide – Nye grupper og roller (HerrupPortal)</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <style>
+    :root { --max: 980px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    main { max-width: var(--max); margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 12px; padding: 16px; margin: 16px 0; }
+    h1 { margin: 0 0 8px; }
+    h2 { margin: 18px 0 8px; }
+    h3 { margin: 14px 0 8px; }
+    .muted { opacity: .75; }
+    .pill { display:inline-block; padding: 2px 10px; border-radius: 999px; background: rgba(0,0,0,.06); font-size: 12px; }
+    .warn { background: rgba(255, 193, 7, .18); border: 1px solid rgba(255,193,7,.35); }
+    .ok { background: rgba(25, 135, 84, .12); border: 1px solid rgba(25,135,84,.25); }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    pre { padding: 12px; border-radius: 10px; background: rgba(0,0,0,.04); overflow: auto; }
+    ul, ol { margin: 8px 0 8px 18px; }
+    a { color: inherit; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    @media (min-width: 920px) {
+      .grid.two { grid-template-columns: 1fr 1fr; }
+    }
+    .checklist li { margin: 6px 0; }
+    .kbd { border:1px solid rgba(0,0,0,.18); background: rgba(0,0,0,.03); border-bottom-width: 2px; padding: 0 6px; border-radius: 6px; font-size: 12px; }
+    .hr { height:1px; background: rgba(0,0,0,.08); margin: 14px 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Admin-guide: Opret ny gruppe/rolle til links i HerrupPortal</h1>
+    <p class="muted">
+      Denne guide forklarer, hvordan du giver adgang til bestemte links i portalen baseret på Entra ID-grupper.
+      Løsningen bruger <strong>App Roles</strong> i én fælles App Registration (HerrupPortal) og tildeler roller til sikkerhedsgrupper via Enterprise Application.
+    </p>
+
+    <div class="card ok">
+      <strong>Vigtigt</strong><br>
+      Du skal <em>ikke</em> oprette en ny App Registration pr. gruppe. Du udvider den eksisterende <strong>HerrupPortal</strong>-app med en ny <strong>App Role</strong>,
+      og så tildeler du en gruppe til rollen.
+    </div>
+
+    <div class="card">
+      <h2>Overblik</h2>
+      <div class="grid two">
+        <div>
+          <h3>Du opretter</h3>
+          <ul>
+            <li>Entra sikkerhedsgruppe (evt. mail-enabled)</li>
+            <li>En ny <span class="pill">App Role</span> i App Registration (værdi fx <code>portal_salg</code>)</li>
+            <li>Tildeler gruppen til rollen i Enterprise Application</li>
+            <li>Bruger rollen i Dataverse-feltet <code>allowedRoles</code> på link-records</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Du tester</h3>
+          <ul>
+            <li><code>/.auth/me</code> (roller kan ligge i <code>claims</code>)</li>
+            <li>At brugeren ser/hidder links med <code>allowedRoles</code></li>
+          </ul>
+        </div>
+      </div>
+      <div class="hr"></div>
+      <p class="muted">
+        Tip: Hvis du vil lave “standardroller” som mange links bruger, så brug fx <code>portal_user</code> til “alle interne brugere”
+        og mere specifikke roller til enkelte links.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>1) Opret Entra sikkerhedsgruppe</h2>
+      <ol>
+        <li>Gå til <strong>Microsoft Entra admin center</strong> → <strong>Groups</strong> → <strong>New group</strong>.</li>
+        <li>Vælg <strong>Security</strong> som gruppetype.</li>
+        <li>Navn: fx <code>HerrupPortal - Salg</code></li>
+        <li>Group email:
+          <ul>
+            <li>Hvis I ønsker en mailadresse på gruppen: opret den som <em>mail-enabled security group</em> (hvis jeres tenant/policy tillader det).</li>
+            <li>Hvis I ikke har behov for mail: en almindelig sikkerhedsgruppe er nok.</li>
+          </ul>
+        </li>
+        <li>Tilføj medlemmer (de brugere som skal have adgang).</li>
+      </ol>
+      <div class="card warn">
+        <strong>Bemærk</strong><br>
+        Mail-enabled er kun nødvendigt, hvis I specifikt vil bruge gruppens mail/Outlook-funktionalitet.
+        Til adgangsstyring i HerrupPortal er en normal sikkerhedsgruppe typisk nok.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2) Opret ny App Role i App Registration (HerrupPortal)</h2>
+      <ol>
+        <li>Gå til <strong>Entra ID</strong> → <strong>App registrations</strong> → vælg <strong>HerrupPortal</strong>.</li>
+        <li>Gå til <strong>App roles</strong> → <strong>Create app role</strong>.</li>
+        <li>Udfyld:
+          <ul>
+            <li><strong>Display name:</strong> fx <code>Portal Salg</code></li>
+            <li><strong>Value:</strong> fx <code>portal_salg</code> (brug små bogstaver)</li>
+            <li><strong>Allowed member types:</strong> <strong>Users/Groups</strong></li>
+            <li><strong>Enabled:</strong> Yes</li>
+          </ul>
+        </li>
+        <li>Gem.</li>
+      </ol>
+      <p class="muted">
+        Navngivning: hold jer til <code>portal_*</code> så det er nemt at genkende i Dataverse.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>3) Tildel sikkerhedsgruppen til App Role (Enterprise application)</h2>
+      <ol>
+        <li>Gå til <strong>Entra ID</strong> → <strong>Enterprise applications</strong>.</li>
+        <li>Find og åbn <strong>HerrupPortal</strong> (samme app som App Registration).</li>
+        <li>Gå til <strong>Users and groups</strong> → <strong>Add user/group</strong>.</li>
+        <li>Vælg gruppen (fx <code>HerrupPortal - Salg</code>).</li>
+        <li>Under <strong>Select a role</strong> vælg din nye rolle (fx <code>portal_salg</code>).</li>
+        <li>Gem.</li>
+      </ol>
+      <div class="card warn">
+        <strong>Fejlklassiker</strong><br>
+        Det er <em>ikke nok</em> at brugeren er medlem af gruppen. Gruppen skal også være tildelt den konkrete <strong>App Role</strong>
+        i <strong>Enterprise application</strong>.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>4) Dataverse: Sæt rolle på links</h2>
+      <p>
+        I Dataverse-tabellen for links (portallinks) udfylder du feltet <code>allowedRoles</code> på de records, der kræver adgang.
+      </p>
+
+      <h3>Eksempler</h3>
+      <pre>portal_user</pre>
+      <pre>portal_salg</pre>
+      <pre>portal_user;portal_salg</pre>
+
+      <ul class="muted">
+        <li>Tomt <code>allowedRoles</code> betyder typisk “vis for alle loggede-in” (afhængig af din app.js logik).</li>
+        <li>Adskil flere roller med semikolon <code>;</code>.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>5) Static Web App settings (Custom mode)</h2>
+      <p>
+        Dette er “én gang”-opsætning. Når det først virker, skal du normalt ikke ændre SWA pr. ny rolle.
+      </p>
+      <ol>
+        <li>Azure Portal → <strong>Static Web App</strong> → <strong>Authentication</strong></li>
+        <li><strong>Mode:</strong> Custom</li>
+        <li><strong>Role assignments API path:</strong> fx <code>/api/getRoles</code></li>
+        <li><strong>Provider:</strong> Entra ID med korrekt Client ID + Client Secret</li>
+      </ol>
+
+      <div class="card warn">
+        <strong>Vigtigt</strong><br>
+        Hvis I bruger en <code>/api/getRoles</code>-funktion, skal den returnere roller ud fra token/claims.
+        Ellers vil portalen kun se <code>authenticated</code> og ikke <code>portal_*</code>.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>6) Test og fejlfinding</h2>
+
+      <h3>A) Tjek roller i token</h3>
+      <ol>
+        <li>Log ind med en bruger som er medlem af gruppen</li>
+        <li>Åbn: <code>/.auth/me</code></li>
+        <li>Find i JSON:
+          <ul>
+            <li><code>clientPrincipal.userRoles</code> (kan være kun standard)</li>
+            <li>og/eller <code>clientPrincipal.claims</code> med <code>"typ": "roles"</code> og <code>"val": "portal_xxx"</code></li>
+          </ul>
+        </li>
+      </ol>
+
+      <h3>B) Hvis brugeren ikke får rollen</h3>
+      <ul class="checklist">
+        <li>✅ Er App Role oprettet i App Registration?</li>
+        <li>✅ Er sikkerhedsgruppen tildelt rollen i Enterprise Application?</li>
+        <li>✅ Har brugeren logget helt ud og ind igen (nyt token)?</li>
+        <li>✅ Tester du på den rigtige URL/hostname (samme som reply URL)?</li>
+      </ul>
+
+      <h3>C) Hurtig “log ud”</h3>
+      <p>
+        Brug: <code>/.auth/logout</code> og log ind igen i et inkognito-vindue for at sikre nye claims.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>7) (Valgfrit) Rolle-hierarki</h2>
+      <p>
+        Hvis I vil have at <code>portal_admin</code> altid også kan se alt, der er markeret som <code>portal_user</code>,
+        så håndteres det i <code>app.js</code> (eller i <code>/api/getRoles</code>) ved at “udvide” roller:
+      </p>
+      <pre>
+// Eksempelidé:
+if (roles.includes("portal_admin")) roles.push("portal_user");</pre>
+      <p class="muted">
+        Det betyder, at I ikke behøver skrive <code>portal_admin</code> på alle records.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Kontakt / ansvar</h2>
+      <p class="muted">
+        Denne portal vedligeholdes af IT (HerrupPortal). Hvis du mangler adgang, så oplys:
+        <strong>din email</strong> + <strong>hvilken rolle</strong> du skal have (fx <code>portal_salg</code>).
+      </p>
+    </div>
+
+    <p class="muted">
+      Version: 1.0 • HerrupPortal
+    </p>
+  </main>
+</body>
+</html>
