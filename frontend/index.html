@@ -3,12 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Herrup Portalen</title>
+  <title>Admin – Herrup Portalen</title>
 
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
 
   <link rel="stylesheet" href="/assets/app.css" />
+  <style>
+    .adminWrap{ max-width:var(--maxw); margin:0 auto; padding:2rem 1rem 2rem; }
+    .adminGrid{ display:grid; grid-template-columns: 420px 1fr; gap: 16px; align-items:start; }
+    @media (max-width: 980px){ .adminGrid{ grid-template-columns: 1fr; } }
+    .card{ background:#fff; border:1px solid rgba(0,0,0,.08); border-radius:12px; padding:14px; box-shadow:0 4px 14px rgba(0,0,0,.06); }
+    .card h2{ margin: 0 0 12px; font-size: 18px; }
+    .formRow{ display:grid; gap:6px; margin: 10px 0; }
+    .formRow label{ font-size:.9rem; color:#374151; }
+    .help{ font-size: 12px; color:#6b7280; margin-top: 2px; }
+    .row2{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width:520px){ .row2{ grid-template-columns: 1fr; } }
+    .iconPreview{ font-size: 28px; padding: 6px 10px; border:1px solid rgba(0,0,0,.08); border-radius:10px; display:inline-flex; align-items:center; justify-content:center; min-width: 56px; }
+    .btnRow{ display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px; }
+    .tableWrap{ overflow:auto; }
+    table{ width:100%; border-collapse: collapse; }
+    th, td{ padding: 10px; border-bottom: 1px solid rgba(0,0,0,.08); text-align:left; font-size: 14px; vertical-align: top; }
+    th{ color:#6b7280; font-weight:700; white-space:nowrap; }
+    .pill{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; background: rgba(0,0,0,.06); }
+    .msg{ margin-top:10px; font-size: 13px; }
+  </style>
 </head>
 
 <body>
@@ -22,54 +42,152 @@
       <div class="nav">
         <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
         <span class="sep">|</span>
+        <a href="/">Forside</a>
         <a href="/guide.html">Genvej</a>
-        <a id="adminLink" class="hidden" href="/admin.html">Admin</a>
         <a href="/logout">Log ud</a>
       </div>
     </div>
     <div class="nav-accent"></div>
   </div>
 
-  <div class="container">
-    <div class="hero">
+  <div class="adminWrap">
+    <div class="hero" style="padding: 1rem 0 1.5rem;">
       <div>
-        <h1>Velkommen</h1>
-        <div class="muted" style="text-align:center">Din hub til Static Apps, favoritter og værktøjer</div>
+        <h1>Admin</h1>
+        <div class="muted" style="text-align:center">Opret / redigér / slet links og apps</div>
       </div>
     </div>
 
-    <div class="panel">
-      <div class="filters">
-        <div class="clearable">
-          <input id="q" type="search" placeholder="Søg..." autocomplete="off">
-          <button class="x" id="qx" type="button">×</button>
-        </div>
+    <div class="adminGrid">
+      <!-- FORM -->
+      <div class="card">
+        <h2>Opret / redigér link</h2>
 
-        <select id="categoryFilter"></select>
-        <select id="groupFilter"></select>
+        <form id="form" class="form">
+          <input id="id" type="hidden" />
+
+          <div class="formRow">
+            <label for="title">Titel</label>
+            <input id="title" class="input" autocomplete="off" />
+          </div>
+
+          <div class="formRow">
+            <label for="url">URL</label>
+            <input id="url" class="input" autocomplete="off" />
+            <div class="help">Tip: Tom URL kan bruges til “mapper” (parent).</div>
+          </div>
+
+          <div class="row2">
+            <div class="formRow">
+              <label for="category">Kategori</label>
+              <select id="category" class="input"></select>
+            </div>
+
+            <div class="formRow" id="groupRow">
+              <label for="group">Gruppe (favoritter)</label>
+              <select id="group" class="input"></select>
+            </div>
+          </div>
+
+          <!-- NYT: Undergruppe -->
+          <div class="formRow" id="subgroupRow">
+            <label for="subgroup">Undergruppe (favoritter)</label>
+            <input id="subgroup" class="input" autocomplete="off" placeholder="fx Dokumentation" />
+            <div class="help">Tom = vises direkte under gruppen. Udfyldt = vises under en ekstra overskrift inde i gruppen.</div>
+          </div>
+
+          <div class="row2">
+            <div class="formRow">
+              <label for="platformHint">Platform</label>
+              <select id="platformHint" class="input"></select>
+            </div>
+
+            <div class="formRow">
+              <label for="openMode">Åbn</label>
+              <select id="openMode" class="input">
+                <option value="newTab">Ny fane</option>
+                <option value="sameTab">Samme fane</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="formRow">
+            <label for="parent">Parent (mappe)</label>
+            <select id="parent" class="input">
+              <option value="">(ingen parent)</option>
+            </select>
+          </div>
+
+          <div class="row2">
+            <div class="formRow">
+              <label for="icon">Ikon (emoji eller tekst)</label>
+              <input id="icon" class="input" list="iconList" placeholder="🔗" />
+              <datalist id="iconList"></datalist>
+            </div>
+            <div class="formRow">
+              <label>Preview</label>
+              <div class="iconPreview" id="iconPreview">🔗</div>
+            </div>
+          </div>
+
+          <div class="formRow">
+            <label for="roles">Allowed roles (adskil med ;)</label>
+            <input id="roles" class="input" placeholder="portal_user;portal_admin" />
+          </div>
+
+          <div class="row2">
+            <div class="formRow">
+              <label for="sort">Sort order</label>
+              <input id="sort" class="input" type="number" />
+              <div class="help">For favoritter kan den auto-forslå +10 i samme gruppe (og undergruppe).</div>
+            </div>
+
+            <div class="formRow">
+              <label class="inline" style="margin-top: 26px;">
+                <input id="enabled" type="checkbox" checked />
+                Aktiv
+              </label>
+            </div>
+          </div>
+
+          <div class="btnRow">
+            <button class="btn primary" type="submit">Gem</button>
+            <button class="btn" type="button" id="resetBtn">Nulstil</button>
+          </div>
+
+          <div class="msg" id="msg"></div>
+        </form>
       </div>
 
-      <div id="sections"></div>
+      <!-- TABLE -->
+      <div class="card">
+        <h2>Links</h2>
+        <div class="tableWrap">
+          <table id="tbl">
+            <thead>
+              <tr>
+                <th>Titel</th>
+                <th>Kategori</th>
+                <th>Gruppe</th>
+                <th>Undergruppe</th>
+                <th>Platform</th>
+                <th>Parent</th>
+                <th>Aktiv</th>
+                <th>Roles</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
 
-      <div class="muted" style="margin-top:12px">Tip: Åbn på telefon og vælg “Føj til hjemmeskærm”.</div>
+        <div class="muted" style="margin-top:10px">
+          Tip: Brug “Kategori = Favoritter” + “Gruppe” + evt. “Undergruppe” for at få overskrifter inde i gruppen.
+        </div>
+      </div>
     </div>
   </div>
 
-  <script src="/assets/app.js"></script>
-
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", async () => {
-        try {
-          const reg = await navigator.serviceWorker.register("/sw.js");
-          console.log("SW registered scope:", reg.scope);
-          console.log("SW active:", !!reg.active);
-          console.log("controller:", navigator.serviceWorker.controller);
-        } catch (e) {
-          console.warn("SW register failed", e);
-        }
-      });
-    }
-  </script>
+  <script src="/assets/admin.js"></script>
 </body>
 </html>
