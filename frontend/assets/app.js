@@ -7,8 +7,6 @@ const TRACKING_ENABLED = false;
 // Utils / tracking
 // ---------------------------
 function safeUrl(u) {
-  // Undgå at logge alt muligt persondata i querystring.
-  // Returnér gerne kun origin+path, eller begræns querystring.
   try {
     const url = new URL(u, location.origin);
     return url.origin + url.pathname + (url.search ? url.search.substring(0, 200) : "");
@@ -38,7 +36,6 @@ async function track(eventType, extra = {}) {
   }
 }
 
-// Log ét "PageView" når siden åbnes
 document.addEventListener("DOMContentLoaded", () => {
   track("PageView");
 });
@@ -57,7 +54,6 @@ async function getMe() {
   const r = await fetch("/.auth/me", { cache: "no-store" });
   if (!r.ok) return null;
   const j = await r.json();
-  // SWA: j.clientPrincipal indeholder userDetails + userRoles
   return j?.clientPrincipal || null;
 }
 
@@ -67,10 +63,7 @@ function normRoles(roles) {
 
 function expandRoles(roles) {
   const set = new Set(normRoles(roles));
-
-  // Hierarki: admin skal også have user
   if (set.has("portal_admin")) set.add("portal_user");
-
   return [...set];
 }
 
@@ -88,15 +81,12 @@ function parseAllowedRoles(s) {
 }
 
 function matchesRoles(itemRoles, userRoles) {
-  // Ingen krav => vis for alle (authenticated siden er låst af SWA routes)
   if (!itemRoles || itemRoles.length === 0) return true;
-
   const set = new Set(normRoles(userRoles));
   return itemRoles.some(r => set.has(String(r).toLowerCase()));
 }
 
 async function loadLinks() {
-  // Din løsning bruger /api/links-admin
   const r = await fetch("/api/links-admin", { cache: "no-store" });
   if (!r.ok) throw new Error(`api_not_ok_${r.status}`);
   return await r.json();
@@ -149,6 +139,15 @@ function groupBy(arr, keyFn) {
   return m;
 }
 
+function normKey(s) {
+  return String(s ?? "").trim();
+}
+
+function normSubgroup(it) {
+  // Undergruppe felt: brug "subgroup" (eller "subGroup" fallback)
+  return normKey(it.subgroup || it.subGroup || "");
+}
+
 // ---------------------------
 // Rendering
 // ---------------------------
@@ -174,26 +173,59 @@ function renderTileHTML(it) {
   `;
 }
 
-// Favorit-gruppe (fold ud/ind)
+// Favorit-gruppe (fold ud/ind) + NY: undergrupper inde i body
 function renderFavGroupHTML(groupName, links, key) {
   const id = `fav_${key}`;
   const label = groupName || "Uden gruppe";
   const count = links.length;
 
+  // 1) split i: uden undergruppe + undergrupper
+  const noSub = [];
+  const bySub = new Map(); // subName -> links
+
+  for (const it of (links || [])) {
+    const sub = normSubgroup(it);
+    if (!sub) {
+      noSub.push(it);
+    } else {
+      if (!bySub.has(sub)) bySub.set(sub, []);
+      bySub.get(sub).push(it);
+    }
+  }
+
+  const subEntries = Array.from(bySub.entries())
+    .sort((a, b) => a[0].localeCompare(b[0], "da"));
+
+  const noSubHTML = noSub.length
+    ? `<div class="grid">${sortLinks(noSub).map(renderTileHTML).join("")}</div>`
+    : "";
+
+  const subHTML = subEntries.map(([subName, subLinks]) => {
+    if (!subLinks || subLinks.length === 0) return "";
+    return `
+      <div class="favSubHdr">
+        <span class="favSubIcon">📄</span>
+        <span class="favSubName">${esc(subName)}</span>
+        <span class="favSubCount">${subLinks.length}</span>
+      </div>
+      <div class="grid">
+        ${sortLinks(subLinks).map(renderTileHTML).join("")}
+      </div>
+    `;
+  }).join("");
+
   return `
-    <div class="favGroup" style="border:1px solid rgba(0,0,0,.08); border-radius:10px; overflow:hidden; margin:10px 0; background:#fff;">
-      <button class="favGroupHdr" type="button" data-toggle="${id}" aria-expanded="false"
-        style="width:100%; display:flex; align-items:center; gap:10px; padding:12px 14px; background:#f7f7f7; border:0; cursor:pointer; font:inherit;">
-        <span style="font-size:18px;">📁</span>
-        <span style="font-weight:700; flex:1; text-align:left;">${esc(label)}</span>
-        <span style="font-size:12px; opacity:.7; padding:2px 8px; border-radius:999px; background: rgba(0,0,0,.06);">${count}</span>
-        <span class="favChevron" style="transition:transform .15s ease;">▾</span>
+    <div class="favGroup">
+      <button class="favGroupHdr" type="button" data-toggle="${id}" aria-expanded="false">
+        <span class="favFolder">📁</span>
+        <span class="favName">${esc(label)}</span>
+        <span class="favCount">${count}</span>
+        <span class="favChevron">▾</span>
       </button>
 
-      <div class="favGroupBody" id="${id}" hidden style="padding:12px 14px;">
-        <div class="grid">
-          ${sortLinks(links).map(renderTileHTML).join("")}
-        </div>
+      <div class="favGroupBody" id="${id}" hidden>
+        ${noSubHTML}
+        ${subHTML}
       </div>
     </div>
   `;
@@ -204,11 +236,11 @@ function renderCategorySectionHTML(categoryName, links, sectionIndex) {
   const isFav = cat.toLowerCase() === "favoritter";
 
   if (isFav) {
-    const byGroup = groupBy(links, x => (x.group || "").trim() || "Uden gruppe");
+    const byGroup = groupBy(links, x => normKey(x.group) || "Uden gruppe");
     const groups = Array.from(byGroup.entries()).sort((a, b) => a[0].localeCompare(b[0], "da"));
 
     return `
-      <section class="section" style="margin:18px 0 26px;">
+      <section class="section">
         <div class="accent-bar" style="margin-bottom:10px;">${esc(cat)}</div>
         <div class="sectionBody">
           ${groups.map(([g, ls], i) => renderFavGroupHTML(g, ls, `${sectionIndex}_${i}`)).join("")}
@@ -218,7 +250,7 @@ function renderCategorySectionHTML(categoryName, links, sectionIndex) {
   }
 
   return `
-    <section class="section" style="margin:18px 0 26px;">
+    <section class="section">
       <div class="accent-bar" style="margin-bottom:10px;">${esc(cat)}</div>
       <div class="sectionBody">
         <div class="grid">
@@ -267,8 +299,7 @@ function renderSections(items) {
   const root = document.getElementById("sections");
   if (!root) return;
 
-  // Favoritter først, resten alfabetisk
-  const byCat = groupBy(items, x => (x.category || "Andet").trim() || "Andet");
+  const byCat = groupBy(items, x => normKey(x.category) || "Andet");
   const entries = Array.from(byCat.entries()).sort((a, b) => {
     const an = a[0].toLowerCase(), bn = b[0].toLowerCase();
     if (an === "favoritter" && bn !== "favoritter") return -1;
@@ -296,27 +327,22 @@ function renderSections(items) {
   }
 
   function rolesFromMe(me) {
-  if (!me) return [];
+    if (!me) return [];
 
-  const fromUserRoles = (me.userRoles || []).map(r => r.toLowerCase());
+    const fromUserRoles = (me.userRoles || []).map(r => r.toLowerCase());
+    const fromClaims = (me.claims || [])
+      .filter(c => String(c.typ).toLowerCase() === "roles")
+      .map(c => String(c.val).toLowerCase());
 
-  const fromClaims = (me.claims || [])
-    .filter(c => String(c.typ).toLowerCase() === "roles")
-    .map(c => String(c.val).toLowerCase());
+    return Array.from(new Set([...fromUserRoles, ...fromClaims]));
+  }
 
-  return Array.from(new Set([...fromUserRoles, ...fromClaims]));
-}
+  const roles = expandRoles(rolesFromMe(me));
 
-const roles = expandRoles(rolesFromMe(me));
-
-  // Vis bruger
   if (userLine) userLine.textContent = me?.userDetails || "Ikke logget ind";
 
-  // Admin link i navbar
   const adminLink = document.getElementById("adminLink");
-  if (adminLink) {
-    adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
-  }
+  if (adminLink) adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
 
   // Hent links
   let raw = [];
@@ -324,7 +350,6 @@ const roles = expandRoles(rolesFromMe(me));
     raw = await loadLinks();
   } catch (e) {
     console.warn("Kunne ikke hente links:", e);
-    // Vis tomt (eller du kan vise en fejlbesked i UI hvis du vil)
     renderSections([]);
     return;
   }
@@ -337,7 +362,10 @@ const roles = expandRoles(rolesFromMe(me));
       ...x,
       allowedRoles: parseAllowedRoles(x.allowedRoles),
       enabled: x.enabled !== false,
-      platformHint: (x.platformHint || "all").toLowerCase()
+      platformHint: (x.platformHint || "all").toLowerCase(),
+
+      // NY: normaliser undergruppe felt
+      subgroup: normSubgroup(x)
     }))
     .filter(x => x.enabled)
     .filter(x => x.platformHint === "all" || x.platformHint === platform)
