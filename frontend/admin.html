@@ -10,33 +10,21 @@
 
   <link rel="stylesheet" href="/assets/app.css" />
 
-  <!-- Kun admin-layout (påvirker ikke index) -->
   <style>
+    /* 1-kolonne admin layout */
     .adminPage .panel { padding: 22px; }
     .adminTitle { text-align:center; margin: 0; font-size: 42px; color: var(--heading); }
     .adminSub { text-align:center; margin: 6px 0 18px; }
 
-    /* Felt-layout */
-    .formGrid {
-      display: grid;
-      grid-template-columns: 1.1fr 1.3fr 1fr 1fr;
-      gap: 10px 12px;
-      align-items: end;
-    }
-    .formGrid label { display:grid; gap:6px; font-size:.9rem; color:#374151; }
-    .formGrid .span2 { grid-column: span 2; }
-    .formGrid .span3 { grid-column: span 3; }
-    .formGrid .span4 { grid-column: span 4; }
+    .stackForm { display:grid; gap: 12px; max-width: 760px; margin: 0 auto; }
+    .stackForm label { display:grid; gap: 6px; font-size:.9rem; color:#374151; }
 
-    /* “Ikon + preview” */
-    .iconRow {
-      display:grid;
-      grid-template-columns: 1fr 110px;
-      gap: 12px;
-      align-items:end;
-    }
-    #iconPreview {
-      height: 38px;
+    .rowInline { display:flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+    .rowInline > label { flex: 1 1 220px; }
+    .rowInline .small { flex: 0 0 180px; }
+
+    .iconPreviewBox{
+      height: 40px;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -44,44 +32,22 @@
       border-radius:6px;
       background:#fff;
       font-size: 22px;
+      min-width: 110px;
     }
 
-    /* Nederste række */
-    .bottomRow {
-      display:grid;
-      grid-template-columns: 1.4fr 200px 170px 120px;
-      gap: 10px 12px;
-      align-items:end;
-      margin-top: 4px;
-    }
-    .inlineCheck {
-      display:flex;
-      gap:8px;
-      align-items:center;
-      height: 38px;
-      padding: 0 6px;
-    }
-
-    .actionsRow {
+    .actionsRow{
       display:flex;
       gap:10px;
       align-items:center;
-      margin-top: 12px;
-      flex-wrap: wrap;
+      flex-wrap:wrap;
+      margin-top: 6px;
     }
     #msg { min-height: 18px; }
 
-    /* Responsiv */
-    @media (max-width: 980px) {
-      .formGrid { grid-template-columns: 1fr 1fr; }
-      .bottomRow { grid-template-columns: 1fr 1fr; }
-      .iconRow { grid-template-columns: 1fr 110px; }
-    }
-    @media (max-width: 520px) {
-      .formGrid { grid-template-columns: 1fr; }
-      .bottomRow { grid-template-columns: 1fr; }
-      .iconRow { grid-template-columns: 1fr; }
-      #iconPreview { width: 100%; }
+    @media (max-width:520px){
+      .rowInline > label { flex: 1 1 100%; }
+      .rowInline .small { flex: 1 1 100%; }
+      .iconPreviewBox{ width: 100%; }
     }
   </style>
 </head>
@@ -107,77 +73,73 @@
     <div class="muted adminSub">Tilføj / redigér / fjern apps og links</div>
 
     <div class="panel">
-      <form id="form">
+      <form id="form" class="stackForm">
         <input id="id" type="hidden" />
 
-        <!-- ØVERSTE GRID -->
-        <div class="formGrid">
+        <label>
+          Titel
+          <input id="title" class="input" autocomplete="off" />
+        </label>
+
+        <label>
+          URL
+          <input id="url" class="input" placeholder="https://..." autocomplete="off" />
+        </label>
+
+        <label>
+          Kategori
+          <select id="category" class="input"></select>
+        </label>
+
+        <!-- Gruppe (kun favoritter) -->
+        <label id="groupRow">
+          Gruppe (favoritter)
+          <select id="group" class="input"></select>
+        </label>
+
+        <!-- Undergruppe (kun favoritter) -->
+        <label id="subgroupRow">
+          Undergruppe (favoritter)
+          <input id="subgroup" class="input" placeholder="fx Dokumentation" autocomplete="off" />
+        </label>
+
+        <label>
+          Platform
+          <select id="platformHint" class="input"></select>
+        </label>
+
+        <label>
+          Parent
+          <select id="parent" class="input">
+            <option value="">(ingen parent)</option>
+          </select>
+        </label>
+
+        <div class="rowInline">
           <label>
-            Titel
-            <input id="title" class="input" autocomplete="off" />
+            Ikon (emoji eller tekst)
+            <input id="icon" class="input" list="iconList" />
+            <datalist id="iconList"></datalist>
           </label>
 
-          <label>
-            URL
-            <input id="url" class="input" placeholder="https://..." autocomplete="off" />
-          </label>
-
-          <label>
-            Kategori
-            <select id="category" class="input"></select>
-          </label>
-
-          <!-- Gruppe (kun favoritter) -->
-          <label id="groupRow">
-            Gruppe (favoritter)
-            <select id="group" class="input"></select>
-          </label>
-
-          <!-- Undergruppe (kun favoritter) -->
-          <label id="subgroupRow" class="span2">
-            Undergruppe (favoritter)
-            <input id="subgroup" class="input" placeholder="fx Dokumentation" autocomplete="off" />
-          </label>
-
-          <label>
-            Platform
-            <select id="platformHint" class="input"></select>
-          </label>
-
-          <label>
-            Parent
-            <select id="parent" class="input">
-              <option value="">(ingen parent)</option>
-            </select>
-          </label>
-
-          <div class="iconRow span2">
-            <label>
-              Ikon (emoji eller tekst)
-              <input id="icon" class="input" list="iconList" />
-              <datalist id="iconList"></datalist>
-            </label>
-
-            <label>
-              Preview
-              <div id="iconPreview">🔗</div>
-            </label>
-          </div>
-
-          <label class="span4">
-            Allowed roles (semikolon-separeret)
-            <input id="roles" class="input" placeholder="portal_user;portal_admin" />
+          <label class="small">
+            Preview
+            <div id="iconPreview" class="iconPreviewBox">🔗</div>
           </label>
         </div>
 
-        <!-- NEDERSTE RÆKKE -->
-        <div class="bottomRow">
-          <label>
+        <label>
+          Allowed roles (semikolon-separeret)
+          <input id="roles" class="input" placeholder="portal_user;portal_admin" />
+        </label>
+
+        <div class="rowInline">
+          <label class="small">
             Sort order
             <input id="sort" class="input" type="number" />
           </label>
 
-          <label>
+          <label class="small">
             Åbn
             <select id="openMode" class="input">
               <option value="newTab">Ny fane</option>
@@ -185,12 +147,10 @@
             </select>
           </label>
 
-          <label class="inlineCheck">
+          <label class="small" style="display:flex;gap:10px;align-items:center;margin-top:22px">
             <input id="enabled" type="checkbox" checked />
             Aktiv
           </label>
-
-          <div></div>
         </div>
 
         <div class="actionsRow">
