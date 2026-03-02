@@ -1,3 +1,36 @@
+async function requirePortalAdmin() {
+  const r = await fetch("/.auth/me", { cache: "no-store" });
+  const me = await r.json();
+  const cp = me?.clientPrincipal;
+
+  const rolesFromUserRoles = (cp?.userRoles || []).map(x => String(x).toLowerCase());
+
+  const rolesFromClaims = (cp?.claims || [])
+    .filter(c => {
+      const t = String(c.typ || "").toLowerCase();
+      return t === "roles" || t === "role" || t.endsWith("/identity/claims/role");
+    })
+    .map(c => String(c.val || "").toLowerCase());
+
+  const roles = new Set([...rolesFromUserRoles, ...rolesFromClaims]);
+
+  if (!roles.has("portal_admin")) {
+    document.body.innerHTML = `
+      <div style="max-width:720px;margin:40px auto;font-family:system-ui">
+        <h1>Ingen adgang</h1>
+        <p>Du har ikke rollen <b>portal_admin</b>.</p>
+        <p><a href="/index.html">Tilbage til forsiden</a></p>
+      </div>
+    `;
+    throw new Error("not_portal_admin");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await requirePortalAdmin();
+  // ... resten af din admin-init her ...
+});
+
 async function api(method, url, body) {
   const r = await fetch(url, {
     method,
