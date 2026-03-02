@@ -20,12 +20,13 @@
     { "route": "/icons/*",  "allowedRoles": ["anonymous", "authenticated"] },
     { "route": "/sw.js",    "allowedRoles": ["anonymous", "authenticated"] },
     { "route": "/manifest.json", "allowedRoles": ["anonymous", "authenticated"] },
+    { "route": "/guide.html", "allowedRoles": ["anonymous", "authenticated"] },
 
     { "route": "/api/*", "allowedRoles": ["authenticated"] },
 
     { "route": "/admin.html", "allowedRoles": ["portal_admin"] },
     { "route": "/adminedit.html", "allowedRoles": ["portal_admin"] },
-    { "route": "/guide.html", "allowedRoles": ["portal_admin"] },
+    { "route": "/adminguide.html", "allowedRoles": ["anonymous", "authenticated"] },
 
     { "route": "/*", "allowedRoles": ["authenticated"] }
   ],
