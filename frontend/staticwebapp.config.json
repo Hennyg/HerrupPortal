@@ -15,7 +15,6 @@
   "routes": [
     { "route": "/login", "redirect": "/.auth/login/aad?post_login_redirect_uri=.referrer", "statusCode": 302 },
     { "route": "/logout", "redirect": "/.auth/logout?post_logout_redirect_uri=/", "statusCode": 302 },
-    { "route": "/.auth/login/github", "statusCode": 404 },
 
     { "route": "/assets/*", "allowedRoles": ["anonymous", "authenticated"] },
     { "route": "/icons/*", "allowedRoles": ["anonymous", "authenticated"] },
@@ -24,7 +23,8 @@
 
     { "route": "/admin.html", "allowedRoles": ["portal_admin"] },
     { "route": "/guide.html", "allowedRoles": ["portal_admin"] },
-    { "route": "/api/*", "allowedRoles": ["portal_admin"] },
+
+    { "route": "/api/*", "allowedRoles": ["authenticated"] },
 
     { "route": "/*", "allowedRoles": ["authenticated"] }
   ],
