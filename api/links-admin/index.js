@@ -1,5 +1,7 @@
 // /api/links-admin/index.js
-
+if (!hasPortalAdmin(req)) {
+  return json(context, 403, { error: "forbidden", message: "Requires portal_admin" });
+}
 
 function hasPortalAdmin(req) {
   const b64 = req.headers["x-ms-client-principal"];
