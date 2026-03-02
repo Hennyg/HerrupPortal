@@ -1,4 +1,24 @@
 // /api/links-admin/index.js
+
+function hasPortalAdmin(req) {
+  const b64 = req.headers["x-ms-client-principal"];
+  if (!b64) return false;
+
+  let cp;
+  try { cp = JSON.parse(Buffer.from(b64, "base64").toString("utf8")); }
+  catch { return false; }
+
+  const roles = new Set(
+    (cp.claims || [])
+      .filter(c => {
+        const t = String(c.typ || "").toLowerCase();
+        return t === "roles" || t === "role" || t.endsWith("/identity/claims/role");
+      })
+      .map(c => String(c.val || "").toLowerCase())
+  );
+
+  return roles.has("portal_admin");
+}
 const { dvFetch } = require("../_dv");
 
 const TABLE = "cr175_lch_portallinks";
@@ -134,6 +154,10 @@ async function dvGetLinksWithFallback() {
 module.exports = async function (context, req) {
   try {
     const m = (req.method || "GET").toUpperCase();
+
+    if (!hasPortalAdmin(req)) {
+  return json(context, 403, { error: "forbidden", message: "Requires portal_admin" });
+}
 
     if (m === "GET") {
       const { hasSubgroup, rows } = await dvGetLinksWithFallback();
