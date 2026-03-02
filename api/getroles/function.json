@@ -7,6 +7,10 @@
       "name": "req",
       "methods": [ "get" ]
     },
-    { "type": "http", "direction": "out", "name": "res" }
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
   ]
 }
