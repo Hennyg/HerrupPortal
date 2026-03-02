@@ -26,7 +26,8 @@
 
   { "route": "/api/*", "allowedRoles": ["authenticated"] },
 
-  { "route": "/admin.html", "allowedRoles": ["portal_admin"] },
+  { "route": "/admin.html", "allowedRoles": ["authenticated"] },
+  { "route": "/assets/admin.js", "allowedRoles": ["authenticated"] }
   { "route": "/*", "allowedRoles": ["authenticated"] }
 ],
   "responseOverrides": {
