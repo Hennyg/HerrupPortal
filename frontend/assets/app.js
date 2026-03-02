@@ -81,8 +81,12 @@ function parseAllowedRoles(s) {
 }
 
 function matchesRoles(itemRoles, userRoles) {
-  if (!itemRoles || itemRoles.length === 0) return true;
   const set = new Set(normRoles(userRoles));
+
+  // ✅ portal_admin ser ALT – ingen vedligehold af roller
+  if (set.has("portal_admin")) return true;
+
+  if (!itemRoles || itemRoles.length === 0) return true;
   return itemRoles.some(r => set.has(String(r).toLowerCase()));
 }
 
