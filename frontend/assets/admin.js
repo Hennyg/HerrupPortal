@@ -27,8 +27,12 @@ async function requirePortalAdmin() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await requirePortalAdmin();
-  // ... resten af din admin-init her ...
+  try {
+    await requirePortalAdmin();
+    await init();
+  } catch (e) {
+    console.warn("Admin gate stoppede init:", e);
+  }
 });
 
 async function api(method, url, body) {
@@ -265,7 +269,7 @@ async function refresh() {
   maybeAutoSort();
 }
 
-(async function init(){
+async function init() {
   seedPickersNow();
 
   $("icon").addEventListener("input", updateIconPreview);
@@ -308,4 +312,4 @@ async function refresh() {
     $("msg").textContent = `API /api/links-admin virker ikke endnu. Fejl (${err?.status || "?"}).`;
     console.warn("refresh() fejlede:", err);
   }
-})();
+}
