@@ -16,6 +16,8 @@
   { "route": "/login",  "redirect": "/.auth/login/aad?post_login_redirect_uri=/index.html", "statusCode": 302 },
   { "route": "/logout", "redirect": "/.auth/logout?post_logout_redirect_uri=/", "statusCode": 302 },
 
+  { "route": "/assets/admin.js", "allowedRoles": ["authenticated"] },
+
   { "route": "/assets/*", "allowedRoles": ["anonymous", "authenticated"] },
   { "route": "/icons/*",  "allowedRoles": ["anonymous", "authenticated"] },
   { "route": "/sw.js",    "allowedRoles": ["anonymous", "authenticated"] },
@@ -23,11 +25,9 @@
 
   { "route": "/api/getroles",   "allowedRoles": ["anonymous", "authenticated"] },
   { "route": "/api/getroles/*", "allowedRoles": ["anonymous", "authenticated"] },
-
   { "route": "/api/*", "allowedRoles": ["authenticated"] },
 
   { "route": "/admin.html", "allowedRoles": ["authenticated"] },
-  { "route": "/assets/admin.js", "allowedRoles": ["authenticated"] },
   { "route": "/*", "allowedRoles": ["authenticated"] }
 ],
   "responseOverrides": {
