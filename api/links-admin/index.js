@@ -1,5 +1,6 @@
 // /api/links-admin/index.js
 
+
 function hasPortalAdmin(req) {
   const b64 = req.headers["x-ms-client-principal"];
   if (!b64) return false;
