@@ -9,8 +9,6 @@
   <meta name="theme-color" content="#c30a14">
 
   <link rel="stylesheet" href="/assets/app.css" />
-
-  
 </head>
 
 <body class="adminPage">
@@ -34,93 +32,88 @@
     <div class="muted adminSub">Tilføj / redigér / fjern apps og links</div>
 
     <div class="panel">
-      <form id="form">
+      <form id="form" class="adminForm" autocomplete="off">
         <input id="id" type="hidden" />
 
-        <!-- ØVERSTE GRID -->
-        <div class="formGrid">
-          <label>
-            Titel
-            <input id="title" class="input" autocomplete="off" />
-          </label>
+        <div class="formRow">
+          <label for="title">Titel</label>
+          <input id="title" class="field" autocomplete="off" />
+        </div>
 
-          <label>
-            URL
-            <input id="url" class="input" placeholder="https://..." autocomplete="off" />
-          </label>
+        <div class="formRow">
+          <label for="url">URL</label>
+          <input id="url" class="field" placeholder="https://..." autocomplete="off" />
+        </div>
 
-          <label>
-            Kategori
-            <select id="category" class="input"></select>
-          </label>
+        <div class="formRow">
+          <label for="category">Kategori</label>
+          <select id="category" class="field"></select>
+        </div>
 
-          <!-- Gruppe (kun favoritter) -->
-          <label id="groupRow">
-            Gruppe (favoritter)
-            <select id="group" class="input"></select>
-          </label>
+        <!-- Gruppe (kun favoritter) -->
+        <div class="formRow" id="groupRow">
+          <label for="group">Gruppe (favoritter)</label>
+          <select id="group" class="field"></select>
+        </div>
 
-          <!-- Undergruppe (kun favoritter) -->
-          <label id="subgroupRow" class="span2">
-            Undergruppe (favoritter)
-            <input id="subgroup" class="input" placeholder="fx Dokumentation" autocomplete="off" />
-          </label>
+        <!-- Undergruppe (kun favoritter) -->
+        <div class="formRow" id="subgroupRow">
+          <label for="subgroup">Undergruppe (favoritter)</label>
+          <input id="subgroup" class="field" placeholder="fx Dokumentation" autocomplete="off" />
+        </div>
 
-          <label>
-            Platform
-            <select id="platformHint" class="input"></select>
-          </label>
+        <div class="formRow">
+          <label for="platformHint">Platform</label>
+          <select id="platformHint" class="field"></select>
+        </div>
 
-          <label>
-            Parent
-            <select id="parent" class="input">
-              <option value="">(ingen parent)</option>
-            </select>
-          </label>
+        <div class="formRow">
+          <label for="parent">Parent</label>
+          <select id="parent" class="field">
+            <option value="">(ingen parent)</option>
+          </select>
+        </div>
 
-          <div class="iconRow span2">
-            <label>
-              Ikon (emoji eller tekst)
-              <input id="icon" class="input" list="iconList" />
-              <datalist id="iconList"></datalist>
-            </label>
+        <div class="formRow">
+          <label for="icon">Ikon (emoji eller tekst)</label>
+          <div class="previewBox">
+            <input id="icon" class="field" list="iconList" />
+            <datalist id="iconList"></datalist>
 
-            <label>
-              Preview
-              <div id="iconPreview">🔗</div>
+            <span class="muted">Preview</span>
+            <span id="iconPreview" class="previewIcon">🔗</span>
+          </div>
+        </div>
+
+        <div class="formRow">
+          <label for="roles">Allowed roles (semikolon-separeret)</label>
+          <input id="roles" class="field" placeholder="portal_user;portal_admin" />
+        </div>
+
+        <div class="formRow">
+          <label for="sort">Sort order</label>
+          <input id="sort" class="field" type="number" />
+        </div>
+
+        <div class="formRow">
+          <label for="openMode">Åbn</label>
+          <select id="openMode" class="field">
+            <option value="newTab">Ny fane</option>
+            <option value="sameTab">Samme fane</option>
+          </select>
+        </div>
+
+        <div class="formRow">
+          <label>Aktiv</label>
+          <div class="formInline">
+            <label class="formInline" style="gap:8px; font-weight:600">
+              <input id="enabled" type="checkbox" checked />
+              Aktiv
             </label>
           </div>
-
-          <label class="span4">
-            Allowed roles (semikolon-separeret)
-            <input id="roles" class="input" placeholder="portal_user;portal_admin" />
-          </label>
         </div>
 
-        <!-- NEDERSTE RÆKKE -->
-        <div class="bottomRow">
-          <label>
-            Sort order
-            <input id="sort" class="input" type="number" />
-          </label>
-
-          <label>
-            Åbn
-            <select id="openMode" class="input">
-              <option value="newTab">Ny fane</option>
-              <option value="sameTab">Samme fane</option>
-            </select>
-          </label>
-
-          <label class="inlineCheck">
-            <input id="enabled" type="checkbox" checked />
-            Aktiv
-          </label>
-
-          <div></div>
-        </div>
-
-        <div class="actionsRow">
+        <div class="formActions">
           <button class="btn primary" type="submit">Gem</button>
           <button class="btn" type="button" id="resetBtn">Nulstil</button>
           <span id="msg" class="muted"></span>
