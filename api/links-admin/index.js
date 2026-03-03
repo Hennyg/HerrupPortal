@@ -8,7 +8,7 @@ const IDCOL = "cr175_lch_portallinkid";
 const PLATFORM_COL = "cr175_lch_platformhinttext";
 
 // Undergruppe tekstfelt (ret hvis dit felt hedder noget andet)
-const SUBGROUP_COL = "cr175_lch_subgrouptext";
+const SUBGROUP_COL = "cr175_lch_subgroup";
 
 function json(context, status, body) {
   context.res = {
