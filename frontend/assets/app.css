@@ -137,3 +137,88 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
   .filters select,
   .clearable input { font-size: 1rem; }
 }
+
+/* ===== Admin form: felter under hinanden (samme look som index) ===== */
+
+.adminPage .panel { padding: 22px; }
+
+.adminTitle{
+  text-align:center;
+  margin: 0;
+  font-size: 42px;
+  color: var(--heading);
+}
+.adminSub{
+  text-align:center;
+  margin: 6px 0 18px;
+}
+
+/* 1-kolonne form */
+.adminForm{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.formRow{
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.formRow label{
+  font-weight: 600;
+  color: #111;
+}
+
+.field,
+.formRow input[type="text"],
+.formRow input[type="url"],
+.formRow input[type="number"],
+.formRow select,
+.formRow textarea{
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: .55rem .65rem;
+  font-size: .95rem;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.formRow textarea{ min-height: 90px; resize: vertical; }
+
+.formInline{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap: wrap;
+}
+
+.previewBox{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.previewIcon{
+  font-size: 26px;
+}
+
+.formActions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.help{
+  color:#6b7280;
+  font-size:.85rem;
+}
+
+/* Mobil: label over felt */
+@media (max-width: 720px){
+  .formRow{ grid-template-columns: 1fr; }
+}
