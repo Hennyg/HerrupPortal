@@ -1,14 +1,14 @@
 <!doctype html>
 <html lang="da">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Herrup Portalen</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Herrup Portalen</title>
 
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#c30a14">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
 
-  <link rel="stylesheet" href="/assets/app.css" />
+<link rel="stylesheet" href="/assets/app.css" />
 
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-32x32.png">
@@ -16,64 +16,64 @@
 </head>
 
 <body>
-  <div class="navbar">
-    <div class="navbar-inner">
-      <div class="brand">
-        <div class="logo" aria-label="Herrup Portal"></div>
-        <div>Herrup Portalen</div>
-      </div>
+<div class="navbar">
+<div class="navbar-inner">
+<div class="brand">
+<div class="logo" aria-label="Herrup Portal"></div>
+<div>Herrup Portalen</div>
+</div>
 
-      <div class="nav">
-        <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
-        <span class="sep">|</span>
-        <a href="/guide.html">Genvej</a>
-        <a id="adminLink" class="hidden" href="/admin.html">Admin</a>
-        <a href="/logout">Log ud</a>
-      </div>
-    </div>
-    <div class="nav-accent"></div>
-  </div>
+<div class="nav">
+<span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+<span class="sep">|</span>
+<a href="/guide.html">Genvej</a>
+<a id="adminLink" class="hidden" href="/admin.html">Admin</a>
+<a href="/logout">Log ud</a>
+</div>
+</div>
+<div class="nav-accent"></div>
+</div>
 
-  <div class="container">
-    <div class="hero">
-      <div>
-        <h1>Velkommen</h1>
-        <div class="muted" style="text-align:center">Din hub til Static Apps, favoritter og værktøjer</div>
-      </div>
-    </div>
+<div class="container">
+<div class="hero">
+<div>
+<h1>Velkommen</h1>
+<div class="muted" style="text-align:center">Din hub til Static Apps, favoritter og værktøjer</div>
+</div>
+</div>
 
-    <div class="panel">
-      <div class="filters">
-        <div class="clearable">
-          <input id="q" type="search" placeholder="Søg..." autocomplete="off">
-          <button class="x" id="qx" type="button">×</button>
-        </div>
+<div class="panel">
+<div class="filters">
+<div class="clearable">
+<input id="q" type="search" placeholder="Søg..." autocomplete="off">
+<button class="x" id="qx" type="button">×</button>
+</div>
 
-        <select id="categoryFilter"></select>
-        <select id="groupFilter"></select>
-      </div>
+<select id="categoryFilter"></select>
+<select id="groupFilter"></select>
+</div>
 
-      <div id="sections"></div>
+<div id="sections"></div>
 
-      <div class="muted" style="margin-top:12px">Tip: Åbn på telefon og vælg “Føj til hjemmeskærm”.</div>
-    </div>
-  </div>
+<div class="muted" style="margin-top:12px">Tip: Åbn på telefon og vælg “Føj til hjemmeskærm”.</div>
+</div>
+</div>
 
-  <script src="/assets/app.js"></script>
+<script src="/assets/app.js"></script>
 
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", async () => {
-        try {
-          const reg = await navigator.serviceWorker.register("/sw.js");
-          console.log("SW registered scope:", reg.scope);
-          console.log("SW active:", !!reg.active);
-          console.log("controller:", navigator.serviceWorker.controller);
-        } catch (e) {
-          console.warn("SW register failed", e);
-        }
-      });
-    }
-  </script>
+<script>
+if ("serviceWorker" in navigator) {
+window.addEventListener("load", async () => {
+try {
+const reg = await navigator.serviceWorker.register("/sw.js");
+console.log("SW registered scope:", reg.scope);
+console.log("SW active:", !!reg.active);
+console.log("controller:", navigator.serviceWorker.controller);
+} catch (e) {
+console.warn("SW register failed", e);
+}
+});
+}
+</script>
 </body>
 </html>
