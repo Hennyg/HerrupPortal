@@ -123,6 +123,10 @@ function seedPickersNow() {
   setSelectOptions($("category"),
     ["Static Apps","Favoritter","Værktøjer","PowerApps","Andet"],
     { includeEmpty:true, emptyText:"(vælg kategori)" }
+  setSelectOptions($("subgroup"),
+    ["Dokumentation"],
+    { includeEmpty:true, emptyText:"(ingen undergruppe)" }
+);
   );
 
   setSelectOptions($("group"),
@@ -155,6 +159,14 @@ function seedPickersNow() {
 function buildPickers(rows) {
   const cats = uniq(["Static Apps","Favoritter","Værktøjer","PowerApps","Andet", ...rows.map(r => r.category)]);
   setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
+
+  const subs = uniq([
+  "Dokumentation",
+  ...rows
+    .filter(r => (r.category || "").toLowerCase() === "favoritter")
+    .map(r => r.subgroup)
+  ]);
+  setSelectOptions($("subgroup"), subs, { includeEmpty:true, emptyText:"(ingen undergruppe)" });
 
   const grps = uniq([
     "Lely","Salg","Tekniker","FMS","Administration",
@@ -271,7 +283,7 @@ async function refresh() {
   });
 
   $("group").addEventListener("change", maybeAutoSort);
-  if ($("subgroup")) $("subgroup").addEventListener("input", maybeAutoSort);
+  if ($("subgroup")) $("subgroup").addEventListener("change", maybeAutoSort);
 
   $("form").addEventListener("submit", async (e) => {
     e.preventDefault();
