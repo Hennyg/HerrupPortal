@@ -123,10 +123,12 @@ function seedPickersNow() {
   setSelectOptions($("category"),
     ["Static Apps","Favoritter","Værktøjer","PowerApps","Andet"],
     { includeEmpty:true, emptyText:"(vælg kategori)" }
+  );
+
+  // Undergruppe dropdown (kun favoritter)
   setSelectOptions($("subgroup"),
     ["Dokumentation"],
     { includeEmpty:true, emptyText:"(ingen undergruppe)" }
-);
   );
 
   setSelectOptions($("group"),
