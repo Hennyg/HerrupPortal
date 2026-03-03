@@ -38,9 +38,22 @@ function setSelectOptions(selectEl, options, { includeEmpty=true, emptyText="(in
 }
 
 function updateIconPreview() {
-  const v = $("icon")?.value?.trim();
+  const v = $("icon")?.value?.trim() || "";
   const p = $("iconPreview");
-  if (p) p.textContent = v || "🔗";
+  if (!p) return;
+
+  // Hvis icon er en billed-URL (http(s) eller /path) eller data:image, så vis <img>
+  const isImg =
+    /^data:image\//i.test(v) ||
+    /^https?:\/\//i.test(v) ||
+    v.startsWith("/") ||
+    /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i.test(v);
+
+  if (isImg && v) {
+    p.innerHTML = `<img src="${v}" alt="" style="height:28px; width:28px; object-fit:contain; vertical-align:middle;">`;
+  } else {
+    p.textContent = v || "🔗";
+  }
 }
 
 function updateFavVisibility() {
@@ -58,7 +71,7 @@ function updateFavVisibility() {
     if ($("subgroup")) $("subgroup").value = "";
   }
 
-  if (isFav) $("sort").value = ""; // samme adfærd som før
+  if (isFav && !($("id")?.value || "").trim()) $("sort").value = "";
 }
 
 function readForm() {
@@ -187,7 +200,18 @@ function renderTable(rows) {
         <button class="btn" data-act="del">Slet</button>
       </td>
     `;
-    tr.querySelector('[data-act="edit"]').onclick = () => fillForm(x);
+    
+    tr.querySelector('[data-act="edit"]').onclick = () => {
+    fillForm(x);
+    
+      // Scroll op til formularen og fokusér første felt
+      const form = $("form");
+      if (form) form.scrollIntoView({ behavior: "smooth", block: "start" });
+    
+      // lille delay så scroll når at starte før fokus
+      setTimeout(() => $("title")?.focus(), 150);
+    };
+    
     tr.querySelector('[data-act="del"]').onclick = async () => {
       if (!confirm(`Slet "${x.title}"?`)) return;
       await api("DELETE", `/api/links-admin?id=${encodeURIComponent(x.id)}`);
@@ -199,6 +223,9 @@ function renderTable(rows) {
 }
 
 function maybeAutoSort() {
+  // Auto-sort kun ved NY record
+  if (($("id")?.value || "").trim()) return;
+  
   const cat = ($("category")?.value || "").trim().toLowerCase();
   if (cat !== "favoritter") return;
 
