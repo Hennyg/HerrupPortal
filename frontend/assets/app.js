@@ -115,7 +115,14 @@ function setIcon(el, iconValue) {
   if (!el) return;
 
   if (v && isImageIcon(v)) {
-    el.innerHTML = `<img src="${v}" alt="" style="height:26px;width:26px;object-fit:contain;vertical-align:middle;">`;
+    el.innerHTML = `
+      <img src="${v}" alt=""
+           style="max-height:40px;
+                  max-width:100%;
+                  width:auto;
+                  height:auto;
+                  object-fit:contain;">
+    `;
   } else {
     el.textContent = v || "🔗";
   }
