@@ -100,6 +100,27 @@ function uniq(arr) {
     .sort((a, b) => a.localeCompare(b, "da"));
 }
 
+function isImageIcon(v) {
+  v = String(v || "").trim();
+  return (
+    /^data:image\//i.test(v) ||
+    /^https?:\/\//i.test(v) ||
+    v.startsWith("/") ||
+    /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i.test(v)
+  );
+}
+
+function setIcon(el, iconValue) {
+  const v = String(iconValue || "").trim();
+  if (!el) return;
+
+  if (v && isImageIcon(v)) {
+    el.innerHTML = `<img src="${v}" alt="" style="height:26px;width:26px;object-fit:contain;vertical-align:middle;">`;
+  } else {
+    el.textContent = v || "🔗";
+  }
+}
+
 function setSelectOptions(selectEl, options, { includeEmpty = true, emptyText = "Alle" } = {}) {
   if (!selectEl) return;
   selectEl.innerHTML = "";
@@ -153,7 +174,9 @@ function normSubgroup(it) {
 // ---------------------------
 function renderTileHTML(it) {
   const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
-  return `
+
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `
     <a class="tile"
        href="${esc(it.url)}"
        target="${target}"
@@ -164,13 +187,19 @@ function renderTileHTML(it) {
        data-category="${esc(it.category || "")}"
        data-group="${esc(it.group || "")}">
       <div class="tileTop">
-        <div class="icon">${esc(it.icon || "🔗")}</div>
+        <div class="icon"></div>
         <div class="badge">${esc(it.category || "")}</div>
       </div>
       <div class="tileTitle">${esc(it.title || "Uden titel")}</div>
       <div class="tileUrl">${esc(it.url || "")}</div>
     </a>
   `;
+
+  const a = wrapper.firstElementChild;
+  const iconEl = a.querySelector(".icon");
+  setIcon(iconEl, it.icon);
+
+  return a.outerHTML;
 }
 
 // Favorit-gruppe (fold ud/ind) + NY: undergrupper inde i body
