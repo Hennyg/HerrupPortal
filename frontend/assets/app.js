@@ -63,8 +63,26 @@ function normRoles(roles) {
 
 function expandRoles(roles) {
   const set = new Set(normRoles(roles));
+  // portal_admin arver automatisk portal_user adgang
   if (set.has("portal_admin")) set.add("portal_user");
   return [...set];
+}
+
+// FIX 1: rolesFromMe håndterer nu alle varianter af claims-typen som Azure sender:
+//   "roles", "role", og den fulde URI ".../identity/claims/role"
+function rolesFromMe(me) {
+  if (!me) return [];
+
+  const fromUserRoles = (me.userRoles || []).map(r => String(r).toLowerCase());
+
+  const fromClaims = (me.claims || [])
+    .filter(c => {
+      const t = String(c.typ || "").toLowerCase();
+      return t === "roles" || t === "role" || t.endsWith("/identity/claims/role");
+    })
+    .map(c => String(c.val || "").toLowerCase());
+
+  return Array.from(new Set([...fromUserRoles, ...fromClaims]));
 }
 
 // ---------------------------
@@ -81,13 +99,15 @@ function parseAllowedRoles(s) {
 }
 
 function matchesRoles(itemRoles, userRoles) {
+  // Tom allowedRoles = synlig for alle loggede-ind brugere
   if (!itemRoles || itemRoles.length === 0) return true;
-  const set = new Set(normRoles(userRoles));
-  return itemRoles.some(r => set.has(String(r).toLowerCase()));
+  const set = new Set(userRoles); // userRoles er allerede normaliseret
+  return itemRoles.some(r => set.has(r));
 }
 
+// FIX 2: Henter fra /api/links (det offentlige endepunkt), ikke /api/links-admin
 async function loadLinks() {
-  const r = await fetch("/api/links-admin", { cache: "no-store" });
+  const r = await fetch("/api/links", { cache: "no-store" });
   if (!r.ok) throw new Error(`api_not_ok_${r.status}`);
   return await r.json();
 }
@@ -172,7 +192,6 @@ function normKey(s) {
 }
 
 function normSubgroup(it) {
-  // Undergruppe felt: brug "subgroup" (eller "subGroup" fallback)
   return normKey(it.subgroup || it.subGroup || "");
 }
 
@@ -209,15 +228,14 @@ function renderTileHTML(it) {
   return a.outerHTML;
 }
 
-// Favorit-gruppe (fold ud/ind) + NY: undergrupper inde i body
+// Favorit-gruppe (fold ud/ind) + undergrupper inde i body
 function renderFavGroupHTML(groupName, links, key) {
   const id = `fav_${key}`;
   const label = groupName || "Uden gruppe";
   const count = links.length;
 
-  // 1) split i: uden undergruppe + undergrupper
   const noSub = [];
-  const bySub = new Map(); // subName -> links
+  const bySub = new Map();
 
   for (const it of (links || [])) {
     const sub = normSubgroup(it);
@@ -362,17 +380,6 @@ function renderSections(items) {
     me = null;
   }
 
-  function rolesFromMe(me) {
-    if (!me) return [];
-
-    const fromUserRoles = (me.userRoles || []).map(r => r.toLowerCase());
-    const fromClaims = (me.claims || [])
-      .filter(c => String(c.typ).toLowerCase() === "roles")
-      .map(c => String(c.val).toLowerCase());
-
-    return Array.from(new Set([...fromUserRoles, ...fromClaims]));
-  }
-
   const roles = expandRoles(rolesFromMe(me));
 
   if (userLine) userLine.textContent = me?.userDetails || "Ikke logget ind";
@@ -399,8 +406,6 @@ function renderSections(items) {
       allowedRoles: parseAllowedRoles(x.allowedRoles),
       enabled: x.enabled !== false,
       platformHint: (x.platformHint || "all").toLowerCase(),
-
-      // NY: normaliser undergruppe felt
       subgroup: normSubgroup(x)
     }))
     .filter(x => x.enabled)
@@ -433,7 +438,6 @@ function renderSections(items) {
     const filtered = itemsAll.filter(x => {
       if (cat && (x.category || "") !== cat) return false;
       if (grp && (x.group || "") !== grp) return false;
-
       if (!qq) return true;
       return (x.title || "").toLowerCase().includes(qq) || (x.url || "").toLowerCase().includes(qq);
     });
