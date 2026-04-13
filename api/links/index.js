@@ -1,12 +1,12 @@
 const { dvFetch } = require("../_dv");
 
-const TABLE = "lch_portallinks";
-const IDCOL = "lch_portallinkid";
+const TABLE = "cr175_lch_portallinks";
+const IDCOL = "cr175_lch_portallinkid";
 
 module.exports = async function (context, req) {
   try {
     const data = await dvFetch(
-      `${TABLE}?$select=${IDCOL},lch_title,lch_url,lch_icon,lch_category,lch_group,lch_parent,lch_allowedroles,lch_enabled,lch_sortorder,lch_openmode&$filter=lch_enabled eq true`
+      `${TABLE}?$select=${IDCOL},cr175_lch_title,cr175_lch_url,cr175_lch_icon,cr175_lch_categorytext,cr175_lch_grouptext,cr175_lch_allowedroles,cr175_lch_enabled,cr175_lch_sortorder,cr175_lch_openmodetext&$filter=cr175_lch_enabled eq true`
     );
 
     // samme mapning som før, men direkte
