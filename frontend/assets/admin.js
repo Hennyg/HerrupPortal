@@ -121,7 +121,7 @@ function resetForm() {
 
 function seedPickersNow() {
   setSelectOptions($("category"),
-    ["Static Apps","Favoritter","Værktøjer","PowerApps","Andet"],
+    ["Web Apps","Favoritter","Værktøjer","PowerApps","Andet"],
     { includeEmpty:true, emptyText:"(vælg kategori)" }
   );
 
@@ -159,7 +159,7 @@ function seedPickersNow() {
 }
 
 function buildPickers(rows) {
-  const cats = uniq(["Static Apps","Favoritter","Værktøjer","PowerApps","Andet", ...rows.map(r => r.category)]);
+  const cats = uniq(["Web Apps","Favoritter","Værktøjer","PowerApps","Andet", ...rows.map(r => r.category)]);
   setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
 
   const subs = uniq([
