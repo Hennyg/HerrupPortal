@@ -79,6 +79,7 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
   text-decoration:none;color:inherit;background:#fff;
 }
 .tile:hover{filter:brightness(.98)}
+.tile--admin-only{border:2px solid #c30a14;box-shadow:0 0 0 1px rgba(195,10,20,.25)}
 .tileTop{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
 .icon{font-size:22px}
 .badge{font-size:12px;color:#6b7280}
