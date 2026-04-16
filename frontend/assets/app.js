@@ -200,10 +200,11 @@ function normSubgroup(it) {
 // ---------------------------
 function renderTileHTML(it) {
   const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
+  const adminClass = it.adminOnly ? " tile--admin-only" : "";
 
   const wrapper = document.createElement("div");
   wrapper.innerHTML = `
-    <a class="tile"
+    <a class="tile${adminClass}"
        href="${esc(it.url)}"
        target="${target}"
        rel="noopener"
@@ -286,7 +287,8 @@ function renderFavGroupHTML(groupName, links, key) {
 }
 
 function renderCategorySectionHTML(categoryName, links, sectionIndex) {
-  const cat = categoryName || "Andet";
+  const rawCat = categoryName || "Andet";
+  const cat = rawCat.toLowerCase() === "static apps" ? "Web Apps" : rawCat;
   const isFav = cat.toLowerCase() === "favoritter";
 
   if (isFav) {
@@ -411,6 +413,12 @@ function renderSections(items) {
     .filter(x => x.enabled)
     .filter(x => x.platformHint === "all" || x.platformHint === platform)
     .filter(x => matchesRoles(x.allowedRoles, roles))
+    .map(x => ({
+      ...x,
+      adminOnly: x.allowedRoles.length > 0
+        && x.allowedRoles.includes("portal_admin")
+        && !x.allowedRoles.includes("portal_user")
+    }))
     .sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 
   // Filters
