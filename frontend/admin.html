@@ -9,6 +9,47 @@
   <meta name="theme-color" content="#c30a14">
 
   <link rel="stylesheet" href="/assets/app.css" />
+  <style>
+    .tableToolbar {
+      display: flex;
+      gap: .5rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: .75rem;
+    }
+    .tableToolbar .clearable {
+      flex: 1;
+      min-width: 160px;
+      max-width: 300px;
+    }
+    .tableToolbar select {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: .45rem .6rem;
+      font-size: .92rem;
+      background: #fff;
+    }
+    #tableCount {
+      margin-left: auto;
+      font-size: .85rem;
+      color: #6b7280;
+      white-space: nowrap;
+    }
+    #tbl thead th[data-col]:hover { background: rgba(0,0,0,.04); }
+    #tbl thead th.sort-active { color: var(--accent-bar); }
+    .sort-arrow { font-size: .75rem; opacity: .7; }
+    .tableWrap { overflow-x: auto; }
+    .table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .table thead th {
+      text-align: left;
+      padding: .5rem .6rem;
+      border-bottom: 2px solid #e5e7eb;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .table tbody tr:hover { background: rgba(0,0,0,.025); }
+    .table tbody td { padding: .45rem .6rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+  </style>
 </head>
 
 <body class="adminPage">
@@ -126,22 +167,39 @@
         <div class="left">
           <div class="sectionTitle" style="margin:0">Links</div>
         </div>
-        <div class="muted">Tip: “Parent” kræver en række uden URL (mappe)</div>
+        <div class="muted">Tip: "Parent" kræver en række uden URL (mappe)</div>
+      </div>
+
+      <!-- Søg og filtre -->
+      <div class="tableToolbar">
+        <div class="clearable">
+          <input id="tableSearch" type="text" placeholder="Søg titel, URL, rolle…" />
+          <button id="tableClearSearch" class="x" type="button" title="Ryd søgning">✕</button>
+        </div>
+        <select id="tableFilterCat">
+          <option value="">Alle kategorier</option>
+        </select>
+        <select id="tableFilterEnabled">
+          <option value="">Alle</option>
+          <option value="ja">Kun aktive</option>
+          <option value="nej">Kun inaktive</option>
+        </select>
+        <span id="tableCount" class="muted"></span>
       </div>
 
       <div class="tableWrap">
         <table class="table" id="tbl">
           <thead>
             <tr>
-              <th>Titel</th>
-              <th>Kategori</th>
-              <th>Gruppe</th>
-              <th>Undergruppe</th>
-              <th>Platform</th>
+              <th data-col="title">Titel<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="category">Kategori<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="group">Gruppe<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="subgroup">Undergruppe<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="platformHint">Platform<span class="sort-arrow"> ⇅</span></th>
               <th>Parent</th>
-              <th>Aktiv</th>
-              <th>Roles</th>
-              <th></th>
+              <th data-col="enabled">Aktiv<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="allowedRoles">Roles<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="sort">Sort<span class="sort-arrow"> ▲</span></th>
             </tr>
           </thead>
           <tbody></tbody>
