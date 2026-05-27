@@ -14,6 +14,8 @@ async function api(method, url, body) {
 function $(id){ return document.getElementById(id); }
 
 let lastRows = [];
+let sortCol = "sort";
+let sortDir = 1; // 1 = asc, -1 = desc
 
 function uniq(arr) {
   return Array.from(new Set((arr||[]).filter(Boolean).map(x => String(x).trim())))
@@ -42,7 +44,6 @@ function updateIconPreview() {
   const p = $("iconPreview");
   if (!p) return;
 
-  // Hvis icon er en billed-URL (http(s) eller /path) eller data:image, så vis <img>
   const isImg =
     /^data:image\//i.test(v) ||
     /^https?:\/\//i.test(v) ||
@@ -125,7 +126,6 @@ function seedPickersNow() {
     { includeEmpty:true, emptyText:"(vælg kategori)" }
   );
 
-  // Undergruppe dropdown (kun favoritter)
   setSelectOptions($("subgroup"),
     ["Dokumentation"],
     { includeEmpty:true, emptyText:"(ingen undergruppe)" }
@@ -163,10 +163,10 @@ function buildPickers(rows) {
   setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
 
   const subs = uniq([
-  "Dokumentation",
-  ...rows
-    .filter(r => (r.category || "").toLowerCase() === "favoritter")
-    .map(r => r.subgroup)
+    "Dokumentation",
+    ...rows
+      .filter(r => (r.category || "").toLowerCase() === "favoritter")
+      .map(r => r.subgroup)
   ]);
   setSelectOptions($("subgroup"), subs, { includeEmpty:true, emptyText:"(ingen undergruppe)" });
 
@@ -192,10 +192,67 @@ function buildPickers(rows) {
   updateFavVisibility();
 }
 
+// ---- Søg og sortér ----
+
+function getFilteredSorted() {
+  const q = ($("tableSearch")?.value || "").toLowerCase().trim();
+  const filterCat = $("tableFilterCat")?.value || "";
+  const filterEnabled = $("tableFilterEnabled")?.value || "";
+
+  let rows = lastRows.filter(x => {
+    if (filterCat && x.category !== filterCat) return false;
+    if (filterEnabled === "ja" && x.enabled === false) return false;
+    if (filterEnabled === "nej" && x.enabled !== false) return false;
+    if (!q) return true;
+    return (
+      (x.title || "").toLowerCase().includes(q) ||
+      (x.url || "").toLowerCase().includes(q) ||
+      (x.category || "").toLowerCase().includes(q) ||
+      (x.group || "").toLowerCase().includes(q) ||
+      (x.allowedRoles || "").toLowerCase().includes(q)
+    );
+  });
+
+  rows = rows.slice().sort((a, b) => {
+    let av, bv;
+    if (sortCol === "sort") {
+      av = a.sort ?? 1000;
+      bv = b.sort ?? 1000;
+      return (av - bv) * sortDir;
+    }
+    av = String(a[sortCol] ?? "").toLowerCase();
+    bv = String(b[sortCol] ?? "").toLowerCase();
+    return av.localeCompare(bv, "da") * sortDir;
+  });
+
+  return rows;
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll("#tbl thead th[data-col]").forEach(th => {
+    const col = th.getAttribute("data-col");
+    th.classList.toggle("sort-active", col === sortCol);
+    const arrow = th.querySelector(".sort-arrow");
+    if (arrow) {
+      arrow.textContent = col === sortCol ? (sortDir === 1 ? " ▲" : " ▼") : " ⇅";
+    }
+  });
+}
+
 function renderTable(rows) {
-  const byId = new Map(rows.map(r => [r.id, r]));
+  const byId = new Map(lastRows.map(r => [r.id, r]));
   const tb = $("tbl").querySelector("tbody");
   tb.innerHTML = "";
+
+  const $count = $("tableCount");
+  if ($count) $count.textContent = `${rows.length} rækker`;
+
+  if (rows.length === 0) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="9" style="text-align:center;color:#6b7280;padding:1.5rem">Ingen resultater</td>`;
+    tb.appendChild(tr);
+    return;
+  }
 
   rows.forEach(x => {
     const parentTitle = x.parent ? (byId.get(x.parent)?.title || x.parent) : "";
@@ -214,18 +271,14 @@ function renderTable(rows) {
         <button class="btn" data-act="del">Slet</button>
       </td>
     `;
-    
+
     tr.querySelector('[data-act="edit"]').onclick = () => {
-    fillForm(x);
-    
-      // Scroll op til formularen og fokusér første felt
+      fillForm(x);
       const form = $("form");
       if (form) form.scrollIntoView({ behavior: "smooth", block: "start" });
-    
-      // lille delay så scroll når at starte før fokus
       setTimeout(() => $("title")?.focus(), 150);
     };
-    
+
     tr.querySelector('[data-act="del"]').onclick = async () => {
       if (!confirm(`Slet "${x.title}"?`)) return;
       await api("DELETE", `/api/links-admin?id=${encodeURIComponent(x.id)}`);
@@ -236,10 +289,13 @@ function renderTable(rows) {
   });
 }
 
+function applyTableFilters() {
+  renderTable(getFilteredSorted());
+}
+
 function maybeAutoSort() {
-  // Auto-sort kun ved NY record
   if (($("id")?.value || "").trim()) return;
-  
+
   const cat = ($("category")?.value || "").trim().toLowerCase();
   if (cat !== "favoritter") return;
 
@@ -266,10 +322,10 @@ function maybeAutoSort() {
 
 async function refresh() {
   const rows = await api("GET", "/api/links-admin");
-  const list = (rows || []).sort((a,b) => (a.sort ?? 1000) - (b.sort ?? 1000));
-  lastRows = list;
-  buildPickers(list);
-  renderTable(list);
+  lastRows = rows || [];
+  buildPickers(lastRows);
+  updateSortHeaders();
+  applyTableFilters();
   maybeAutoSort();
 }
 
@@ -286,6 +342,32 @@ async function refresh() {
 
   $("group").addEventListener("change", maybeAutoSort);
   if ($("subgroup")) $("subgroup").addEventListener("change", maybeAutoSort);
+
+  // Tabel: søg og filtre
+  $("tableSearch")?.addEventListener("input", applyTableFilters);
+  $("tableFilterCat")?.addEventListener("change", applyTableFilters);
+  $("tableFilterEnabled")?.addEventListener("change", applyTableFilters);
+
+  $("tableClearSearch")?.addEventListener("click", () => {
+    if ($("tableSearch")) $("tableSearch").value = "";
+    applyTableFilters();
+  });
+
+  // Sorterbare kolonner
+  document.querySelectorAll("#tbl thead th[data-col]").forEach(th => {
+    th.style.cursor = "pointer";
+    th.addEventListener("click", () => {
+      const col = th.getAttribute("data-col");
+      if (sortCol === col) {
+        sortDir *= -1;
+      } else {
+        sortCol = col;
+        sortDir = 1;
+      }
+      updateSortHeaders();
+      applyTableFilters();
+    });
+  });
 
   $("form").addEventListener("submit", async (e) => {
     e.preventDefault();
