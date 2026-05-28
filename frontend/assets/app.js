@@ -417,9 +417,8 @@ function renderSections(items) {
     .filter(x => matchesRoles(x.allowedRoles, roles))
     .map(x => ({
       ...x,
-      adminOnly: x.allowedRoles.length > 0
-        && x.allowedRoles.includes("portal_admin")
-        && !x.allowedRoles.includes("portal_user")
+      adminOnly: x.allowedRoles.length === 1
+      && x.allowedRoles[0] === "portal_admin"
     }))
     .sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 
