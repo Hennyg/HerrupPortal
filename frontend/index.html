@@ -13,6 +13,71 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-32x32.png">
   <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  .admin-infobox {
+    display: none;
+    background: #fff3f3;
+    border: 2px solid #c30a14;
+    border-radius: 10px;
+    padding: .85rem 1rem;
+    margin-bottom: 1rem;
+    font-size: .95rem;
+    color: #333;
+  }
+  .admin-infobox.visible { display: block; }
+  .admin-infobox-label {
+    font-weight: 700;
+    color: #c30a14;
+    margin-bottom: .35rem;
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .admin-infobox textarea {
+    width: 100%;
+    border: 1px solid #f0b0b0;
+    border-radius: 6px;
+    padding: .5rem;
+    font-size: .93rem;
+    background: #fff;
+    box-sizing: border-box;
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+    color: #333;
+  }
+  .admin-infobox-actions {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    margin-top: .4rem;
+  }
+  .admin-infobox-saved {
+    font-size: .85rem;
+    color: #6b7280;
+  }
+  .admin-infobox-legend {
+    font-size: .8rem;
+    color: #6b7280;
+    margin-bottom: .4rem;
+  }
+  /* Rød ring forklaring */
+  .ring-legend {
+    display: none;
+    font-size: .82rem;
+    color: #6b7280;
+    margin-top: .3rem;
+  }
+  .ring-legend.visible { display: flex; align-items: center; gap: .4rem; }
+  .ring-swatch {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid #c30a14;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+</style>
 </head>
 
 <body>
@@ -35,11 +100,29 @@
 </div>
 
 <div class="container">
-<div class="hero">
+<div class="hero" style="padding:.6rem 0 .8rem">
 <div>
 <h1>Velkommen</h1>
 <div class="muted" style="text-align:center">Din hub til Web Apps, favoritter og værktøjer</div>
 </div>
+</div>
+
+<!-- Infoboks: kun synlig for portal_admin -->
+<div id="adminInfoBox" class="admin-infobox">
+  <div class="admin-infobox-label">🔴 Admin-besked til alle brugere</div>
+  <div class="admin-infobox-legend">Denne besked vises kun for dig som admin. Skriv her hvis du vil forklare hvorfor nogle apps er markeret med rød ring eller andet der er relevant.</div>
+  <textarea id="adminInfoText" placeholder="Skriv en besked her..."></textarea>
+  <div class="admin-infobox-actions">
+    <button class="btn primary" id="adminInfoSave" type="button">Gem</button>
+    <button class="btn" id="adminInfoClear" type="button">Ryd</button>
+    <span id="adminInfoStatus" class="admin-infobox-saved"></span>
+  </div>
+</div>
+
+<!-- Rød ring forklaring: synlig for alle hvis der er en besked -->
+<div id="ringLegend" class="ring-legend">
+  <span class="ring-swatch"></span>
+  <span id="ringLegendText"></span>
 </div>
 
 <div class="panel">
@@ -55,11 +138,12 @@
 
 <div id="sections"></div>
 
-<div class="muted" style="margin-top:12px">Tip: Åbn på telefon og vælg “Føj til hjemmeskærm”.</div>
+<div class="muted" style="margin-top:12px">Tip: Åbn på telefon og vælg "Føj til hjemmeskærm".</div>
 </div>
 </div>
 
 <script src="/assets/app.js"></script>
+<script src="/assets/infobox.js"></script>
 
 <script>
 if ("serviceWorker" in navigator) {
