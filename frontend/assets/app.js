@@ -101,7 +101,9 @@ function parseAllowedRoles(s) {
 function matchesRoles(itemRoles, userRoles) {
   // Tom allowedRoles = synlig for alle loggede-ind brugere
   if (!itemRoles || itemRoles.length === 0) return true;
-  const set = new Set(userRoles); // userRoles er allerede normaliseret
+  // portal_admin ser altid alle links uanset rolle-krav
+  if (userRoles.includes("portal_admin")) return true;
+  const set = new Set(userRoles);
   return itemRoles.some(r => set.has(r));
 }
 
