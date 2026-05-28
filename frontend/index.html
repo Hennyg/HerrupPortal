@@ -13,22 +13,6 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-32x32.png">
   <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
-
-<style>
-  .admin-infobox {
-    display: none;
-    align-items: center;
-    gap: .5rem;
-    background: #fff3f3;
-    border: 2px solid #c30a14;
-    border-radius: 8px;
-    padding: .55rem .9rem;
-    margin-bottom: .75rem;
-    font-size: .88rem;
-    color: #7a0000;
-  }
-  .admin-infobox.visible { display: flex; }
-</style>
 </head>
 
 <body>
@@ -44,23 +28,18 @@
 <span class="sep">|</span>
 <a href="/guide.html">Genvej</a>
 <a id="adminLink" class="hidden" href="/admin.html">Admin</a>
-<a href="/.auth/logout?post_logout_redirect_uri=/.auth/login/aad">Log ud</a>
+<a href="/logout">Log ud</a>
 </div>
 </div>
 <div class="nav-accent"></div>
 </div>
 
 <div class="container">
-<div class="hero" style="padding:.6rem 0 .8rem">
+<div class="hero">
 <div>
 <h1>Velkommen</h1>
 <div class="muted" style="text-align:center">Din hub til Web Apps, favoritter og værktøjer</div>
 </div>
-</div>
-
-<div id="adminInfoBox" class="admin-infobox">
-  <span>🔴</span>
-  <span>Apps markeret med rød kant har kun <strong>portal_admin</strong> som adgangsgruppe.</span>
 </div>
 
 <div class="panel">
