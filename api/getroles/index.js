@@ -27,7 +27,12 @@ module.exports = async function (context, req) {
   const rolesFromClaims = (cp.claims || [])
     .filter(c => {
       const t = String(c.typ || "").toLowerCase();
-      return t === "roles" || t === "role" || t.endsWith("/identity/claims/role");
+      return (
+        t === "roles" ||
+        t === "role" ||
+        t === "http://schemas.microsoft.com/ws/2008/06/identity/claims/role" ||
+        t.endsWith("/identity/claims/role")
+      );
     })
     .map(c => String(c.val || "").toLowerCase());
 
