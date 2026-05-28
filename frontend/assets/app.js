@@ -391,6 +391,10 @@ function renderSections(items) {
   const adminLink = document.getElementById("adminLink");
   if (adminLink) adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
 
+  // Vis infoboks om rød kant kun for portal_admin
+  const adminInfoBox = document.getElementById("adminInfoBox");
+  if (adminInfoBox && roles.includes("portal_admin")) adminInfoBox.classList.add("visible");
+
   // Hent links
   let raw = [];
   try {
@@ -418,7 +422,7 @@ function renderSections(items) {
     .map(x => ({
       ...x,
       adminOnly: x.allowedRoles.length === 1
-      && x.allowedRoles[0] === "portal_admin"
+        && x.allowedRoles[0] === "portal_admin"
     }))
     .sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 
