@@ -171,7 +171,7 @@ function renderTileHTML(it) {
         <div class="badge">${esc(it.category || "")}</div>
       </div>
       <div class="tileTitle">${esc(it.title || "Uden titel")}</div>
-      <div class="tileUrl">${esc(it.url || "")}</div>
+      <div class="tileUrl">${esc(it.description || it.forklaring || "")}</div>
     </a>
   `;
   const a = wrapper.firstElementChild;
