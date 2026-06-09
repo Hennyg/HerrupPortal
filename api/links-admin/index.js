@@ -10,6 +10,10 @@ const PLATFORM_COL = "cr175_lch_platformhinttext";
 // Undergruppe tekstfelt (ret hvis dit felt hedder noget andet)
 const SUBGROUP_COL = "cr175_lch_subgroup";
 
+// Forklaring-feltet er normalt prefikset med publisher-prefix i Dataverse.
+// Hvis dit logical name faktisk er lch_forklaring, håndterer fallback det også.
+const DESCRIPTION_COLS = ["cr175_lch_forklaring", "lch_forklaring"];
+
 function json(context, status, body) {
   context.res = {
     status,
@@ -33,13 +37,15 @@ function normPlatformHint(v) {
 }
 
 // DV -> frontend
-function mapOut(r, { hasSubgroup } = { hasSubgroup: true }) {
+function mapOut(r, { hasSubgroup, descriptionCol } = { hasSubgroup: true, descriptionCol: DESCRIPTION_COLS[0] }) {
   return {
     id: r?.[IDCOL],
 
     title: r?.cr175_lch_title || "",
     url: r?.cr175_lch_url || "",
     icon: r?.cr175_lch_icon || "",
+    description: descriptionCol ? (r?.[descriptionCol] || "") : "",
+    forklaring: descriptionCol ? (r?.[descriptionCol] || "") : "",
 
     category: r?.cr175_lch_categorytext || "",
     group: r?.cr175_lch_grouptext || "",
@@ -60,7 +66,7 @@ function mapOut(r, { hasSubgroup } = { hasSubgroup: true }) {
 }
 
 // frontend -> DV payload
-function mapIn(b, { hasSubgroup } = { hasSubgroup: true }) {
+function mapIn(b, { hasSubgroup, descriptionCol } = { hasSubgroup: true, descriptionCol: DESCRIPTION_COLS[0] }) {
   const category = norm(b.category ?? b.cr175_lch_categorytext ?? "");
   const isFav = category.toLowerCase() === "favoritter";
   const group = isFav ? norm(b.group ?? b.cr175_lch_grouptext ?? "") : "";
@@ -83,6 +89,10 @@ function mapIn(b, { hasSubgroup } = { hasSubgroup: true }) {
       ? Number(b.sort ?? b.cr175_lch_sortorder)
       : 1000
   };
+
+  if (descriptionCol) {
+    payload[descriptionCol] = norm(b.description ?? b.forklaring ?? b[descriptionCol] ?? "");
+  }
 
   // Undergruppe kun hvis feltet findes (og vi vælger at bruge det)
   if (hasSubgroup) payload[SUBGROUP_COL] = subgroup;
@@ -115,20 +125,26 @@ async function dvGetLinksWithFallback() {
     "cr175_lch_sortorder"
   ];
 
-  // 1) prøv med subgroup
-  try {
-    const select = [...baseCols, SUBGROUP_COL].join(",");
-    const data = await dvFetch(`${TABLE}?$select=${select}&$orderby=cr175_lch_sortorder asc`);
-    return { hasSubgroup: true, rows: (data.value || []) };
-  } catch (e) {
-    // 2) hvis det var 400 (ofte ukendt kolonne), prøv uden subgroup
-    if ((e?.status || 0) === 400) {
-      const select = baseCols.join(",");
-      const data = await dvFetch(`${TABLE}?$select=${select}&$orderby=cr175_lch_sortorder asc`);
-      return { hasSubgroup: false, rows: (data.value || []) };
-    }
-    throw e;
+  const variants = [];
+  for (const descriptionCol of DESCRIPTION_COLS) {
+    variants.push({ hasSubgroup: true, descriptionCol, cols: [...baseCols, SUBGROUP_COL, descriptionCol] });
+    variants.push({ hasSubgroup: false, descriptionCol, cols: [...baseCols, descriptionCol] });
   }
+  variants.push({ hasSubgroup: true, descriptionCol: null, cols: [...baseCols, SUBGROUP_COL] });
+  variants.push({ hasSubgroup: false, descriptionCol: null, cols: baseCols });
+
+  let lastError;
+  for (const v of variants) {
+    try {
+      const select = v.cols.join(",");
+      const data = await dvFetch(`${TABLE}?$select=${select}&$orderby=cr175_lch_sortorder asc`);
+      return { hasSubgroup: v.hasSubgroup, descriptionCol: v.descriptionCol, rows: (data.value || []) };
+    } catch (e) {
+      lastError = e;
+      if ((e?.status || 0) !== 400) throw e;
+    }
+  }
+  throw lastError;
 }
 
 module.exports = async function (context, req) {
@@ -136,21 +152,21 @@ module.exports = async function (context, req) {
     const m = (req.method || "GET").toUpperCase();
 
     if (m === "GET") {
-      const { hasSubgroup, rows } = await dvGetLinksWithFallback();
-      return json(context, 200, rows.map(r => mapOut(r, { hasSubgroup })));
+      const { hasSubgroup, descriptionCol, rows } = await dvGetLinksWithFallback();
+      return json(context, 200, rows.map(r => mapOut(r, { hasSubgroup, descriptionCol })));
     }
 
     // POST/PUT/PATCH: vi prøver at skrive med subgroup – hvis DV giver 400, skriver vi uden
     async function writeWithFallback(method, idOrNull) {
       const body = req.body || {};
       try {
-        const payload = mapIn(body, { hasSubgroup: true });
+        const payload = mapIn(body, { hasSubgroup: true, descriptionCol: DESCRIPTION_COLS[0] });
         if (method === "POST") return await dvFetch(`${TABLE}`, { method: "POST", body: payload });
         await dvFetch(`${TABLE}(${idOrNull})`, { method: "PATCH", body: payload });
         return { ok: true };
       } catch (e) {
         if ((e?.status || 0) === 400) {
-          const payload = mapIn(body, { hasSubgroup: false });
+          const payload = mapIn(body, { hasSubgroup: false, descriptionCol: DESCRIPTION_COLS[0] });
           if (method === "POST") return await dvFetch(`${TABLE}`, { method: "POST", body: payload });
           await dvFetch(`${TABLE}(${idOrNull})`, { method: "PATCH", body: payload });
           return { ok: true, subgroupIgnored: true };
@@ -164,9 +180,9 @@ module.exports = async function (context, req) {
       // returnér noget brugbart
       if (created && created[IDCOL]) {
         // hent igen så vi får ens output
-        const { hasSubgroup, rows } = await dvGetLinksWithFallback();
+        const { hasSubgroup, descriptionCol, rows } = await dvGetLinksWithFallback();
         const row = rows.find(r => r[IDCOL] === created[IDCOL]);
-        return json(context, 200, mapOut(row || created, { hasSubgroup }));
+        return json(context, 200, mapOut(row || created, { hasSubgroup, descriptionCol }));
       }
       return json(context, 200, { ok: true });
     }
