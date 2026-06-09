@@ -83,6 +83,7 @@ function readForm() {
     id: $("id").value || null,
     title: $("title").value.trim(),
     url: $("url").value.trim(),
+    description: $("description")?.value.trim() || "",
     category,
     group: isFav ? ($("group").value || "") : "",
     subgroup: isFav ? ($("subgroup")?.value || "").trim() : "",
@@ -100,6 +101,7 @@ function fillForm(x) {
   $("id").value = x?.id || "";
   $("title").value = x?.title || "";
   $("url").value = x?.url || "";
+  if ($("description")) $("description").value = x?.description || x?.forklaring || "";
   $("category").value = x?.category || "";
   $("group").value = x?.group || "";
   if ($("subgroup")) $("subgroup").value = x?.subgroup || "";
@@ -207,6 +209,7 @@ function getFilteredSorted() {
     return (
       (x.title || "").toLowerCase().includes(q) ||
       (x.url || "").toLowerCase().includes(q) ||
+      (x.description || x.forklaring || "").toLowerCase().includes(q) ||
       (x.category || "").toLowerCase().includes(q) ||
       (x.group || "").toLowerCase().includes(q) ||
       (x.allowedRoles || "").toLowerCase().includes(q)
@@ -249,7 +252,7 @@ function renderTable(rows) {
 
   if (rows.length === 0) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="9" style="text-align:center;color:#6b7280;padding:1.5rem">Ingen resultater</td>`;
+    tr.innerHTML = `<td colspan="10" style="text-align:center;color:#6b7280;padding:1.5rem">Ingen resultater</td>`;
     tb.appendChild(tr);
     return;
   }
@@ -259,6 +262,7 @@ function renderTable(rows) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${x.title || ""}</td>
+      <td>${x.description || x.forklaring || ""}</td>
       <td>${x.category || ""}</td>
       <td>${x.group || ""}</td>
       <td>${x.subgroup || ""}</td>
