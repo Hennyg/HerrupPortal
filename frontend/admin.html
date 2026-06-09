@@ -87,6 +87,11 @@
         </div>
 
         <div class="formRow">
+          <label for="description">Forklaring</label>
+          <input id="description" class="field" maxlength="150" placeholder="Kort forklaring til hvad tile gør" autocomplete="off" />
+        </div>
+
+        <div class="formRow">
           <label for="category">Kategori</label>
           <select id="category" class="field"></select>
         </div>
@@ -192,6 +197,7 @@
           <thead>
             <tr>
               <th data-col="title">Titel<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="description">Forklaring<span class="sort-arrow"> ⇅</span></th>
               <th data-col="category">Kategori<span class="sort-arrow"> ⇅</span></th>
               <th data-col="group">Gruppe<span class="sort-arrow"> ⇅</span></th>
               <th data-col="subgroup">Undergruppe<span class="sort-arrow"> ⇅</span></th>
