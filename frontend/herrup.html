@@ -44,10 +44,14 @@
     .userTable tbody tr:hover { background:rgba(0,0,0,.025); }
     .userTable tbody td { padding:.45rem .7rem; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
 
-    /* Avatar */
-    .avatar { display:inline-flex; align-items:center; justify-content:center;
-              width:36px; height:36px; border-radius:50%; background:var(--nav-bg);
-              color:#fff; font-size:.8rem; font-weight:700; flex-shrink:0; overflow:hidden; }
+    /* Avatar i tabel — klikbar */
+    .avatar {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:36px; height:36px; border-radius:50%; background:var(--nav-bg);
+      color:#fff; font-size:.8rem; font-weight:700; flex-shrink:0; overflow:hidden;
+      cursor:pointer; transition:box-shadow .15s;
+    }
+    .avatar:hover { box-shadow:0 0 0 3px rgba(133,12,24,.3); }
     .avatar img { width:36px; height:36px; object-fit:cover; border-radius:50%; }
     .nameCell { display:flex; align-items:center; gap:.6rem; }
 
@@ -62,88 +66,114 @@
                          animation:spin .75s linear infinite; margin-bottom:.5rem; }
     @keyframes spin { to { transform:rotate(360deg); } }
 
-    /* ── Org chart ─────────────────────────────────────────────────────────── */
+    /* ── Modal ──────────────────────────────────────────────────────────────── */
+    .modal-backdrop {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.45);
+      z-index:1000; align-items:center; justify-content:center; padding:1rem;
+    }
+    .modal-backdrop.open { display:flex; }
+    .modal {
+      background:#fff; border-radius:16px; width:100%; max-width:680px;
+      max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25);
+      display:flex; flex-direction:column;
+    }
+    .modal-header {
+      display:flex; align-items:flex-start; gap:1rem; padding:1.5rem 1.5rem 1rem;
+      border-bottom:1px solid #f3f4f6; position:relative;
+    }
+    .modal-close {
+      position:absolute; top:1rem; right:1rem; appearance:none; border:0;
+      background:transparent; font-size:1.4rem; cursor:pointer; color:#6b7280; line-height:1;
+    }
+    .modal-close:hover { color:#111; }
+    .modal-big-avatar {
+      width:80px; height:80px; border-radius:50%; background:var(--nav-bg);
+      color:#fff; font-size:1.4rem; font-weight:700; display:flex; align-items:center;
+      justify-content:center; overflow:hidden; flex-shrink:0;
+    }
+    .modal-big-avatar img { width:80px; height:80px; object-fit:cover; border-radius:50%; }
+    .modal-name  { font-size:1.3rem; font-weight:700; margin:0 0 4px; }
+    .modal-title { font-size:.9rem; color:#6b7280; margin:0 0 8px; }
+    .modal-badges { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .modal-badge { background:#f3f4f6; border:1px solid #e5e7eb; border-radius:999px;
+                   padding:2px 10px; font-size:.78rem; color:#374151; }
+
+    .modal-body { padding:1.25rem 1.5rem; display:flex; flex-direction:column; gap:1.25rem; }
+
+    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem 1.5rem; }
+    @media (max-width:500px) { .detail-grid { grid-template-columns:1fr; } }
+    .detail-row { display:flex; flex-direction:column; gap:2px; }
+    .detail-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#9ca3af; }
+    .detail-value { font-size:.9rem; color:#111; font-weight:500; word-break:break-word; }
+    .detail-value a { color:inherit; text-decoration:none; }
+    .detail-value a:hover { text-decoration:underline; }
+
+    /* Mini org-chart i modal */
+    .modal-section-title {
+      font-size:.8rem; text-transform:uppercase; letter-spacing:.06em;
+      color:#6b7280; font-weight:700; margin-bottom:.6rem;
+    }
+    .mini-org { display:flex; flex-direction:column; gap:0; }
+
+    /* Manager-kort */
+    .mini-card {
+      display:flex; align-items:center; gap:.75rem; padding:.6rem .75rem;
+      border:1px solid #e5e7eb; border-radius:10px; cursor:pointer;
+      transition:background .1s; text-decoration:none; color:inherit;
+    }
+    .mini-card:hover { background:#f9fafb; border-color:#d1d5db; }
+    .mini-card.current { background:#fef3f2; border-color:#fca5a5; cursor:default; }
+    .mini-avatar {
+      width:36px; height:36px; border-radius:50%; background:var(--nav-bg);
+      color:#fff; font-size:.78rem; font-weight:700; display:flex; align-items:center;
+      justify-content:center; overflow:hidden; flex-shrink:0;
+    }
+    .mini-avatar img { width:36px; height:36px; object-fit:cover; border-radius:50%; }
+    .mini-name  { font-size:.88rem; font-weight:600; }
+    .mini-sub   { font-size:.78rem; color:#6b7280; }
+    .mini-tag   { margin-left:auto; font-size:.72rem; background:#f3f4f6;
+                  border-radius:999px; padding:2px 8px; color:#6b7280; white-space:nowrap; }
+    .mini-tag.you { background:#fef3f2; color:#850c18; }
+
+    /* Connector pil */
+    .mini-connector {
+      display:flex; justify-content:center; align-items:center;
+      height:20px; color:#d1d5db; font-size:1rem;
+    }
+
+    /* Direkte rapporter */
+    .mini-reports { display:flex; flex-direction:column; gap:.4rem; margin-top:.4rem; }
+
+    /* Org-view */
     #orgView { display:none; overflow-x:auto; padding-bottom:1rem; }
-
-    .org-tree { display:flex; flex-direction:column; align-items:center; gap:0; }
-
-    .org-level { display:flex; gap:16px; justify-content:center; flex-wrap:nowrap; position:relative; }
-
-    .org-node {
-      display:flex; flex-direction:column; align-items:center;
-      position:relative; min-width:110px; max-width:130px;
-    }
-
-    /* Lodret linje ned fra forælder */
-    .org-node::before {
-      content:""; position:absolute; top:-20px; left:50%;
-      transform:translateX(-50%);
-      width:2px; height:20px; background:#d1d5db;
-    }
-    /* Ingen linje på rod-noden */
-    .org-node.root::before { display:none; }
-
-    /* Vandret linje der forbinder søskende */
-    .org-level.has-siblings::before {
-      content:""; position:absolute; top:0; left:0; right:0;
-      height:2px; background:#d1d5db;
-      margin:0 auto;
-      width:calc(100% - 110px);
-    }
-
-    .org-card {
-      display:flex; flex-direction:column; align-items:center; gap:6px;
-      background:#fff; border:1px solid #e5e7eb; border-radius:12px;
-      padding:12px 8px; cursor:pointer; transition:box-shadow .15s, border-color .15s;
-      width:100%; text-align:center;
-    }
-    .org-card:hover { border-color:#850c18; box-shadow:0 4px 12px rgba(133,12,24,.12); }
-    .org-card.selected { border-color:#850c18; background:#fef3f2; }
-
-    .org-avatar { width:48px; height:48px; border-radius:50%; background:var(--nav-bg);
-                  color:#fff; display:flex; align-items:center; justify-content:center;
-                  font-size:.9rem; font-weight:700; overflow:hidden; flex-shrink:0; }
-    .org-avatar img { width:48px; height:48px; object-fit:cover; border-radius:50%; }
-
-    .org-name { font-size:.78rem; font-weight:700; color:#111827; line-height:1.2;
-                word-break:break-word; }
-    .org-title { font-size:.68rem; color:#6b7280; line-height:1.2; }
-
-    .org-children { display:flex; gap:16px; justify-content:center;
-                    position:relative; padding-top:20px; flex-wrap:nowrap; }
-
-    /* Vandret linje over børn */
-    .org-children::before {
-      content:""; position:absolute; top:0; left:50px; right:50px;
-      height:2px; background:#d1d5db;
-    }
-    /* Hvis kun ét barn — ingen vandret linje */
-    .org-children.single-child::before { display:none; }
-
-    /* Lodret linje fra barn op */
-    .org-child-wrap { display:flex; flex-direction:column; align-items:center; position:relative; }
-    .org-child-wrap::before {
-      content:""; width:2px; height:20px; background:#d1d5db; flex-shrink:0;
-    }
-
-    /* Ingen top-connector på første nivel */
-    .org-root-wrap > .org-child-wrap::before { display:none; }
-
     .org-placeholder { color:#9ca3af; font-size:.85rem; text-align:center; padding:2rem; }
 
-    /* Detalje-panel */
-    .org-detail {
-      position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb;
-      padding:1rem; display:none; gap:1rem; align-items:center; flex-wrap:wrap;
+    /* Org tree cards */
+    .org-wrap { display:flex; flex-direction:column; align-items:center; }
+    .org-card {
+      display:flex; flex-direction:column; align-items:center; gap:5px;
+      background:#fff; border:1px solid #e5e7eb; border-radius:12px;
+      padding:10px 8px; cursor:pointer; transition:box-shadow .15s, border-color .15s;
+      width:110px; text-align:center;
     }
-    .org-detail.visible { display:flex; }
-    .org-detail-avatar { width:56px; height:56px; border-radius:50%; background:var(--nav-bg);
-                         color:#fff; display:flex; align-items:center; justify-content:center;
-                         font-size:1rem; font-weight:700; overflow:hidden; flex-shrink:0; }
-    .org-detail-avatar img { width:56px; height:56px; object-fit:cover; border-radius:50%; }
-    .org-detail-info { flex:1; min-width:0; }
-    .org-detail-name  { font-size:1rem; font-weight:700; }
-    .org-detail-meta  { font-size:.85rem; color:#6b7280; }
+    .org-card:hover { border-color:#850c18; box-shadow:0 4px 12px rgba(133,12,24,.12); }
+    .org-avatar { width:44px; height:44px; border-radius:50%; background:var(--nav-bg);
+                  color:#fff; display:flex; align-items:center; justify-content:center;
+                  font-size:.82rem; font-weight:700; overflow:hidden; flex-shrink:0; }
+    .org-avatar img { width:44px; height:44px; object-fit:cover; border-radius:50%; }
+    .org-name  { font-size:.72rem; font-weight:700; color:#111827; line-height:1.2; word-break:break-word; }
+    .org-title { font-size:.65rem; color:#6b7280; line-height:1.2; }
+    .org-line-v { width:2px; height:20px; background:#d1d5db; }
+    .org-children-row {
+      display:flex; gap:12px; justify-content:center;
+      position:relative; padding-top:0;
+    }
+    .org-children-row::before {
+      content:""; position:absolute; top:0; left:55px; right:55px;
+      height:2px; background:#d1d5db;
+    }
+    .org-children-row.single::before { display:none; }
+    .org-child-col { display:flex; flex-direction:column; align-items:center; }
 
     @media (max-width:640px) {
       .userTable thead th:nth-child(3),
@@ -186,7 +216,7 @@
       <button class="tab"        id="tabOrg"  onclick="switchTab('org')">🌳 Org chart</button>
     </div>
 
-    <!-- Liste-panel -->
+    <!-- Liste -->
     <div class="panel" id="listView">
       <div class="userToolbar">
         <div class="clearable">
@@ -204,7 +234,7 @@
               <th data-col="mail">E-mail<span class="sort-arrow"> ⇅</span></th>
               <th data-col="jobTitle">Stilling<span class="sort-arrow"> ⇅</span></th>
               <th data-col="department">Afdeling<span class="sort-arrow"> ⇅</span></th>
-              <th data-col="mobilePhone">Mobil<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="businessPhone">Telefon<span class="sort-arrow"> ⇅</span></th>
               <th data-col="accountEnabled">Status<span class="sort-arrow"> ⇅</span></th>
             </tr>
           </thead>
@@ -212,7 +242,7 @@
             <tr><td colspan="6">
               <div class="stateMsg">
                 <div class="spinner"></div>
-                <div>Henter brugere… (foto + manager hentes også — tager lidt tid)</div>
+                <div>Henter brugere… foto + manager hentes også</div>
               </div>
             </td></tr>
           </tbody>
@@ -220,16 +250,36 @@
       </div>
     </div>
 
-    <!-- Org chart panel -->
+    <!-- Org chart -->
     <div class="panel" id="orgView">
-      <div id="orgTree" style="overflow-x:auto;padding:1rem 0;">
-        <div class="org-placeholder">Indlæser org chart…</div>
+      <div id="orgTree" style="overflow-x:auto;padding:1rem 0;min-height:200px;">
+        <div class="org-placeholder">Indlæser…</div>
       </div>
-      <div class="org-detail" id="orgDetail">
-        <div class="org-detail-avatar" id="orgDetailAvatar"></div>
-        <div class="org-detail-info">
-          <div class="org-detail-name" id="orgDetailName"></div>
-          <div class="org-detail-meta" id="orgDetailMeta"></div>
+    </div>
+  </div>
+
+  <!-- ── Modal ──────────────────────────────────────────────────────────────── -->
+  <div class="modal-backdrop" id="modalBackdrop" onclick="closeModalOnBackdrop(event)">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <div class="modal-big-avatar" id="mAvatar"></div>
+        <div style="flex:1;min-width:0;">
+          <div class="modal-name"  id="mName"></div>
+          <div class="modal-title" id="mTitle"></div>
+          <div class="modal-badges" id="mBadges"></div>
+        </div>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Kontaktinfo -->
+        <div>
+          <div class="modal-section-title">Kontakt</div>
+          <div class="detail-grid" id="mDetails"></div>
+        </div>
+        <!-- Mini org -->
+        <div id="mOrgSection">
+          <div class="modal-section-title">Organisation</div>
+          <div class="mini-org" id="mOrg"></div>
         </div>
       </div>
     </div>
@@ -238,15 +288,14 @@
   <script src="/assets/app.js"></script>
   <script>
     let allUsers = [];
+    let byId     = new Map();
     let sortCol  = "displayName";
     let sortDir  = 1;
-    let activeTab = "list";
 
     // ── Init ──────────────────────────────────────────────────────────────────
     (async function init() {
       let me = null;
       try { me = await getMe(); } catch {}
-
       const userLine = document.getElementById("userLine");
       if (userLine) userLine.textContent = me?.userDetails || "";
 
@@ -261,10 +310,11 @@
       try {
         const r = await fetch("/api/entra-users", { cache: "no-store" });
         if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(body.error || `HTTP ${r.status}`);
+          const b = await r.json().catch(() => ({}));
+          throw new Error(b.error || `HTTP ${r.status}`);
         }
         allUsers = await r.json();
+        byId = new Map(allUsers.map(u => [u.id, u]));
         buildDeptFilter(allUsers);
         renderTable();
         renderOrg();
@@ -275,7 +325,6 @@
 
     // ── Faner ─────────────────────────────────────────────────────────────────
     function switchTab(tab) {
-      activeTab = tab;
       document.getElementById("listView").style.display = tab === "list" ? "" : "none";
       document.getElementById("orgView").style.display  = tab === "org"  ? "" : "none";
       document.getElementById("tabList").classList.toggle("active", tab === "list");
@@ -288,11 +337,16 @@
       const listEl = document.getElementById("roleList");
       const display = roles.filter(r => r !== "anonymous" && r !== "authenticated");
       if (!display.length) return;
-      listEl.innerHTML = display.map(role => {
-        const isAdmin = role === "portal_admin";
-        return `<span class="rolePill ${isAdmin ? "admin" : ""}"><span class="dot"></span>${esc(role)}</span>`;
+      listEl.innerHTML = display.map(r => {
+        const isAdmin = r === "portal_admin";
+        return `<span class="rolePill ${isAdmin?"admin":""}"><span class="dot"></span>${esc(r)}</span>`;
       }).join("");
       panel.style.display = "";
+    }
+
+    // ── businessPhone hjælper ─────────────────────────────────────────────────
+    function bizPhone(u) {
+      return Array.isArray(u.businessPhones) ? (u.businessPhones[0] || "") : (u.businessPhones || "");
     }
 
     // ── Tabel ─────────────────────────────────────────────────────────────────
@@ -306,12 +360,15 @@
           return (u.displayName||"").toLowerCase().includes(q)
               || (u.mail||"").toLowerCase().includes(q)
               || (u.jobTitle||"").toLowerCase().includes(q)
-              || (u.mobilePhone||"").toLowerCase().includes(q);
+              || bizPhone(u).toLowerCase().includes(q);
         })
         .slice()
         .sort((a, b) => {
           if (sortCol === "accountEnabled") {
-            return ((a[sortCol] === true ? 1 : 0) - (b[sortCol] === true ? 1 : 0)) * sortDir;
+            return ((a[sortCol]===true?1:0) - (b[sortCol]===true?1:0)) * sortDir;
+          }
+          if (sortCol === "businessPhone") {
+            return bizPhone(a).localeCompare(bizPhone(b), "da") * sortDir;
           }
           return String(a[sortCol]??"").localeCompare(String(b[sortCol]??""), "da") * sortDir;
         });
@@ -327,21 +384,19 @@
         return;
       }
       tbody.innerHTML = rows.map(u => {
-        const avatarInner = u.photo
-          ? `<img src="${u.photo}" alt="" />`
-          : esc(makeInitials(u.displayName));
+        const av = avatarHTML(u, 36);
         const statusBadge = u.accountEnabled !== false
           ? `<span class="badge-ok">Aktiv</span>`
           : `<span class="badge-off">Deaktiveret</span>`;
         return `<tr>
           <td><div class="nameCell">
-            <div class="avatar">${avatarInner}</div>
-            <div>${esc(u.displayName||"–")}</div>
+            <div class="avatar" onclick="openModal('${esc(u.id)}')" title="Se detaljer">${av}</div>
+            <div style="cursor:pointer" onclick="openModal('${esc(u.id)}')">${esc(u.displayName||"–")}</div>
           </div></td>
           <td><a href="mailto:${esc(u.mail||"")}" style="color:inherit">${esc(u.mail||"–")}</a></td>
           <td>${esc(u.jobTitle||"–")}</td>
           <td>${esc(u.department||"–")}</td>
-          <td>${esc(u.mobilePhone||"–")}</td>
+          <td>${esc(bizPhone(u)||"–")}</td>
           <td>${statusBadge}</td>
         </tr>`;
       }).join("");
@@ -353,12 +408,10 @@
       const sel = document.getElementById("deptFilter");
       depts.forEach(d => {
         const o = document.createElement("option");
-        o.value = d; o.textContent = d;
-        sel.appendChild(o);
+        o.value = d; o.textContent = d; sel.appendChild(o);
       });
     }
 
-    // Søg
     const searchEl = document.getElementById("search");
     const clearBtn = document.getElementById("searchClear");
     function syncClear() { if (clearBtn) clearBtn.style.visibility = searchEl?.value ? "visible" : "hidden"; }
@@ -367,13 +420,11 @@
     document.getElementById("deptFilter")?.addEventListener("change", renderTable);
     syncClear();
 
-    // Sortering
     document.querySelectorAll("#tbl thead th[data-col]").forEach(th => {
       th.addEventListener("click", () => {
         const col = th.getAttribute("data-col");
         if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
-        updateSortHeaders();
-        renderTable();
+        updateSortHeaders(); renderTable();
       });
     });
     function updateSortHeaders() {
@@ -381,144 +432,207 @@
         const col = th.getAttribute("data-col");
         th.classList.toggle("sort-active", col === sortCol);
         const arrow = th.querySelector(".sort-arrow");
-        if (arrow) arrow.textContent = col === sortCol ? (sortDir === 1 ? " ▲" : " ▼") : " ⇅";
+        if (arrow) arrow.textContent = col === sortCol ? (sortDir===1?" ▲":" ▼") : " ⇅";
       });
     }
 
-    // ── Org chart ─────────────────────────────────────────────────────────────
+    // ── Modal ──────────────────────────────────────────────────────────────────
+    function openModal(userId) {
+      const u = byId.get(userId);
+      if (!u) return;
+
+      // Header
+      document.getElementById("mAvatar").innerHTML = avatarHTML(u, 80);
+      document.getElementById("mName").textContent  = u.displayName || "";
+      document.getElementById("mTitle").textContent = u.jobTitle    || "";
+
+      const badges = [];
+      if (u.department)       badges.push(u.department);
+      if (u.officeLocation)   badges.push(u.officeLocation);
+      if (u.accountEnabled === false) badges.push("Deaktiveret");
+      document.getElementById("mBadges").innerHTML = badges
+        .map(b => `<span class="modal-badge">${esc(b)}</span>`).join("");
+
+      // Kontaktdetaljer
+      const phone = bizPhone(u);
+      const details = [
+        { label: "E-mail",   value: u.mail    ? `<a href="mailto:${esc(u.mail)}">${esc(u.mail)}</a>`  : "–" },
+        { label: "Telefon",  value: phone      ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>`       : "–" },
+        { label: "Mobil",    value: u.mobilePhone ? `<a href="tel:${esc(u.mobilePhone)}">${esc(u.mobilePhone)}</a>` : "–" },
+        { label: "Stilling", value: esc(u.jobTitle    || "–") },
+        { label: "Afdeling", value: esc(u.department  || "–") },
+        { label: "Kontor",   value: esc(u.officeLocation || "–") },
+      ];
+      document.getElementById("mDetails").innerHTML = details.map(d =>
+        `<div class="detail-row">
+          <div class="detail-label">${d.label}</div>
+          <div class="detail-value">${d.value}</div>
+        </div>`
+      ).join("");
+
+      // Mini org-chart
+      renderMiniOrg(u);
+
+      document.getElementById("modalBackdrop").classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeModal() {
+      document.getElementById("modalBackdrop").classList.remove("open");
+      document.body.style.overflow = "";
+    }
+    function closeModalOnBackdrop(e) {
+      if (e.target === document.getElementById("modalBackdrop")) closeModal();
+    }
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+    // ── Mini org-chart i modal ─────────────────────────────────────────────────
+    function renderMiniOrg(user) {
+      const container = document.getElementById("mOrg");
+      container.innerHTML = "";
+
+      // Find manager-kæde opad (maks 2 niveauer)
+      const chain = [];
+      let cur = user;
+      for (let i = 0; i < 2; i++) {
+        const mgr = cur.managerId ? byId.get(cur.managerId) : null;
+        if (!mgr) break;
+        chain.unshift(mgr);
+        cur = mgr;
+      }
+
+      // Find direkte rapporter
+      const reports = allUsers
+        .filter(u => u.managerId === user.id)
+        .sort((a, b) => (a.displayName||"").localeCompare(b.displayName||"", "da"));
+
+      // Tegn manager-kæde
+      chain.forEach(mgr => {
+        container.appendChild(makeMiniCard(mgr, "manager", () => { closeModal(); setTimeout(() => openModal(mgr.id), 50); }));
+        const arrow = document.createElement("div");
+        arrow.className = "mini-connector";
+        arrow.textContent = "↓";
+        container.appendChild(arrow);
+      });
+
+      // Nuværende bruger
+      container.appendChild(makeMiniCard(user, "current"));
+
+      // Direkte rapporter
+      if (reports.length) {
+        const arrow = document.createElement("div");
+        arrow.className = "mini-connector";
+        arrow.textContent = "↓";
+        container.appendChild(arrow);
+
+        const label = document.createElement("div");
+        label.style.cssText = "font-size:.78rem;color:#6b7280;margin-bottom:.4rem;";
+        label.textContent = `${reports.length} direkte rapporter`;
+        container.appendChild(label);
+
+        const reportsEl = document.createElement("div");
+        reportsEl.className = "mini-reports";
+        reports.forEach(r => {
+          reportsEl.appendChild(makeMiniCard(r, "report", () => { closeModal(); setTimeout(() => openModal(r.id), 50); }));
+        });
+        container.appendChild(reportsEl);
+      }
+    }
+
+    function makeMiniCard(user, role, onClick) {
+      const div = document.createElement("div");
+      div.className = "mini-card" + (role === "current" ? " current" : "");
+      if (onClick) div.addEventListener("click", onClick);
+
+      const tagText = role === "manager" ? "Manager" : role === "report" ? "Rapport" : "Dig";
+      const tagClass = role === "current" ? "mini-tag you" : "mini-tag";
+
+      div.innerHTML = `
+        <div class="mini-avatar">${avatarHTML(user, 36)}</div>
+        <div>
+          <div class="mini-name">${esc(user.displayName||"")}</div>
+          <div class="mini-sub">${esc(user.jobTitle||"")}</div>
+        </div>
+        <span class="${tagClass}">${tagText}</span>`;
+      return div;
+    }
+
+    // ── Org chart (fuld) ──────────────────────────────────────────────────────
     function renderOrg() {
       const container = document.getElementById("orgTree");
       if (!allUsers.length) {
-        container.innerHTML = `<div class="org-placeholder">Ingen brugere at vise</div>`;
+        container.innerHTML = `<div class="org-placeholder">Ingen brugere</div>`;
         return;
       }
 
-      // Byg id → user map
-      const byId = new Map(allUsers.map(u => [u.id, u]));
-
-      // Find rødder: brugere hvis manager ikke er i gruppen
       const groupIds = new Set(allUsers.map(u => u.id));
-      const roots = allUsers.filter(u => !u.managerId || !groupIds.has(u.managerId));
-
-      // Byg children-map
-      const children = new Map();
+      const childMap = new Map();
       allUsers.forEach(u => {
         if (u.managerId && groupIds.has(u.managerId)) {
-          if (!children.has(u.managerId)) children.set(u.managerId, []);
-          children.get(u.managerId).push(u);
+          if (!childMap.has(u.managerId)) childMap.set(u.managerId, []);
+          childMap.get(u.managerId).push(u);
         }
       });
+      childMap.forEach(arr => arr.sort((a,b) => (a.displayName||"").localeCompare(b.displayName||"","da")));
 
-      // Sort children
-      children.forEach(arr => arr.sort((a, b) => (a.displayName||"").localeCompare(b.displayName||"", "da")));
-      roots.sort((a, b) => (a.displayName||"").localeCompare(b.displayName||"", "da"));
+      const roots = allUsers
+        .filter(u => !u.managerId || !groupIds.has(u.managerId))
+        .sort((a,b) => (a.displayName||"").localeCompare(b.displayName||"","da"));
 
       container.innerHTML = "";
 
-      function makeCard(user, isRoot = false) {
+      function buildNode(user) {
         const wrap = document.createElement("div");
-        wrap.style.cssText = "display:flex;flex-direction:column;align-items:center;";
+        wrap.className = "org-wrap";
 
         const card = document.createElement("div");
         card.className = "org-card";
-        card.dataset.id = user.id;
-
-        const avatarInner = user.photo
-          ? `<img src="${user.photo}" alt="" />`
-          : esc(makeInitials(user.displayName));
-
         card.innerHTML = `
-          <div class="org-avatar">${avatarInner}</div>
+          <div class="org-avatar">${avatarHTML(user, 44)}</div>
           <div class="org-name">${esc(user.displayName||"")}</div>
           <div class="org-title">${esc(user.jobTitle||"")}</div>`;
-
-        card.addEventListener("click", () => showDetail(user));
+        card.addEventListener("click", () => openModal(user.id));
         wrap.appendChild(card);
 
-        const kids = children.get(user.id) || [];
+        const kids = childMap.get(user.id) || [];
         if (kids.length) {
-          const kidRow = document.createElement("div");
-          kidRow.style.cssText = `display:flex;gap:12px;justify-content:center;
-            position:relative;padding-top:20px;flex-wrap:wrap;margin-top:0;`;
+          const vLine = document.createElement("div");
+          vLine.className = "org-line-v";
+          wrap.appendChild(vLine);
 
-          // Vandret linje over børn
-          if (kids.length > 1) {
-            kidRow.style.position = "relative";
-          }
-
-          // Lodret linje ned fra forælder til vandret linje
-          const vLineDown = document.createElement("div");
-          vLineDown.style.cssText = "width:2px;height:20px;background:#d1d5db;margin:0 auto;";
-          wrap.appendChild(vLineDown);
-
-          kids.forEach((kid, i) => {
-            const kidWrap = document.createElement("div");
-            kidWrap.style.cssText = "display:flex;flex-direction:column;align-items:center;";
-
-            // Lodret linje op til vandret
-            const vLine = document.createElement("div");
-            vLine.style.cssText = "width:2px;height:20px;background:#d1d5db;";
-            kidWrap.appendChild(vLine);
-            kidWrap.appendChild(makeCard(kid));
-            kidRow.appendChild(kidWrap);
+          const row = document.createElement("div");
+          row.className = "org-children-row" + (kids.length === 1 ? " single" : "");
+          kids.forEach(kid => {
+            const col = document.createElement("div");
+            col.className = "org-child-col";
+            const vUp = document.createElement("div");
+            vUp.className = "org-line-v";
+            col.appendChild(vUp);
+            col.appendChild(buildNode(kid));
+            row.appendChild(col);
           });
-
-          // Tegn vandret linje over børn via SVG (simpel CSS-løsning)
-          if (kids.length > 1) {
-            const hLine = document.createElement("div");
-            hLine.style.cssText = `position:absolute;top:0;left:0;right:0;
-              height:2px;background:#d1d5db;
-              margin:0 ${Math.round(110/2)}px;`;
-            kidRow.appendChild(hLine);
-          }
-
-          wrap.appendChild(kidRow);
+          wrap.appendChild(row);
         }
-
         return wrap;
       }
 
       if (roots.length === 1) {
-        container.appendChild(makeCard(roots[0], true));
+        container.appendChild(buildNode(roots[0]));
       } else {
-        // Flere rødder — vis side om side
-        const rootRow = document.createElement("div");
-        rootRow.style.cssText = "display:flex;gap:24px;justify-content:center;flex-wrap:wrap;";
-        roots.forEach(r => rootRow.appendChild(makeCard(r, true)));
-        container.appendChild(rootRow);
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;gap:24px;justify-content:center;flex-wrap:wrap;";
+        roots.forEach(r => row.appendChild(buildNode(r)));
+        container.appendChild(row);
       }
     }
 
-    function showDetail(user) {
-      // Fjern evt. tidligere selected
-      document.querySelectorAll(".org-card.selected").forEach(c => c.classList.remove("selected"));
-      // Markér valgt
-      document.querySelectorAll(`.org-card[data-id="${user.id}"]`).forEach(c => c.classList.add("selected"));
-
-      const detail = document.getElementById("orgDetail");
-      const avatarEl = document.getElementById("orgDetailAvatar");
-      const nameEl   = document.getElementById("orgDetailName");
-      const metaEl   = document.getElementById("orgDetailMeta");
-
-      avatarEl.innerHTML = user.photo
-        ? `<img src="${user.photo}" alt="" />`
-        : esc(makeInitials(user.displayName));
-
-      nameEl.textContent = user.displayName || "";
-
-      const parts = [
-        user.jobTitle    ? user.jobTitle    : null,
-        user.department  ? user.department  : null,
-        user.mail        ? user.mail        : null,
-        user.mobilePhone ? user.mobilePhone : null,
-        user.managerName ? `Manager: ${user.managerName}` : null
-      ].filter(Boolean);
-      metaEl.textContent = parts.join("  ·  ");
-
-      detail.classList.add("visible");
-    }
-
     // ── Hjælpere ─────────────────────────────────────────────────────────────
+    function avatarHTML(user, size) {
+      if (user.photo) {
+        return `<img src="${user.photo}" alt="" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:50%;" />`;
+      }
+      return esc(makeInitials(user.displayName));
+    }
     function makeInitials(name) {
       if (!name) return "?";
       return name.trim().split(/\s+/).slice(0, 2).map(p => p[0].toUpperCase()).join("");
