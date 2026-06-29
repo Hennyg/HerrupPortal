@@ -74,10 +74,10 @@ async function findGroupId(token, name) {
   return groups[0].id;
 }
 
-// ── Hent gruppemedlemmer med paginering ───────────────────────────────────────
+// ── Hent alle brugere rekursivt via transitiveMembers ────────────────────────
 async function getGroupMembers(token, groupId) {
-  // Max 100 per side — paginering håndteres automatisk via @odata.nextLink
-  const url = `https://graph.microsoft.com/v1.0/groups/${groupId}/members/microsoft.graph.user?$select=${USER_FIELDS}&$top=100`;
+  // transitiveMembers flader nested groups ud automatisk
+  const url = `https://graph.microsoft.com/v1.0/groups/${groupId}/transitiveMembers/microsoft.graph.user?$select=${USER_FIELDS}&$top=100`;
   return graphGetAll(token, url);
 }
 
@@ -92,19 +92,9 @@ module.exports = async function (context, req) {
     const groupId = await findGroupId(token, GROUP_NAME);
 
     // DEBUG: returner rå Graph-svar for første side så vi kan se hvad vi får
-    // Test uden type-cast og med $count for at se det fulde billede
-    const firstUrl = `https://graph.microsoft.com/v1.0/groups/${groupId}/members?$top=100&$count=true`;
-    const firstR = await fetch(firstUrl, { headers: { Authorization: `Bearer ${token}`, ConsistencyLevel: "eventual" } });
-    const firstJ = await firstR.json();
-
-    return json(context, 200, {
-      groupId,
-      firstPageCount: (firstJ.value || []).length,
-      odataCount: firstJ["@odata.count"] ?? null,
-      hasNextLink: !!firstJ["@odata.nextLink"],
-      firstThree: (firstJ.value || []).slice(0, 3).map(u => ({ name: u.displayName, type: u["@odata.type"] })),
-      rawKeys: Object.keys(firstJ)
-    });
+    const members = await getGroupMembers(token, groupId);
+    members.sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "da"));
+    return json(context, 200, members);
   } catch (e) {
     return json(context, 500, { error: e.message });
   }
