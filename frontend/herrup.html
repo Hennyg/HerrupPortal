@@ -4,169 +4,155 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Brugere – Herrup Portalen</title>
-
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
-
   <link rel="stylesheet" href="/assets/app.css" />
   <style>
-    .pageTitle {
-      text-align: center;
-      margin: 0;
-      font-size: 2rem;
-      color: var(--heading);
-    }
-    .pageSub {
-      text-align: center;
-      margin: 6px 0 18px;
-      color: #6b7280;
-      font-size: .9rem;
-    }
+    .pageTitle { text-align:center; margin:0; font-size:2rem; color:var(--heading); }
+    .pageSub   { text-align:center; margin:6px 0 18px; color:#6b7280; font-size:.9rem; }
 
-    /* ── Min adgang boks ───────────────────────────────────────────────── */
-    .accessPanel {
-      display: flex;
-      flex-direction: column;
-      gap: .5rem;
-    }
-    .accessPanelTitle {
-      font-size: .8rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      color: #6b7280;
-      margin-bottom: .15rem;
-    }
-    .roleList {
-      display: flex;
-      flex-wrap: wrap;
-      gap: .4rem;
-    }
-    .rolePill {
-      display: inline-flex;
-      align-items: center;
-      gap: .3rem;
-      background: #f3f4f6;
-      border: 1px solid #e5e7eb;
-      border-radius: 999px;
-      padding: .25rem .65rem;
-      font-size: .82rem;
-      font-weight: 600;
-      color: #374151;
-    }
-    .rolePill.admin {
-      background: #fef3f2;
-      border-color: #fca5a5;
-      color: #850c18;
-    }
-    .rolePill .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #9ca3af;
-      flex-shrink: 0;
-    }
-    .rolePill.admin .dot { background: #c30a14; }
+    /* Faner */
+    .tabs { display:flex; gap:.5rem; margin-bottom:1rem; }
+    .tab  { appearance:none; border:1px solid #d1d5db; background:#fff; padding:.45rem 1rem;
+            border-radius:8px; cursor:pointer; font-size:.92rem; font-weight:600; color:#374151; }
+    .tab.active { background:var(--nav-bg); color:#fff; border-color:transparent; }
 
-    /* ── Søgebar ───────────────────────────────────────────────────────── */
-    .userToolbar {
-      display: flex;
-      gap: .5rem;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 1rem;
-    }
-    .userToolbar .clearable {
-      flex: 1;
-      min-width: 200px;
-      max-width: 380px;
-    }
-    #userCount {
-      margin-left: auto;
-      font-size: .85rem;
-      color: #6b7280;
-      white-space: nowrap;
-    }
+    /* Adgangs-pills */
+    .accessPanelTitle { font-size:.8rem; font-weight:700; text-transform:uppercase;
+                        letter-spacing:.06em; color:#6b7280; margin-bottom:.3rem; }
+    .roleList  { display:flex; flex-wrap:wrap; gap:.4rem; }
+    .rolePill  { display:inline-flex; align-items:center; gap:.3rem; background:#f3f4f6;
+                 border:1px solid #e5e7eb; border-radius:999px; padding:.25rem .65rem;
+                 font-size:.82rem; font-weight:600; color:#374151; }
+    .rolePill.admin { background:#fef3f2; border-color:#fca5a5; color:#850c18; }
+    .rolePill .dot  { width:7px; height:7px; border-radius:50%; background:#9ca3af; flex-shrink:0; }
+    .rolePill.admin .dot { background:#c30a14; }
 
-    /* ── Tabel ─────────────────────────────────────────────────────────── */
-    .tableWrap { overflow-x: auto; }
-    .userTable {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: .92rem;
-    }
-    .userTable thead th {
-      text-align: left;
-      padding: .55rem .7rem;
-      border-bottom: 2px solid #e5e7eb;
-      white-space: nowrap;
-      user-select: none;
-      cursor: pointer;
-    }
-    .userTable thead th:hover { background: rgba(0,0,0,.03); }
-    .userTable thead th.sort-active { color: var(--accent-bar); }
-    .sort-arrow { font-size: .75rem; opacity: .65; }
-    .userTable tbody tr:hover { background: rgba(0,0,0,.025); }
-    .userTable tbody td {
-      padding: .5rem .7rem;
-      border-bottom: 1px solid #f3f4f6;
-      vertical-align: middle;
-    }
+    /* Søgebar */
+    .userToolbar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-bottom:1rem; }
+    .userToolbar .clearable { flex:1; min-width:200px; max-width:380px; }
+    #userCount { margin-left:auto; font-size:.85rem; color:#6b7280; white-space:nowrap; }
+
+    /* Tabel */
+    .tableWrap { overflow-x:auto; }
+    .userTable { width:100%; border-collapse:collapse; font-size:.92rem; }
+    .userTable thead th { text-align:left; padding:.55rem .7rem; border-bottom:2px solid #e5e7eb;
+                          white-space:nowrap; user-select:none; cursor:pointer; }
+    .userTable thead th:hover { background:rgba(0,0,0,.03); }
+    .userTable thead th.sort-active { color:var(--accent-bar); }
+    .sort-arrow { font-size:.75rem; opacity:.65; }
+    .userTable tbody tr:hover { background:rgba(0,0,0,.025); }
+    .userTable tbody td { padding:.45rem .7rem; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
 
     /* Avatar */
-    .avatar {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      background: var(--nav-bg);
-      color: #fff;
-      font-size: .8rem;
-      font-weight: 700;
-      flex-shrink: 0;
-      letter-spacing: .03em;
-    }
-    .nameCell {
-      display: flex;
-      align-items: center;
-      gap: .6rem;
+    .avatar { display:inline-flex; align-items:center; justify-content:center;
+              width:36px; height:36px; border-radius:50%; background:var(--nav-bg);
+              color:#fff; font-size:.8rem; font-weight:700; flex-shrink:0; overflow:hidden; }
+    .avatar img { width:36px; height:36px; object-fit:cover; border-radius:50%; }
+    .nameCell { display:flex; align-items:center; gap:.6rem; }
+
+    /* Status */
+    .badge-ok  { background:#d1fae5; color:#065f46; font-size:.78rem; padding:2px 8px; border-radius:999px; }
+    .badge-off { background:#fee2e2; color:#991b1b; font-size:.78rem; padding:2px 8px; border-radius:999px; }
+
+    /* Loading/fejl */
+    .stateMsg { text-align:center; padding:2.5rem 1rem; color:#6b7280; font-size:.95rem; }
+    .stateMsg .spinner { display:inline-block; width:28px; height:28px; border:3px solid #e5e7eb;
+                         border-top-color:var(--accent-bar); border-radius:50%;
+                         animation:spin .75s linear infinite; margin-bottom:.5rem; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── Org chart ─────────────────────────────────────────────────────────── */
+    #orgView { display:none; overflow-x:auto; padding-bottom:1rem; }
+
+    .org-tree { display:flex; flex-direction:column; align-items:center; gap:0; }
+
+    .org-level { display:flex; gap:16px; justify-content:center; flex-wrap:nowrap; position:relative; }
+
+    .org-node {
+      display:flex; flex-direction:column; align-items:center;
+      position:relative; min-width:110px; max-width:130px;
     }
 
-    /* Status badge */
-    .badge-ok  { background: #d1fae5; color: #065f46; font-size: .78rem; padding: 2px 8px; border-radius: 999px; }
-    .badge-off { background: #fee2e2; color: #991b1b; font-size: .78rem; padding: 2px 8px; border-radius: 999px; }
-
-    /* Fejl/loading */
-    .stateMsg {
-      text-align: center;
-      padding: 2.5rem 1rem;
-      color: #6b7280;
-      font-size: .95rem;
+    /* Lodret linje ned fra forælder */
+    .org-node::before {
+      content:""; position:absolute; top:-20px; left:50%;
+      transform:translateX(-50%);
+      width:2px; height:20px; background:#d1d5db;
     }
-    .stateMsg .spinner {
-      display: inline-block;
-      width: 28px;
-      height: 28px;
-      border: 3px solid #e5e7eb;
-      border-top-color: var(--accent-bar);
-      border-radius: 50%;
-      animation: spin .75s linear infinite;
-      margin-bottom: .5rem;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Ingen linje på rod-noden */
+    .org-node.root::before { display:none; }
 
-    /* Mobil: skjul stilling + mobil */
-    @media (max-width: 640px) {
+    /* Vandret linje der forbinder søskende */
+    .org-level.has-siblings::before {
+      content:""; position:absolute; top:0; left:0; right:0;
+      height:2px; background:#d1d5db;
+      margin:0 auto;
+      width:calc(100% - 110px);
+    }
+
+    .org-card {
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+      background:#fff; border:1px solid #e5e7eb; border-radius:12px;
+      padding:12px 8px; cursor:pointer; transition:box-shadow .15s, border-color .15s;
+      width:100%; text-align:center;
+    }
+    .org-card:hover { border-color:#850c18; box-shadow:0 4px 12px rgba(133,12,24,.12); }
+    .org-card.selected { border-color:#850c18; background:#fef3f2; }
+
+    .org-avatar { width:48px; height:48px; border-radius:50%; background:var(--nav-bg);
+                  color:#fff; display:flex; align-items:center; justify-content:center;
+                  font-size:.9rem; font-weight:700; overflow:hidden; flex-shrink:0; }
+    .org-avatar img { width:48px; height:48px; object-fit:cover; border-radius:50%; }
+
+    .org-name { font-size:.78rem; font-weight:700; color:#111827; line-height:1.2;
+                word-break:break-word; }
+    .org-title { font-size:.68rem; color:#6b7280; line-height:1.2; }
+
+    .org-children { display:flex; gap:16px; justify-content:center;
+                    position:relative; padding-top:20px; flex-wrap:nowrap; }
+
+    /* Vandret linje over børn */
+    .org-children::before {
+      content:""; position:absolute; top:0; left:50px; right:50px;
+      height:2px; background:#d1d5db;
+    }
+    /* Hvis kun ét barn — ingen vandret linje */
+    .org-children.single-child::before { display:none; }
+
+    /* Lodret linje fra barn op */
+    .org-child-wrap { display:flex; flex-direction:column; align-items:center; position:relative; }
+    .org-child-wrap::before {
+      content:""; width:2px; height:20px; background:#d1d5db; flex-shrink:0;
+    }
+
+    /* Ingen top-connector på første nivel */
+    .org-root-wrap > .org-child-wrap::before { display:none; }
+
+    .org-placeholder { color:#9ca3af; font-size:.85rem; text-align:center; padding:2rem; }
+
+    /* Detalje-panel */
+    .org-detail {
+      position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb;
+      padding:1rem; display:none; gap:1rem; align-items:center; flex-wrap:wrap;
+    }
+    .org-detail.visible { display:flex; }
+    .org-detail-avatar { width:56px; height:56px; border-radius:50%; background:var(--nav-bg);
+                         color:#fff; display:flex; align-items:center; justify-content:center;
+                         font-size:1rem; font-weight:700; overflow:hidden; flex-shrink:0; }
+    .org-detail-avatar img { width:56px; height:56px; object-fit:cover; border-radius:50%; }
+    .org-detail-info { flex:1; min-width:0; }
+    .org-detail-name  { font-size:1rem; font-weight:700; }
+    .org-detail-meta  { font-size:.85rem; color:#6b7280; }
+
+    @media (max-width:640px) {
       .userTable thead th:nth-child(3),
       .userTable tbody td:nth-child(3),
       .userTable thead th:nth-child(5),
-      .userTable tbody td:nth-child(5) { display: none; }
+      .userTable tbody td:nth-child(5) { display:none; }
     }
   </style>
 </head>
-
 <body>
   <div class="navbar">
     <div class="navbar-inner">
@@ -184,31 +170,32 @@
     <div class="nav-accent"></div>
   </div>
 
-  <div class="container" style="padding-top: 1.5rem">
+  <div class="container" style="padding-top:1.5rem">
     <h1 class="pageTitle">Alle brugere</h1>
     <div class="pageSub">Medlemmer af gruppen "Alle - lely center herrup"</div>
 
     <!-- Min adgang -->
-    <div class="panel" id="accessPanel" style="margin-bottom: 1rem; display: none;">
-      <div class="accessPanel">
-        <div class="accessPanelTitle">Din adgang</div>
-        <div class="roleList" id="roleList"></div>
-      </div>
+    <div class="panel" id="accessPanel" style="margin-bottom:1rem;display:none;">
+      <div class="accessPanelTitle">Din adgang</div>
+      <div class="roleList" id="roleList"></div>
     </div>
 
-    <!-- Brugertabel -->
-    <div class="panel">
+    <!-- Faner -->
+    <div class="tabs">
+      <button class="tab active" id="tabList" onclick="switchTab('list')">👥 Liste</button>
+      <button class="tab"        id="tabOrg"  onclick="switchTab('org')">🌳 Org chart</button>
+    </div>
+
+    <!-- Liste-panel -->
+    <div class="panel" id="listView">
       <div class="userToolbar">
         <div class="clearable">
           <input id="search" type="text" placeholder="Søg navn, e-mail, titel…" autocomplete="off" />
           <button class="x" id="searchClear" type="button" title="Ryd">✕</button>
         </div>
-        <select id="deptFilter">
-          <option value="">Alle afdelinger</option>
-        </select>
+        <select id="deptFilter"><option value="">Alle afdelinger</option></select>
         <span id="userCount" class="muted"></span>
       </div>
-
       <div class="tableWrap">
         <table class="userTable" id="tbl">
           <thead>
@@ -222,16 +209,28 @@
             </tr>
           </thead>
           <tbody id="tbody">
-            <tr>
-              <td colspan="6">
-                <div class="stateMsg">
-                  <div class="spinner"></div>
-                  <div>Henter brugere…</div>
-                </div>
-              </td>
-            </tr>
+            <tr><td colspan="6">
+              <div class="stateMsg">
+                <div class="spinner"></div>
+                <div>Henter brugere… (foto + manager hentes også — tager lidt tid)</div>
+              </div>
+            </td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Org chart panel -->
+    <div class="panel" id="orgView">
+      <div id="orgTree" style="overflow-x:auto;padding:1rem 0;">
+        <div class="org-placeholder">Indlæser org chart…</div>
+      </div>
+      <div class="org-detail" id="orgDetail">
+        <div class="org-detail-avatar" id="orgDetailAvatar"></div>
+        <div class="org-detail-info">
+          <div class="org-detail-name" id="orgDetailName"></div>
+          <div class="org-detail-meta" id="orgDetailMeta"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -241,6 +240,7 @@
     let allUsers = [];
     let sortCol  = "displayName";
     let sortDir  = 1;
+    let activeTab = "list";
 
     // ── Init ──────────────────────────────────────────────────────────────────
     (async function init() {
@@ -250,17 +250,14 @@
       const userLine = document.getElementById("userLine");
       if (userLine) userLine.textContent = me?.userDetails || "";
 
-      // Vis "Min adgang"-boks
       const roles = expandRoles(rolesFromMe(me));
-      renderAccessPanel(me, roles);
+      renderAccessPanel(roles);
 
-      // Adgangskontrol: kun portal_admin
       if (!roles.includes("portal_admin")) {
         renderError("Du har ikke adgang til denne side.");
         return;
       }
 
-      // Hent brugere
       try {
         const r = await fetch("/api/entra-users", { cache: "no-store" });
         if (!r.ok) {
@@ -269,97 +266,87 @@
         }
         allUsers = await r.json();
         buildDeptFilter(allUsers);
-        render();
+        renderTable();
+        renderOrg();
       } catch (e) {
         renderError("Kunne ikke hente brugere: " + e.message);
       }
     })();
 
-    // ── Min adgang panel ──────────────────────────────────────────────────────
-    function renderAccessPanel(me, roles) {
-      const panel   = document.getElementById("accessPanel");
-      const listEl  = document.getElementById("roleList");
-      if (!panel || !listEl) return;
+    // ── Faner ─────────────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      activeTab = tab;
+      document.getElementById("listView").style.display = tab === "list" ? "" : "none";
+      document.getElementById("orgView").style.display  = tab === "org"  ? "" : "none";
+      document.getElementById("tabList").classList.toggle("active", tab === "list");
+      document.getElementById("tabOrg").classList.toggle("active",  tab === "org");
+    }
 
-      // Filtrér system-roller ud
-      const displayRoles = roles.filter(r => r !== "anonymous" && r !== "authenticated");
-      if (displayRoles.length === 0) return;
-
-      listEl.innerHTML = displayRoles.map(role => {
+    // ── Adgangs-panel ─────────────────────────────────────────────────────────
+    function renderAccessPanel(roles) {
+      const panel  = document.getElementById("accessPanel");
+      const listEl = document.getElementById("roleList");
+      const display = roles.filter(r => r !== "anonymous" && r !== "authenticated");
+      if (!display.length) return;
+      listEl.innerHTML = display.map(role => {
         const isAdmin = role === "portal_admin";
-        return `
-          <span class="rolePill ${isAdmin ? "admin" : ""}">
-            <span class="dot"></span>
-            ${esc(role)}
-          </span>`;
+        return `<span class="rolePill ${isAdmin ? "admin" : ""}"><span class="dot"></span>${esc(role)}</span>`;
       }).join("");
-
       panel.style.display = "";
     }
 
-    // ── Filtrer + sortér + render ─────────────────────────────────────────────
+    // ── Tabel ─────────────────────────────────────────────────────────────────
     function getFiltered() {
       const q    = (document.getElementById("search")?.value || "").toLowerCase().trim();
       const dept = document.getElementById("deptFilter")?.value || "";
-
       return allUsers
         .filter(u => {
           if (dept && (u.department || "") !== dept) return false;
           if (!q) return true;
-          return (
-            (u.displayName || "").toLowerCase().includes(q) ||
-            (u.mail        || "").toLowerCase().includes(q) ||
-            (u.jobTitle    || "").toLowerCase().includes(q) ||
-            (u.mobilePhone || "").toLowerCase().includes(q)
-          );
+          return (u.displayName||"").toLowerCase().includes(q)
+              || (u.mail||"").toLowerCase().includes(q)
+              || (u.jobTitle||"").toLowerCase().includes(q)
+              || (u.mobilePhone||"").toLowerCase().includes(q);
         })
         .slice()
         .sort((a, b) => {
-          let av = a[sortCol] ?? "";
-          let bv = b[sortCol] ?? "";
           if (sortCol === "accountEnabled") {
-            av = av === true ? 1 : 0;
-            bv = bv === true ? 1 : 0;
-            return (av - bv) * sortDir;
+            return ((a[sortCol] === true ? 1 : 0) - (b[sortCol] === true ? 1 : 0)) * sortDir;
           }
-          return String(av).localeCompare(String(bv), "da") * sortDir;
+          return String(a[sortCol]??"").localeCompare(String(b[sortCol]??""), "da") * sortDir;
         });
     }
 
-    function render() {
+    function renderTable() {
       const rows  = getFiltered();
       const tbody = document.getElementById("tbody");
       const count = document.getElementById("userCount");
       if (count) count.textContent = `${rows.length} brugere`;
-
-      if (rows.length === 0) {
+      if (!rows.length) {
         tbody.innerHTML = `<tr><td colspan="6"><div class="stateMsg">Ingen resultater</div></td></tr>`;
         return;
       }
-
       tbody.innerHTML = rows.map(u => {
-        const initials    = makeInitials(u.displayName);
+        const avatarInner = u.photo
+          ? `<img src="${u.photo}" alt="" />`
+          : esc(makeInitials(u.displayName));
         const statusBadge = u.accountEnabled !== false
           ? `<span class="badge-ok">Aktiv</span>`
           : `<span class="badge-off">Deaktiveret</span>`;
-        return `
-          <tr>
-            <td>
-              <div class="nameCell">
-                <div class="avatar">${esc(initials)}</div>
-                <div>${esc(u.displayName || "–")}</div>
-              </div>
-            </td>
-            <td><a href="mailto:${esc(u.mail || "")}" style="color:inherit">${esc(u.mail || "–")}</a></td>
-            <td>${esc(u.jobTitle   || "–")}</td>
-            <td>${esc(u.department || "–")}</td>
-            <td>${esc(u.mobilePhone || "–")}</td>
-            <td>${statusBadge}</td>
-          </tr>`;
+        return `<tr>
+          <td><div class="nameCell">
+            <div class="avatar">${avatarInner}</div>
+            <div>${esc(u.displayName||"–")}</div>
+          </div></td>
+          <td><a href="mailto:${esc(u.mail||"")}" style="color:inherit">${esc(u.mail||"–")}</a></td>
+          <td>${esc(u.jobTitle||"–")}</td>
+          <td>${esc(u.department||"–")}</td>
+          <td>${esc(u.mobilePhone||"–")}</td>
+          <td>${statusBadge}</td>
+        </tr>`;
       }).join("");
     }
 
-    // ── Afdelingsfilter ───────────────────────────────────────────────────────
     function buildDeptFilter(users) {
       const depts = [...new Set(users.map(u => u.department).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, "da"));
@@ -371,44 +358,24 @@
       });
     }
 
-    // ── Hjælpere ─────────────────────────────────────────────────────────────
-    function makeInitials(name) {
-      if (!name) return "?";
-      return name.trim().split(/\s+/).slice(0, 2).map(p => p[0].toUpperCase()).join("");
-    }
-
-    function esc(s) {
-      return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-    }
-
-    function renderError(msg) {
-      document.getElementById("tbody").innerHTML =
-        `<tr><td colspan="6"><div class="stateMsg" style="color:#c30a14">${esc(msg)}</div></td></tr>`;
-    }
-
-    // ── Søgning ───────────────────────────────────────────────────────────────
+    // Søg
     const searchEl = document.getElementById("search");
     const clearBtn = document.getElementById("searchClear");
-
-    function syncClear() {
-      if (clearBtn) clearBtn.style.visibility = searchEl?.value ? "visible" : "hidden";
-    }
-
-    searchEl?.addEventListener("input", () => { syncClear(); render(); });
-    clearBtn?.addEventListener("click", () => { if (searchEl) searchEl.value = ""; syncClear(); render(); });
-    document.getElementById("deptFilter")?.addEventListener("change", render);
+    function syncClear() { if (clearBtn) clearBtn.style.visibility = searchEl?.value ? "visible" : "hidden"; }
+    searchEl?.addEventListener("input", () => { syncClear(); renderTable(); });
+    clearBtn?.addEventListener("click", () => { if (searchEl) searchEl.value = ""; syncClear(); renderTable(); });
+    document.getElementById("deptFilter")?.addEventListener("change", renderTable);
     syncClear();
 
-    // ── Sortérbare kolonner ───────────────────────────────────────────────────
+    // Sortering
     document.querySelectorAll("#tbl thead th[data-col]").forEach(th => {
       th.addEventListener("click", () => {
         const col = th.getAttribute("data-col");
         if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
         updateSortHeaders();
-        render();
+        renderTable();
       });
     });
-
     function updateSortHeaders() {
       document.querySelectorAll("#tbl thead th[data-col]").forEach(th => {
         const col = th.getAttribute("data-col");
@@ -416,6 +383,153 @@
         const arrow = th.querySelector(".sort-arrow");
         if (arrow) arrow.textContent = col === sortCol ? (sortDir === 1 ? " ▲" : " ▼") : " ⇅";
       });
+    }
+
+    // ── Org chart ─────────────────────────────────────────────────────────────
+    function renderOrg() {
+      const container = document.getElementById("orgTree");
+      if (!allUsers.length) {
+        container.innerHTML = `<div class="org-placeholder">Ingen brugere at vise</div>`;
+        return;
+      }
+
+      // Byg id → user map
+      const byId = new Map(allUsers.map(u => [u.id, u]));
+
+      // Find rødder: brugere hvis manager ikke er i gruppen
+      const groupIds = new Set(allUsers.map(u => u.id));
+      const roots = allUsers.filter(u => !u.managerId || !groupIds.has(u.managerId));
+
+      // Byg children-map
+      const children = new Map();
+      allUsers.forEach(u => {
+        if (u.managerId && groupIds.has(u.managerId)) {
+          if (!children.has(u.managerId)) children.set(u.managerId, []);
+          children.get(u.managerId).push(u);
+        }
+      });
+
+      // Sort children
+      children.forEach(arr => arr.sort((a, b) => (a.displayName||"").localeCompare(b.displayName||"", "da")));
+      roots.sort((a, b) => (a.displayName||"").localeCompare(b.displayName||"", "da"));
+
+      container.innerHTML = "";
+
+      function makeCard(user, isRoot = false) {
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "display:flex;flex-direction:column;align-items:center;";
+
+        const card = document.createElement("div");
+        card.className = "org-card";
+        card.dataset.id = user.id;
+
+        const avatarInner = user.photo
+          ? `<img src="${user.photo}" alt="" />`
+          : esc(makeInitials(user.displayName));
+
+        card.innerHTML = `
+          <div class="org-avatar">${avatarInner}</div>
+          <div class="org-name">${esc(user.displayName||"")}</div>
+          <div class="org-title">${esc(user.jobTitle||"")}</div>`;
+
+        card.addEventListener("click", () => showDetail(user));
+        wrap.appendChild(card);
+
+        const kids = children.get(user.id) || [];
+        if (kids.length) {
+          const kidRow = document.createElement("div");
+          kidRow.style.cssText = `display:flex;gap:12px;justify-content:center;
+            position:relative;padding-top:20px;flex-wrap:wrap;margin-top:0;`;
+
+          // Vandret linje over børn
+          if (kids.length > 1) {
+            kidRow.style.position = "relative";
+          }
+
+          // Lodret linje ned fra forælder til vandret linje
+          const vLineDown = document.createElement("div");
+          vLineDown.style.cssText = "width:2px;height:20px;background:#d1d5db;margin:0 auto;";
+          wrap.appendChild(vLineDown);
+
+          kids.forEach((kid, i) => {
+            const kidWrap = document.createElement("div");
+            kidWrap.style.cssText = "display:flex;flex-direction:column;align-items:center;";
+
+            // Lodret linje op til vandret
+            const vLine = document.createElement("div");
+            vLine.style.cssText = "width:2px;height:20px;background:#d1d5db;";
+            kidWrap.appendChild(vLine);
+            kidWrap.appendChild(makeCard(kid));
+            kidRow.appendChild(kidWrap);
+          });
+
+          // Tegn vandret linje over børn via SVG (simpel CSS-løsning)
+          if (kids.length > 1) {
+            const hLine = document.createElement("div");
+            hLine.style.cssText = `position:absolute;top:0;left:0;right:0;
+              height:2px;background:#d1d5db;
+              margin:0 ${Math.round(110/2)}px;`;
+            kidRow.appendChild(hLine);
+          }
+
+          wrap.appendChild(kidRow);
+        }
+
+        return wrap;
+      }
+
+      if (roots.length === 1) {
+        container.appendChild(makeCard(roots[0], true));
+      } else {
+        // Flere rødder — vis side om side
+        const rootRow = document.createElement("div");
+        rootRow.style.cssText = "display:flex;gap:24px;justify-content:center;flex-wrap:wrap;";
+        roots.forEach(r => rootRow.appendChild(makeCard(r, true)));
+        container.appendChild(rootRow);
+      }
+    }
+
+    function showDetail(user) {
+      // Fjern evt. tidligere selected
+      document.querySelectorAll(".org-card.selected").forEach(c => c.classList.remove("selected"));
+      // Markér valgt
+      document.querySelectorAll(`.org-card[data-id="${user.id}"]`).forEach(c => c.classList.add("selected"));
+
+      const detail = document.getElementById("orgDetail");
+      const avatarEl = document.getElementById("orgDetailAvatar");
+      const nameEl   = document.getElementById("orgDetailName");
+      const metaEl   = document.getElementById("orgDetailMeta");
+
+      avatarEl.innerHTML = user.photo
+        ? `<img src="${user.photo}" alt="" />`
+        : esc(makeInitials(user.displayName));
+
+      nameEl.textContent = user.displayName || "";
+
+      const parts = [
+        user.jobTitle    ? user.jobTitle    : null,
+        user.department  ? user.department  : null,
+        user.mail        ? user.mail        : null,
+        user.mobilePhone ? user.mobilePhone : null,
+        user.managerName ? `Manager: ${user.managerName}` : null
+      ].filter(Boolean);
+      metaEl.textContent = parts.join("  ·  ");
+
+      detail.classList.add("visible");
+    }
+
+    // ── Hjælpere ─────────────────────────────────────────────────────────────
+    function makeInitials(name) {
+      if (!name) return "?";
+      return name.trim().split(/\s+/).slice(0, 2).map(p => p[0].toUpperCase()).join("");
+    }
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, m =>
+        ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+    }
+    function renderError(msg) {
+      document.getElementById("tbody").innerHTML =
+        `<tr><td colspan="6"><div class="stateMsg" style="color:#c30a14">${esc(msg)}</div></td></tr>`;
     }
   </script>
 </body>
