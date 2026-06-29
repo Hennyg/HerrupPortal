@@ -31,12 +31,12 @@ function json(context, status, body) {
 
 // ── Token ─────────────────────────────────────────────────────────────────────
 async function getGraphToken() {
-  const tenant       = process.env.GRAPH_TENANT_ID;
-  const clientId     = process.env.GRAPH_CLIENT_ID;
-  const clientSecret = process.env.GRAPH_CLIENT_SECRET;
+  const tenant       = process.env.DV_TENANT_ID;
+  const clientId     = process.env.DV_CLIENT_ID;
+  const clientSecret = process.env.DV_CLIENT_SECRET;
 
   if (!tenant || !clientId || !clientSecret) {
-    throw new Error("Manglende miljøvariabler: GRAPH_TENANT_ID, GRAPH_CLIENT_ID eller GRAPH_CLIENT_SECRET");
+    throw new Error("Manglende miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID eller DV_CLIENT_SECRET");
   }
 
   const r = await fetch(
