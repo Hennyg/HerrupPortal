@@ -48,14 +48,17 @@ async function graphGetAll(token, url, extraHeaders = {}) {
 
   while (next) {
     const headers = { Authorization: `Bearer ${token}` };
-    // extraHeaders (fx ConsistencyLevel) kun på første kald — nextLink har dem allerede encoded
     if (firstCall) Object.assign(headers, extraHeaders);
     firstCall = false;
 
     const r = await fetch(next, { headers });
     const j = await r.json();
     if (!r.ok) throw new Error(`graph_error ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
-    items.push(...(j.value || []));
+
+    const page = j.value || [];
+    console.log(`[graphGetAll] page: ${page.length} items, nextLink: ${j["@odata.nextLink"] ? "ja" : "nej"}, url: ${next.substring(0, 120)}`);
+
+    items.push(...page);
     next = j["@odata.nextLink"] || null;
   }
 
@@ -87,14 +90,22 @@ module.exports = async function (context, req) {
   try {
     const token   = await getGraphToken();
     const groupId = await findGroupId(token, GROUP_NAME);
-    const members = await getGroupMembers(token, groupId);
 
-    context.log(`entra-users: hentede ${members.length} medlemmer`);
+    // DEBUG: returner rå Graph-svar for første side så vi kan se hvad vi får
+    const firstUrl = `https://graph.microsoft.com/v1.0/groups/${groupId}/members/microsoft.graph.user?$select=${USER_FIELDS}&$top=100`;
+    const firstR = await fetch(firstUrl, { headers: { Authorization: `Bearer ${token}` } });
+    const firstJ = await firstR.json();
 
-    members.sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "da"));
-    return json(context, 200, members);
+    return json(context, 200, {
+      groupId,
+      firstPageCount: (firstJ.value || []).length,
+      hasNextLink: !!firstJ["@odata.nextLink"],
+      nextLink: firstJ["@odata.nextLink"] || null,
+      odataCount: firstJ["@odata.count"] || null,
+      firstThree: (firstJ.value || []).slice(0, 3).map(u => u.displayName),
+      rawKeys: Object.keys(firstJ)
+    });
   } catch (e) {
-    context.log("entra-users ERROR:", e.message);
     return json(context, 500, { error: e.message });
   }
 };
