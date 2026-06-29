@@ -5,7 +5,7 @@ const GROUP_NAME = "Alle - lely center herrup";
 
 const USER_FIELDS = [
   "id", "displayName", "mail", "userPrincipalName",
-  "jobTitle", "department", "mobilePhone", "officeLocation", "accountEnabled"
+  "jobTitle", "department", "mobilePhone", "businessPhones", "officeLocation", "accountEnabled"
 ].join(",");
 
 function json(context, status, body) {
