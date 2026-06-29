@@ -23,7 +23,52 @@
       font-size: .9rem;
     }
 
-    /* Søgebar */
+    /* ── Min adgang boks ───────────────────────────────────────────────── */
+    .accessPanel {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+    .accessPanelTitle {
+      font-size: .8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #6b7280;
+      margin-bottom: .15rem;
+    }
+    .roleList {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+    }
+    .rolePill {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      padding: .25rem .65rem;
+      font-size: .82rem;
+      font-weight: 600;
+      color: #374151;
+    }
+    .rolePill.admin {
+      background: #fef3f2;
+      border-color: #fca5a5;
+      color: #850c18;
+    }
+    .rolePill .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #9ca3af;
+      flex-shrink: 0;
+    }
+    .rolePill.admin .dot { background: #c30a14; }
+
+    /* ── Søgebar ───────────────────────────────────────────────────────── */
     .userToolbar {
       display: flex;
       gap: .5rem;
@@ -43,7 +88,7 @@
       white-space: nowrap;
     }
 
-    /* Tabel */
+    /* ── Tabel ─────────────────────────────────────────────────────────── */
     .tableWrap { overflow-x: auto; }
     .userTable {
       width: 100%;
@@ -68,7 +113,7 @@
       vertical-align: middle;
     }
 
-    /* Avatar-initialer */
+    /* Avatar */
     .avatar {
       display: inline-flex;
       align-items: center;
@@ -89,7 +134,7 @@
       gap: .6rem;
     }
 
-    /* Status-badge */
+    /* Status badge */
     .badge-ok  { background: #d1fae5; color: #065f46; font-size: .78rem; padding: 2px 8px; border-radius: 999px; }
     .badge-off { background: #fee2e2; color: #991b1b; font-size: .78rem; padding: 2px 8px; border-radius: 999px; }
 
@@ -112,7 +157,7 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Mobil */
+    /* Mobil: skjul stilling + mobil */
     @media (max-width: 640px) {
       .userTable thead th:nth-child(3),
       .userTable tbody td:nth-child(3),
@@ -143,6 +188,15 @@
     <h1 class="pageTitle">Alle brugere</h1>
     <div class="pageSub">Medlemmer af gruppen "Alle - lely center herrup"</div>
 
+    <!-- Min adgang -->
+    <div class="panel" id="accessPanel" style="margin-bottom: 1rem; display: none;">
+      <div class="accessPanel">
+        <div class="accessPanelTitle">Din adgang</div>
+        <div class="roleList" id="roleList"></div>
+      </div>
+    </div>
+
+    <!-- Brugertabel -->
     <div class="panel">
       <div class="userToolbar">
         <div class="clearable">
@@ -159,7 +213,7 @@
         <table class="userTable" id="tbl">
           <thead>
             <tr>
-              <th data-col="displayName">Navn<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="displayName">Navn<span class="sort-arrow"> ▲</span></th>
               <th data-col="mail">E-mail<span class="sort-arrow"> ⇅</span></th>
               <th data-col="jobTitle">Stilling<span class="sort-arrow"> ⇅</span></th>
               <th data-col="department">Afdeling<span class="sort-arrow"> ⇅</span></th>
@@ -184,21 +238,23 @@
 
   <script src="/assets/app.js"></script>
   <script>
-    // ── Tilstand ──────────────────────────────────────────────────────────────
     let allUsers = [];
-    let sortCol = "displayName";
-    let sortDir = 1;
+    let sortCol  = "displayName";
+    let sortDir  = 1;
 
-    // ── Init: tjek rolle + hent brugere ───────────────────────────────────────
+    // ── Init ──────────────────────────────────────────────────────────────────
     (async function init() {
-      // Vis login-navn i navbar
       let me = null;
       try { me = await getMe(); } catch {}
+
       const userLine = document.getElementById("userLine");
       if (userLine) userLine.textContent = me?.userDetails || "";
 
-      // Adgangskontrol: kun portal_admin
+      // Vis "Min adgang"-boks
       const roles = expandRoles(rolesFromMe(me));
+      renderAccessPanel(me, roles);
+
+      // Adgangskontrol: kun portal_admin
       if (!roles.includes("portal_admin")) {
         renderError("Du har ikke adgang til denne side.");
         return;
@@ -219,9 +275,31 @@
       }
     })();
 
+    // ── Min adgang panel ──────────────────────────────────────────────────────
+    function renderAccessPanel(me, roles) {
+      const panel   = document.getElementById("accessPanel");
+      const listEl  = document.getElementById("roleList");
+      if (!panel || !listEl) return;
+
+      // Filtrér system-roller ud
+      const displayRoles = roles.filter(r => r !== "anonymous" && r !== "authenticated");
+      if (displayRoles.length === 0) return;
+
+      listEl.innerHTML = displayRoles.map(role => {
+        const isAdmin = role === "portal_admin";
+        return `
+          <span class="rolePill ${isAdmin ? "admin" : ""}">
+            <span class="dot"></span>
+            ${esc(role)}
+          </span>`;
+      }).join("");
+
+      panel.style.display = "";
+    }
+
     // ── Filtrer + sortér + render ─────────────────────────────────────────────
     function getFiltered() {
-      const q = (document.getElementById("search")?.value || "").toLowerCase().trim();
+      const q    = (document.getElementById("search")?.value || "").toLowerCase().trim();
       const dept = document.getElementById("deptFilter")?.value || "";
 
       return allUsers
@@ -230,8 +308,8 @@
           if (!q) return true;
           return (
             (u.displayName || "").toLowerCase().includes(q) ||
-            (u.mail || "").toLowerCase().includes(q) ||
-            (u.jobTitle || "").toLowerCase().includes(q) ||
+            (u.mail        || "").toLowerCase().includes(q) ||
+            (u.jobTitle    || "").toLowerCase().includes(q) ||
             (u.mobilePhone || "").toLowerCase().includes(q)
           );
         })
@@ -239,7 +317,6 @@
         .sort((a, b) => {
           let av = a[sortCol] ?? "";
           let bv = b[sortCol] ?? "";
-          // accountEnabled: true > false
           if (sortCol === "accountEnabled") {
             av = av === true ? 1 : 0;
             bv = bv === true ? 1 : 0;
@@ -250,7 +327,7 @@
     }
 
     function render() {
-      const rows = getFiltered();
+      const rows  = getFiltered();
       const tbody = document.getElementById("tbody");
       const count = document.getElementById("userCount");
       if (count) count.textContent = `${rows.length} brugere`;
@@ -261,7 +338,7 @@
       }
 
       tbody.innerHTML = rows.map(u => {
-        const initials = makeInitials(u.displayName);
+        const initials    = makeInitials(u.displayName);
         const statusBadge = u.accountEnabled !== false
           ? `<span class="badge-ok">Aktiv</span>`
           : `<span class="badge-off">Deaktiveret</span>`;
@@ -274,23 +351,22 @@
               </div>
             </td>
             <td><a href="mailto:${esc(u.mail || "")}" style="color:inherit">${esc(u.mail || "–")}</a></td>
-            <td>${esc(u.jobTitle || "–")}</td>
+            <td>${esc(u.jobTitle   || "–")}</td>
             <td>${esc(u.department || "–")}</td>
             <td>${esc(u.mobilePhone || "–")}</td>
             <td>${statusBadge}</td>
-          </tr>
-        `;
+          </tr>`;
       }).join("");
     }
 
     // ── Afdelingsfilter ───────────────────────────────────────────────────────
     function buildDeptFilter(users) {
-      const depts = [...new Set(users.map(u => u.department).filter(Boolean))].sort((a, b) => a.localeCompare(b, "da"));
+      const depts = [...new Set(users.map(u => u.department).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "da"));
       const sel = document.getElementById("deptFilter");
       depts.forEach(d => {
         const o = document.createElement("option");
-        o.value = d;
-        o.textContent = d;
+        o.value = d; o.textContent = d;
         sel.appendChild(o);
       });
     }
@@ -341,8 +417,6 @@
         if (arrow) arrow.textContent = col === sortCol ? (sortDir === 1 ? " ▲" : " ▼") : " ⇅";
       });
     }
-
-    updateSortHeaders();
   </script>
 </body>
 </html>
