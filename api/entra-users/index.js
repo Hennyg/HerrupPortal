@@ -92,17 +92,17 @@ module.exports = async function (context, req) {
     const groupId = await findGroupId(token, GROUP_NAME);
 
     // DEBUG: returner rå Graph-svar for første side så vi kan se hvad vi får
-    const firstUrl = `https://graph.microsoft.com/v1.0/groups/${groupId}/members/microsoft.graph.user?$select=${USER_FIELDS}&$top=100`;
-    const firstR = await fetch(firstUrl, { headers: { Authorization: `Bearer ${token}` } });
+    // Test uden type-cast og med $count for at se det fulde billede
+    const firstUrl = `https://graph.microsoft.com/v1.0/groups/${groupId}/members?$top=100&$count=true`;
+    const firstR = await fetch(firstUrl, { headers: { Authorization: `Bearer ${token}`, ConsistencyLevel: "eventual" } });
     const firstJ = await firstR.json();
 
     return json(context, 200, {
       groupId,
       firstPageCount: (firstJ.value || []).length,
+      odataCount: firstJ["@odata.count"] ?? null,
       hasNextLink: !!firstJ["@odata.nextLink"],
-      nextLink: firstJ["@odata.nextLink"] || null,
-      odataCount: firstJ["@odata.count"] || null,
-      firstThree: (firstJ.value || []).slice(0, 3).map(u => u.displayName),
+      firstThree: (firstJ.value || []).slice(0, 3).map(u => ({ name: u.displayName, type: u["@odata.type"] })),
       rawKeys: Object.keys(firstJ)
     });
   } catch (e) {
