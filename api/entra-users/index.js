@@ -29,24 +29,6 @@ function json(context, status, body) {
   };
 }
 
-// ── Roller fra x-ms-client-principal ─────────────────────────────────────────
-// Matcher samme logik som it-support auth.js og herrup app.js
-function getRolesFromPrincipal(principal) {
-  return [
-    ...(principal.userRoles || []),
-    ...(principal.claims || [])
-      .filter(c => {
-        const t = String(c.typ || "").toLowerCase();
-        return (
-          t === "roles" ||
-          t === "role" ||
-          t.includes("claims/role")
-        );
-      })
-      .map(c => String(c.val || ""))
-  ].map(r => String(r).toLowerCase());
-}
-
 // ── Token ─────────────────────────────────────────────────────────────────────
 async function getGraphToken() {
   const tenant       = process.env.GRAPH_TENANT_ID;
@@ -114,25 +96,10 @@ async function getGroupMembers(token, groupId) {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 module.exports = async function (context, req) {
-  // Tjek at brugeren er logget ind
-  const principalB64 = req.headers["x-ms-client-principal"];
-  if (!principalB64) {
+  // SWA-routen (/herrup.html) kræver allerede "authenticated".
+  // Frontend tjekker portal_admin-rollen. Her sikrer vi blot at der er en bruger.
+  if (!req.headers["x-ms-client-principal"]) {
     return json(context, 401, { error: "Ikke logget ind" });
-  }
-
-  let principal;
-  try {
-    principal = JSON.parse(Buffer.from(principalB64, "base64").toString("utf8"));
-  } catch {
-    return json(context, 401, { error: "Ugyldig principal" });
-  }
-
-  // Tjek portal_admin — matcher samme logik som app.js og it-support auth.js
-  const roles = getRolesFromPrincipal(principal);
-  if (!roles.includes("portal_admin")) {
-    // Log hvad vi faktisk fik så du nemmere kan debugge
-    context.log("entra-users: adgang nægtet. userRoles:", principal.userRoles, "claims typer:", (principal.claims || []).map(c => c.typ));
-    return json(context, 403, { error: "Adgang nægtet – kræver portal_admin" });
   }
 
   try {
