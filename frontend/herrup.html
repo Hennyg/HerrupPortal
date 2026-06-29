@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brugere – Herrup Portalen</title>
+
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#c30a14">
+
+  <link rel="stylesheet" href="/assets/app.css" />
+  <style>
+    .pageTitle {
+      text-align: center;
+      margin: 0;
+      font-size: 2rem;
+      color: var(--heading);
+    }
+    .pageSub {
+      text-align: center;
+      margin: 6px 0 18px;
+      color: #6b7280;
+      font-size: .9rem;
+    }
+
+    /* Søgebar */
+    .userToolbar {
+      display: flex;
+      gap: .5rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .userToolbar .clearable {
+      flex: 1;
+      min-width: 200px;
+      max-width: 380px;
+    }
+    #userCount {
+      margin-left: auto;
+      font-size: .85rem;
+      color: #6b7280;
+      white-space: nowrap;
+    }
+
+    /* Tabel */
+    .tableWrap { overflow-x: auto; }
+    .userTable {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .92rem;
+    }
+    .userTable thead th {
+      text-align: left;
+      padding: .55rem .7rem;
+      border-bottom: 2px solid #e5e7eb;
+      white-space: nowrap;
+      user-select: none;
+      cursor: pointer;
+    }
+    .userTable thead th:hover { background: rgba(0,0,0,.03); }
+    .userTable thead th.sort-active { color: var(--accent-bar); }
+    .sort-arrow { font-size: .75rem; opacity: .65; }
+    .userTable tbody tr:hover { background: rgba(0,0,0,.025); }
+    .userTable tbody td {
+      padding: .5rem .7rem;
+      border-bottom: 1px solid #f3f4f6;
+      vertical-align: middle;
+    }
+
+    /* Avatar-initialer */
+    .avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--nav-bg);
+      color: #fff;
+      font-size: .8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      letter-spacing: .03em;
+    }
+    .nameCell {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+
+    /* Status-badge */
+    .badge-ok  { background: #d1fae5; color: #065f46; font-size: .78rem; padding: 2px 8px; border-radius: 999px; }
+    .badge-off { background: #fee2e2; color: #991b1b; font-size: .78rem; padding: 2px 8px; border-radius: 999px; }
+
+    /* Fejl/loading */
+    .stateMsg {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: #6b7280;
+      font-size: .95rem;
+    }
+    .stateMsg .spinner {
+      display: inline-block;
+      width: 28px;
+      height: 28px;
+      border: 3px solid #e5e7eb;
+      border-top-color: var(--accent-bar);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+      margin-bottom: .5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Mobil */
+    @media (max-width: 640px) {
+      .userTable thead th:nth-child(3),
+      .userTable tbody td:nth-child(3),
+      .userTable thead th:nth-child(5),
+      .userTable tbody td:nth-child(5) { display: none; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <div class="logo" aria-label="Herrup Portal"></div>
+        <div>Brugere</div>
+      </div>
+      <div class="nav">
+        <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+        <span class="sep">|</span>
+        <a href="/">← Til portal</a>
+        <a href="/logout">Log ud</a>
+      </div>
+    </div>
+    <div class="nav-accent"></div>
+  </div>
+
+  <div class="container" style="padding-top: 1.5rem">
+    <h1 class="pageTitle">Alle brugere</h1>
+    <div class="pageSub">Medlemmer af gruppen "Alle - lely center herrup"</div>
+
+    <div class="panel">
+      <div class="userToolbar">
+        <div class="clearable">
+          <input id="search" type="text" placeholder="Søg navn, e-mail, titel…" autocomplete="off" />
+          <button class="x" id="searchClear" type="button" title="Ryd">✕</button>
+        </div>
+        <select id="deptFilter">
+          <option value="">Alle afdelinger</option>
+        </select>
+        <span id="userCount" class="muted"></span>
+      </div>
+
+      <div class="tableWrap">
+        <table class="userTable" id="tbl">
+          <thead>
+            <tr>
+              <th data-col="displayName">Navn<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="mail">E-mail<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="jobTitle">Stilling<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="department">Afdeling<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="mobilePhone">Mobil<span class="sort-arrow"> ⇅</span></th>
+              <th data-col="accountEnabled">Status<span class="sort-arrow"> ⇅</span></th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr>
+              <td colspan="6">
+                <div class="stateMsg">
+                  <div class="spinner"></div>
+                  <div>Henter brugere…</div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/app.js"></script>
+  <script>
+    // ── Tilstand ──────────────────────────────────────────────────────────────
+    let allUsers = [];
+    let sortCol = "displayName";
+    let sortDir = 1;
+
+    // ── Init: tjek rolle + hent brugere ───────────────────────────────────────
+    (async function init() {
+      // Vis login-navn i navbar
+      let me = null;
+      try { me = await getMe(); } catch {}
+      const userLine = document.getElementById("userLine");
+      if (userLine) userLine.textContent = me?.userDetails || "";
+
+      // Adgangskontrol: kun portal_admin
+      const roles = expandRoles(rolesFromMe(me));
+      if (!roles.includes("portal_admin")) {
+        renderError("Du har ikke adgang til denne side.");
+        return;
+      }
+
+      // Hent brugere
+      try {
+        const r = await fetch("/api/entra-users", { cache: "no-store" });
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${r.status}`);
+        }
+        allUsers = await r.json();
+        buildDeptFilter(allUsers);
+        render();
+      } catch (e) {
+        renderError("Kunne ikke hente brugere: " + e.message);
+      }
+    })();
+
+    // ── Filtrer + sortér + render ─────────────────────────────────────────────
+    function getFiltered() {
+      const q = (document.getElementById("search")?.value || "").toLowerCase().trim();
+      const dept = document.getElementById("deptFilter")?.value || "";
+
+      return allUsers
+        .filter(u => {
+          if (dept && (u.department || "") !== dept) return false;
+          if (!q) return true;
+          return (
+            (u.displayName || "").toLowerCase().includes(q) ||
+            (u.mail || "").toLowerCase().includes(q) ||
+            (u.jobTitle || "").toLowerCase().includes(q) ||
+            (u.mobilePhone || "").toLowerCase().includes(q)
+          );
+        })
+        .slice()
+        .sort((a, b) => {
+          let av = a[sortCol] ?? "";
+          let bv = b[sortCol] ?? "";
+          // accountEnabled: true > false
+          if (sortCol === "accountEnabled") {
+            av = av === true ? 1 : 0;
+            bv = bv === true ? 1 : 0;
+            return (av - bv) * sortDir;
+          }
+          return String(av).localeCompare(String(bv), "da") * sortDir;
+        });
+    }
+
+    function render() {
+      const rows = getFiltered();
+      const tbody = document.getElementById("tbody");
+      const count = document.getElementById("userCount");
+      if (count) count.textContent = `${rows.length} brugere`;
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="stateMsg">Ingen resultater</div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(u => {
+        const initials = makeInitials(u.displayName);
+        const statusBadge = u.accountEnabled !== false
+          ? `<span class="badge-ok">Aktiv</span>`
+          : `<span class="badge-off">Deaktiveret</span>`;
+        return `
+          <tr>
+            <td>
+              <div class="nameCell">
+                <div class="avatar">${esc(initials)}</div>
+                <div>${esc(u.displayName || "–")}</div>
+              </div>
+            </td>
+            <td><a href="mailto:${esc(u.mail || "")}" style="color:inherit">${esc(u.mail || "–")}</a></td>
+            <td>${esc(u.jobTitle || "–")}</td>
+            <td>${esc(u.department || "–")}</td>
+            <td>${esc(u.mobilePhone || "–")}</td>
+            <td>${statusBadge}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // ── Afdelingsfilter ───────────────────────────────────────────────────────
+    function buildDeptFilter(users) {
+      const depts = [...new Set(users.map(u => u.department).filter(Boolean))].sort((a, b) => a.localeCompare(b, "da"));
+      const sel = document.getElementById("deptFilter");
+      depts.forEach(d => {
+        const o = document.createElement("option");
+        o.value = d;
+        o.textContent = d;
+        sel.appendChild(o);
+      });
+    }
+
+    // ── Hjælpere ─────────────────────────────────────────────────────────────
+    function makeInitials(name) {
+      if (!name) return "?";
+      return name.trim().split(/\s+/).slice(0, 2).map(p => p[0].toUpperCase()).join("");
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+    }
+
+    function renderError(msg) {
+      document.getElementById("tbody").innerHTML =
+        `<tr><td colspan="6"><div class="stateMsg" style="color:#c30a14">${esc(msg)}</div></td></tr>`;
+    }
+
+    // ── Søgning ───────────────────────────────────────────────────────────────
+    const searchEl = document.getElementById("search");
+    const clearBtn = document.getElementById("searchClear");
+
+    function syncClear() {
+      if (clearBtn) clearBtn.style.visibility = searchEl?.value ? "visible" : "hidden";
+    }
+
+    searchEl?.addEventListener("input", () => { syncClear(); render(); });
+    clearBtn?.addEventListener("click", () => { if (searchEl) searchEl.value = ""; syncClear(); render(); });
+    document.getElementById("deptFilter")?.addEventListener("change", render);
+    syncClear();
+
+    // ── Sortérbare kolonner ───────────────────────────────────────────────────
+    document.querySelectorAll("#tbl thead th[data-col]").forEach(th => {
+      th.addEventListener("click", () => {
+        const col = th.getAttribute("data-col");
+        if (sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
+        updateSortHeaders();
+        render();
+      });
+    });
+
+    function updateSortHeaders() {
+      document.querySelectorAll("#tbl thead th[data-col]").forEach(th => {
+        const col = th.getAttribute("data-col");
+        th.classList.toggle("sort-active", col === sortCol);
+        const arrow = th.querySelector(".sort-arrow");
+        if (arrow) arrow.textContent = col === sortCol ? (sortDir === 1 ? " ▲" : " ▼") : " ⇅";
+      });
+    }
+
+    updateSortHeaders();
+  </script>
+</body>
+</html>
