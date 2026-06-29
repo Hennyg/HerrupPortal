@@ -1,32 +1,15 @@
 // api/entra-users/index.js
-// Henter alle medlemmer af gruppen "Alle - lely center herrup" via Microsoft Graph API.
-// Miljøvariabler (sæt i SWA Application settings):
-//   GRAPH_TENANT_ID     – dit tenant-id
-//   GRAPH_CLIENT_ID     – app registration client id (med Group.Read.All + User.Read.All)
-//   GRAPH_CLIENT_SECRET – client secret
-
 const fetch = globalThis.fetch;
 
 const GROUP_NAME = "Alle - lely center herrup";
 
 const USER_FIELDS = [
-  "id",
-  "displayName",
-  "mail",
-  "userPrincipalName",
-  "jobTitle",
-  "department",
-  "mobilePhone",
-  "officeLocation",
-  "accountEnabled"
+  "id", "displayName", "mail", "userPrincipalName",
+  "jobTitle", "department", "mobilePhone", "officeLocation", "accountEnabled"
 ].join(",");
 
 function json(context, status, body) {
-  context.res = {
-    status,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-    body
-  };
+  context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
 }
 
 // ── Token ─────────────────────────────────────────────────────────────────────
@@ -45,31 +28,31 @@ async function getGraphToken() {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        grant_type:    "client_credentials",
-        client_id:     clientId,
+        grant_type: "client_credentials",
+        client_id: clientId,
         client_secret: clientSecret,
-        scope:         "https://graph.microsoft.com/.default"
+        scope: "https://graph.microsoft.com/.default"
       })
     }
   );
-
   const j = await r.json();
   if (!r.ok) throw new Error(`token_error ${r.status}: ${j.error_description || JSON.stringify(j)}`);
   return j.access_token;
 }
 
-// ── Graph-fetch med auto-paginering ──────────────────────────────────────────
-async function graphGetAll(token, url) {
+// ── Graph-fetch med paginering — extraHeaders kun til første kald ─────────────
+async function graphGetAll(token, url, extraHeaders = {}) {
   const items = [];
   let next = url;
+  let firstCall = true;
 
   while (next) {
-    const r = await fetch(next, {
-      headers: {
-        Authorization:    `Bearer ${token}`,
-        ConsistencyLevel: "eventual"
-      }
-    });
+    const headers = { Authorization: `Bearer ${token}` };
+    // extraHeaders (fx ConsistencyLevel) kun på første kald — nextLink har dem allerede encoded
+    if (firstCall) Object.assign(headers, extraHeaders);
+    firstCall = false;
+
+    const r = await fetch(next, { headers });
     const j = await r.json();
     if (!r.ok) throw new Error(`graph_error ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
     items.push(...(j.value || []));
@@ -81,35 +64,34 @@ async function graphGetAll(token, url) {
 
 // ── Find gruppe på displayName ────────────────────────────────────────────────
 async function findGroupId(token, name) {
-  const encoded = encodeURIComponent(`displayName eq '${name}'`);
-  const url = `https://graph.microsoft.com/v1.0/groups?$filter=${encoded}&$select=id,displayName&$count=true`;
-  const groups = await graphGetAll(token, url);
+  const filter = encodeURIComponent(`displayName eq '${name}'`);
+  const url = `https://graph.microsoft.com/v1.0/groups?$filter=${filter}&$select=id,displayName&$count=true`;
+  const groups = await graphGetAll(token, url, { ConsistencyLevel: "eventual" });
   if (groups.length === 0) throw new Error(`Gruppe ikke fundet: "${name}"`);
   return groups[0].id;
 }
 
-// ── Hent gruppemedlemmer (kun User-objekter) ──────────────────────────────────
+// ── Hent gruppemedlemmer med paginering ───────────────────────────────────────
 async function getGroupMembers(token, groupId) {
-  const url = `https://graph.microsoft.com/v1.0/groups/${groupId}/members/microsoft.graph.user?$select=${USER_FIELDS}&$top=999`;
+  // Max 100 per side — paginering håndteres automatisk via @odata.nextLink
+  const url = `https://graph.microsoft.com/v1.0/groups/${groupId}/members/microsoft.graph.user?$select=${USER_FIELDS}&$top=100`;
   return graphGetAll(token, url);
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 module.exports = async function (context, req) {
-  // SWA-routen (/herrup.html) kræver allerede "authenticated".
-  // Frontend tjekker portal_admin-rollen. Her sikrer vi blot at der er en bruger.
   if (!req.headers["x-ms-client-principal"]) {
     return json(context, 401, { error: "Ikke logget ind" });
   }
 
   try {
-    const token    = await getGraphToken();
-    const groupId  = await findGroupId(token, GROUP_NAME);
-    const members  = await getGroupMembers(token, groupId);
+    const token   = await getGraphToken();
+    const groupId = await findGroupId(token, GROUP_NAME);
+    const members = await getGroupMembers(token, groupId);
 
-    // Sorter alfabetisk på displayName
+    context.log(`entra-users: hentede ${members.length} medlemmer`);
+
     members.sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "da"));
-
     return json(context, 200, members);
   } catch (e) {
     context.log("entra-users ERROR:", e.message);
