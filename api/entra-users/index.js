@@ -40,7 +40,7 @@ async function getGraphToken() {
   return j.access_token;
 }
 
-// ── Graph-fetch med paginering — extraHeaders kun til første kald ─────────────
+// ── Graph-fetch med paginering ────────────────────────────────────────────────
 async function graphGetAll(token, url, extraHeaders = {}) {
   const items = [];
   let next = url;
@@ -54,11 +54,7 @@ async function graphGetAll(token, url, extraHeaders = {}) {
     const r = await fetch(next, { headers });
     const j = await r.json();
     if (!r.ok) throw new Error(`graph_error ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
-
-    const page = j.value || [];
-    console.log(`[graphGetAll] page: ${page.length} items, nextLink: ${j["@odata.nextLink"] ? "ja" : "nej"}, url: ${next.substring(0, 120)}`);
-
-    items.push(...page);
+    items.push(...(j.value || []));
     next = j["@odata.nextLink"] || null;
   }
 
@@ -76,9 +72,51 @@ async function findGroupId(token, name) {
 
 // ── Hent alle brugere rekursivt via transitiveMembers ────────────────────────
 async function getGroupMembers(token, groupId) {
-  // transitiveMembers flader nested groups ud automatisk
   const url = `https://graph.microsoft.com/v1.0/groups/${groupId}/transitiveMembers/microsoft.graph.user?$select=${USER_FIELDS}&$top=100`;
   return graphGetAll(token, url);
+}
+
+// ── Hent foto som base64 (returnerer null hvis ingen) ────────────────────────
+async function getPhoto(token, userId) {
+  try {
+    const r = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${userId}/photos/48x48/$value`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!r.ok) return null;
+    const buf = await r.arrayBuffer();
+    const b64 = Buffer.from(buf).toString("base64");
+    const ct  = r.headers.get("content-type") || "image/jpeg";
+    return `data:${ct};base64,${b64}`;
+  } catch {
+    return null;
+  }
+}
+
+// ── Hent manager (returnerer { id, displayName } eller null) ─────────────────
+async function getManager(token, userId) {
+  try {
+    const r = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${userId}/manager?$select=id,displayName`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!r.ok) return null;
+    const j = await r.json();
+    return { id: j.id, displayName: j.displayName };
+  } catch {
+    return null;
+  }
+}
+
+// ── Kør i batches for at undgå for mange parallelle kald ─────────────────────
+async function runBatched(items, batchSize, fn) {
+  const results = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+  }
+  return results;
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -90,12 +128,21 @@ module.exports = async function (context, req) {
   try {
     const token   = await getGraphToken();
     const groupId = await findGroupId(token, GROUP_NAME);
-
-    // DEBUG: returner rå Graph-svar for første side så vi kan se hvad vi får
     const members = await getGroupMembers(token, groupId);
-    members.sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "da"));
-    return json(context, 200, members);
+
+    // Hent foto + manager for alle brugere i batches af 10
+    const enriched = await runBatched(members, 10, async (user) => {
+      const [photo, manager] = await Promise.all([
+        getPhoto(token, user.id),
+        getManager(token, user.id)
+      ]);
+      return { ...user, photo, managerId: manager?.id || null, managerName: manager?.displayName || null };
+    });
+
+    enriched.sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "da"));
+    return json(context, 200, enriched);
   } catch (e) {
+    context.log("entra-users ERROR:", e.message);
     return json(context, 500, { error: e.message });
   }
 };
