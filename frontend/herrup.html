@@ -113,6 +113,40 @@
 
     .hidden-value { color:#9ca3af; font-style:italic; font-weight:400; }
 
+    /* Rediger-knap + inline formular i Privat-fanen */
+    .privatHeader { display:flex; justify-content:space-between; align-items:center; margin-bottom:.6rem; }
+    .btn-edit {
+      appearance:none; border:1px solid #d1d5db; background:#fff; border-radius:8px;
+      padding:.4rem .9rem; font-size:.82rem; font-weight:600; color:#374151; cursor:pointer;
+    }
+    .btn-edit:hover { border-color:#850c18; color:#850c18; }
+    .btn-edit.cancel { color:#6b7280; }
+
+    .editFormGrid { display:grid; grid-template-columns:1fr 1fr; gap:.85rem 1.25rem; }
+    @media (max-width:500px) { .editFormGrid { grid-template-columns:1fr; } }
+    .editField { display:flex; flex-direction:column; gap:.3rem; }
+    .editField label { font-size:.74rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; }
+    .editField input {
+      padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:7px; font-size:.88rem;
+    }
+    .editField input:focus { outline:2px solid #850c18; outline-offset:-1px; border-color:#850c18; }
+
+    .visToggles { display:flex; flex-direction:column; gap:.5rem; margin-top:.9rem; }
+    .visToggleRow { display:flex; align-items:center; gap:.55rem; }
+    .visToggleRow input[type=checkbox] { width:17px; height:17px; cursor:pointer; }
+    .visToggleRow label { font-size:.84rem; color:#374151; cursor:pointer; }
+
+    .editActions { display:flex; gap:.6rem; align-items:center; margin-top:1rem; }
+    .btn-save-inline {
+      background:var(--nav-bg); color:#fff; border:0; border-radius:8px;
+      padding:.5rem 1.2rem; font-size:.85rem; font-weight:700; cursor:pointer;
+    }
+    .btn-save-inline:hover { opacity:.92; }
+    .btn-save-inline:disabled { opacity:.5; cursor:not-allowed; }
+    .saveMsg { font-size:.82rem; }
+    .saveMsg.ok  { color:#065f46; }
+    .saveMsg.err { color:#c30a14; }
+
     .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem 1.5rem; }
     @media (max-width:500px) { .detail-grid { grid-template-columns:1fr; } }
     .detail-row { display:flex; flex-direction:column; gap:2px; }
@@ -206,7 +240,6 @@
       <div class="nav">
         <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
         <span class="sep">|</span>
-        <a href="/herrupadmin.html">Rediger privat-info</a>
         <a href="/">← Til portal</a>
         <a href="/logout">Log ud</a>
       </div>
@@ -302,9 +335,12 @@
         <!-- Privat -->
         <div class="modal-tab-panel" id="panelPrivat">
           <div>
-            <div class="modal-section-title">Privat kontakt</div>
-            <div class="detail-grid" id="mPrivatDetails">
-              <div class="stateMsg" style="grid-column:1/-1;padding:1.5rem 0;">
+            <div class="privatHeader">
+              <div class="modal-section-title" style="margin-bottom:0;">Privat kontakt</div>
+              <button class="btn-edit" id="btnEditPrivat" style="display:none;" onclick="toggleEditMode()">Rediger</button>
+            </div>
+            <div id="mPrivatDetails">
+              <div class="stateMsg" style="padding:1.5rem 0;">
                 <div class="spinner"></div>
                 <div>Henter…</div>
               </div>
@@ -321,6 +357,11 @@
     let byId     = new Map();
     let sortCol  = "displayName";
     let sortDir  = 1;
+    let myRoles  = [];
+    let myEmail  = "";
+    let currentModalUser = null;
+    let currentPrivateData = null;
+    let editMode = false;
 
     // ── Init ──────────────────────────────────────────────────────────────────
     (async function init() {
@@ -330,6 +371,8 @@
       if (userLine) userLine.textContent = me?.userDetails || "";
 
       const roles = expandRoles(rolesFromMe(me));
+      myRoles = roles;
+      myEmail = (me?.userDetails || "").toLowerCase();
       renderAccessPanel(roles);
 
       if (!roles.includes("portal_admin")) {
@@ -466,6 +509,8 @@
     function openModal(userId) {
       const u = byId.get(userId);
       if (!u) return;
+      currentModalUser = u;
+      editMode = false;
 
       // Header
       document.getElementById("mAvatar").innerHTML = avatarHTML(u, 80);
@@ -512,14 +557,21 @@
       document.getElementById("mtPrivat").classList.toggle("active", tab === "privat");
     }
 
+    function canEditUser(u) {
+      const targetEmail = (u.mail || u.userPrincipalName || "").toLowerCase();
+      return myRoles.includes("portal_admin") || (myEmail && myEmail === targetEmail);
+    }
+
     async function loadPrivateTab(u) {
-      const target = document.getElementById("mPrivatDetails");
-      target.innerHTML = `<div class="stateMsg" style="grid-column:1/-1;padding:1.5rem 0;">
+      const target  = document.getElementById("mPrivatDetails");
+      const editBtn = document.getElementById("btnEditPrivat");
+      target.innerHTML = `<div class="stateMsg" style="padding:1.5rem 0;">
         <div class="spinner"></div><div>Henter…</div></div>`;
+      editBtn.style.display = "none";
 
       const lookupEmail = u.mail || u.userPrincipalName;
       if (!lookupEmail) {
-        target.innerHTML = renderPrivateFields({});
+        target.innerHTML = renderPrivateView({});
         return;
       }
 
@@ -527,16 +579,21 @@
         const r = await fetch(`/api/employee-private/${encodeURIComponent(lookupEmail)}`, { cache: "no-store" });
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-        target.innerHTML = renderPrivateFields(data);
+        currentPrivateData = data;
+        target.innerHTML = renderPrivateView(data);
+
+        if (canEditUser(u)) {
+          editBtn.style.display = "";
+        }
       } catch (e) {
-        target.innerHTML = `<div class="stateMsg" style="grid-column:1/-1;color:#c30a14;">
+        target.innerHTML = `<div class="stateMsg" style="color:#c30a14;">
           Kunne ikke hente privat info: ${esc(e.message)}</div>`;
       }
     }
 
-    function renderPrivateFields(d) {
+    function renderPrivateView(d) {
       const valueOrHidden = (value, visesFlag) => {
-        if (visesFlag === false) return `<span class="hidden-value">vises ikke</span>`;
+        if (!visesFlag) return `<span class="hidden-value">vises ikke</span>`;
         return esc(value || "–");
       };
 
@@ -547,12 +604,114 @@
         { label: "Privat postby",   value: valueOrHidden(d.privatPostby, d.adresseVises) },
       ];
 
-      return rows.map(row =>
+      return `<div class="detail-grid">${rows.map(row =>
         `<div class="detail-row">
           <div class="detail-label">${row.label}</div>
           <div class="detail-value">${row.value}</div>
         </div>`
-      ).join("");
+      ).join("")}</div>`;
+    }
+
+    // ── Rediger-tilstand ──────────────────────────────────────────────────────
+    function toggleEditMode() {
+      editMode = !editMode;
+      const editBtn = document.getElementById("btnEditPrivat");
+
+      if (editMode) {
+        editBtn.textContent = "Annuller";
+        editBtn.classList.add("cancel");
+        renderPrivateEditForm(currentPrivateData || {});
+      } else {
+        editBtn.textContent = "Rediger";
+        editBtn.classList.remove("cancel");
+        document.getElementById("mPrivatDetails").innerHTML = renderPrivateView(currentPrivateData || {});
+      }
+    }
+
+    function renderPrivateEditForm(d) {
+      const target = document.getElementById("mPrivatDetails");
+      target.innerHTML = `
+        <div class="editFormGrid">
+          <div class="editField">
+            <label for="ePrivatMail">Privat mail</label>
+            <input type="email" id="ePrivatMail" value="${escAttr(d.privatMail)}" />
+          </div>
+          <div class="editField">
+            <label for="ePrivatTlf">Privat telefon</label>
+            <input type="tel" id="ePrivatTlf" value="${escAttr(d.privatTlf)}" />
+          </div>
+          <div class="editField">
+            <label for="ePrivatAdresse">Privat adresse</label>
+            <input type="text" id="ePrivatAdresse" value="${escAttr(d.privatAdresse)}" />
+          </div>
+          <div class="editField">
+            <label for="ePrivatPostby">Privat postby</label>
+            <input type="text" id="ePrivatPostby" value="${escAttr(d.privatPostby)}" />
+          </div>
+        </div>
+
+        <div class="visToggles">
+          <div class="visToggleRow">
+            <input type="checkbox" id="eTelefonVises" ${d.telefonVises ? "checked" : ""} />
+            <label for="eTelefonVises">Vis privat telefon for kolleger</label>
+          </div>
+          <div class="visToggleRow">
+            <input type="checkbox" id="eAdresseVises" ${d.adresseVises ? "checked" : ""} />
+            <label for="eAdresseVises">Vis privat adresse + postby for kolleger</label>
+          </div>
+        </div>
+
+        <div class="editActions">
+          <button class="btn-save-inline" id="btnSavePrivat">Gem</button>
+          <span class="saveMsg" id="savePrivatMsg"></span>
+        </div>
+      `;
+      document.getElementById("btnSavePrivat").addEventListener("click", savePrivateEdit);
+    }
+
+    async function savePrivateEdit() {
+      const u = currentModalUser;
+      const lookupEmail = u.mail || u.userPrincipalName;
+      const btn = document.getElementById("btnSavePrivat");
+      const msg = document.getElementById("savePrivatMsg");
+      btn.disabled = true;
+      msg.textContent = "";
+      msg.className = "saveMsg";
+
+      const payload = {
+        privatMail:    document.getElementById("ePrivatMail").value.trim(),
+        privatTlf:     document.getElementById("ePrivatTlf").value.trim(),
+        privatAdresse: document.getElementById("ePrivatAdresse").value.trim(),
+        privatPostby:  document.getElementById("ePrivatPostby").value.trim(),
+        telefonVises:  document.getElementById("eTelefonVises").checked,
+        adresseVises:  document.getElementById("eAdresseVises").checked
+      };
+
+      try {
+        const r = await fetch(`/api/employee-private/${encodeURIComponent(lookupEmail)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+
+        currentPrivateData = { found: true, ...payload };
+        msg.textContent = "Gemt ✓";
+        msg.classList.add("ok");
+
+        setTimeout(() => {
+          editMode = false;
+          const editBtn = document.getElementById("btnEditPrivat");
+          editBtn.textContent = "Rediger";
+          editBtn.classList.remove("cancel");
+          document.getElementById("mPrivatDetails").innerHTML = renderPrivateView(currentPrivateData);
+        }, 600);
+      } catch (e) {
+        msg.textContent = "Fejl: " + e.message;
+        msg.classList.add("err");
+        btn.disabled = false;
+      }
     }
 
     function closeModal() {
@@ -719,6 +878,7 @@
       return String(s ?? "").replace(/[&<>"']/g, m =>
         ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
     }
+    function escAttr(s) { return esc(s); }
     function renderError(msg) {
       document.getElementById("tbody").innerHTML =
         `<tr><td colspan="5"><div class="stateMsg" style="color:#c30a14">${esc(msg)}</div></td></tr>`;
