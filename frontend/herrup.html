@@ -100,6 +100,19 @@
 
     .modal-body { padding:1.25rem 1.5rem; display:flex; flex-direction:column; gap:1.25rem; }
 
+    /* Modal-faner */
+    .modal-tabs { display:flex; gap:.4rem; padding:0 1.5rem; margin-top:.75rem; }
+    .modal-tab {
+      appearance:none; border:0; background:transparent; padding:.5rem .9rem;
+      font-size:.85rem; font-weight:600; color:#6b7280; cursor:pointer;
+      border-bottom:2px solid transparent;
+    }
+    .modal-tab.active { color:#850c18; border-bottom-color:#850c18; }
+    .modal-tab-panel { display:none; }
+    .modal-tab-panel.active { display:flex; flex-direction:column; gap:1.25rem; }
+
+    .hidden-value { color:#9ca3af; font-style:italic; font-weight:400; }
+
     .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem 1.5rem; }
     @media (max-width:500px) { .detail-grid { grid-template-columns:1fr; } }
     .detail-row { display:flex; flex-direction:column; gap:2px; }
@@ -269,16 +282,33 @@
         </div>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
+      <div class="modal-tabs">
+        <button class="modal-tab active" id="mtArbejde" onclick="switchModalTab('arbejde')">Arbejde</button>
+        <button class="modal-tab" id="mtPrivat" onclick="switchModalTab('privat')">Privat</button>
+      </div>
       <div class="modal-body">
-        <!-- Kontaktinfo -->
-        <div>
-          <div class="modal-section-title">Kontakt</div>
-          <div class="detail-grid" id="mDetails"></div>
+        <!-- Arbejde -->
+        <div class="modal-tab-panel active" id="panelArbejde">
+          <div>
+            <div class="modal-section-title">Kontakt</div>
+            <div class="detail-grid" id="mDetails"></div>
+          </div>
+          <div id="mOrgSection">
+            <div class="modal-section-title">Organisation</div>
+            <div class="mini-org" id="mOrg"></div>
+          </div>
         </div>
-        <!-- Mini org -->
-        <div id="mOrgSection">
-          <div class="modal-section-title">Organisation</div>
-          <div class="mini-org" id="mOrg"></div>
+        <!-- Privat -->
+        <div class="modal-tab-panel" id="panelPrivat">
+          <div>
+            <div class="modal-section-title">Privat kontakt</div>
+            <div class="detail-grid" id="mPrivatDetails">
+              <div class="stateMsg" style="grid-column:1/-1;padding:1.5rem 0;">
+                <div class="spinner"></div>
+                <div>Henter…</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -448,15 +478,13 @@
       document.getElementById("mBadges").innerHTML = badges
         .map(b => `<span class="modal-badge">${esc(b)}</span>`).join("");
 
-      // Kontaktdetaljer
+      // Kontaktdetaljer (Arbejde) — Mobil og Kontor er fjernet
       const phone = bizPhone(u);
       const details = [
         { label: "E-mail",   value: u.mail    ? `<a href="mailto:${esc(u.mail)}">${esc(u.mail)}</a>`  : "–" },
         { label: "Telefon",  value: phone      ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>`       : "–" },
-        { label: "Mobil",    value: u.mobilePhone ? `<a href="tel:${esc(u.mobilePhone)}">${esc(u.mobilePhone)}</a>` : "–" },
         { label: "Stilling", value: esc(u.jobTitle    || "–") },
         { label: "Afdeling", value: esc(u.department  || "–") },
-        { label: "Kontor",   value: esc(u.officeLocation || "–") },
       ];
       document.getElementById("mDetails").innerHTML = details.map(d =>
         `<div class="detail-row">
@@ -468,8 +496,62 @@
       // Mini org-chart
       renderMiniOrg(u);
 
+      // Nulstil til Arbejde-fanen og hent privat-data
+      switchModalTab("arbejde");
+      loadPrivateTab(u);
+
       document.getElementById("modalBackdrop").classList.add("open");
       document.body.style.overflow = "hidden";
+    }
+
+    function switchModalTab(tab) {
+      document.getElementById("panelArbejde").classList.toggle("active", tab === "arbejde");
+      document.getElementById("panelPrivat").classList.toggle("active", tab === "privat");
+      document.getElementById("mtArbejde").classList.toggle("active", tab === "arbejde");
+      document.getElementById("mtPrivat").classList.toggle("active", tab === "privat");
+    }
+
+    async function loadPrivateTab(u) {
+      const target = document.getElementById("mPrivatDetails");
+      target.innerHTML = `<div class="stateMsg" style="grid-column:1/-1;padding:1.5rem 0;">
+        <div class="spinner"></div><div>Henter…</div></div>`;
+
+      const lookupEmail = u.mail || u.userPrincipalName;
+      if (!lookupEmail) {
+        target.innerHTML = renderPrivateFields({});
+        return;
+      }
+
+      try {
+        const r = await fetch(`/api/employee-private/${encodeURIComponent(lookupEmail)}`, { cache: "no-store" });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        target.innerHTML = renderPrivateFields(data);
+      } catch (e) {
+        target.innerHTML = `<div class="stateMsg" style="grid-column:1/-1;color:#c30a14;">
+          Kunne ikke hente privat info: ${esc(e.message)}</div>`;
+      }
+    }
+
+    function renderPrivateFields(d) {
+      const valueOrHidden = (value, visesFlag) => {
+        if (visesFlag === false) return `<span class="hidden-value">vises ikke</span>`;
+        return esc(value || "–");
+      };
+
+      const rows = [
+        { label: "Privat mail",     value: esc(d.privatMail || "–") },
+        { label: "Privat telefon",  value: valueOrHidden(d.privatTlf, d.telefonVises) },
+        { label: "Privat adresse",  value: valueOrHidden(d.privatAdresse, d.adresseVises) },
+        { label: "Privat postby",   value: valueOrHidden(d.privatPostby, d.adresseVises) },
+      ];
+
+      return rows.map(row =>
+        `<div class="detail-row">
+          <div class="detail-label">${row.label}</div>
+          <div class="detail-value">${row.value}</div>
+        </div>`
+      ).join("");
     }
 
     function closeModal() {
