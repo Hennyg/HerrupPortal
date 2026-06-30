@@ -42,8 +42,6 @@
     .userTable thead th.sort-active { color:var(--accent-bar); }
     .sort-arrow { font-size:.75rem; opacity:.65; }
     .userTable tbody tr:hover { background:rgba(0,0,0,.025); }
-    .userTable tbody tr.row-disabled { opacity:.45; background:#fafafa; }
-    .userTable tbody tr.row-disabled:hover { background:#f3f4f6; }
     .userTable tbody td { padding:.45rem .7rem; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
 
     /* Avatar i tabel — klikbar */
@@ -386,8 +384,7 @@
       }
       tbody.innerHTML = rows.map(u => {
         const av = avatarHTML(u, 36);
-        const disabled = u.accountEnabled === false;
-        return `<tr class="${disabled ? "row-disabled" : ""}">
+        return `<tr>
           <td><div class="nameCell">
             <div class="avatar" onclick="openModal('${esc(u.id)}')" title="Se detaljer">${av}</div>
             <div style="cursor:pointer" onclick="openModal('${esc(u.id)}')">${esc(u.displayName||"–")}</div>
