@@ -375,11 +375,6 @@
       myEmail = (me?.userDetails || "").toLowerCase();
       renderAccessPanel(roles);
 
-      if (!roles.includes("portal_admin")) {
-        renderError("Du har ikke adgang til denne side.");
-        return;
-      }
-
       try {
         const r = await fetch("/api/entra-users", { cache: "no-store" });
         if (!r.ok) {
