@@ -41,8 +41,14 @@ async function getDataverseToken() {
   const clientSecret = process.env.DV_CLIENT_SECRET;
   const dvUrl         = process.env.DV_COREDATA;
 
-  if (!tenant || !clientId || !clientSecret || !dvUrl) {
-    throw new Error("Manglende miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET eller DV_COREDATA");
+  const missing = [];
+  if (!tenant)       missing.push("DV_TENANT_ID");
+  if (!clientId)     missing.push("DV_CLIENT_ID");
+  if (!clientSecret) missing.push("DV_CLIENT_SECRET");
+  if (!dvUrl)         missing.push("DV_COREDATA");
+
+  if (missing.length) {
+    throw new Error("Manglende miljøvariabler: " + missing.join(", "));
   }
 
   const r = await fetch(
