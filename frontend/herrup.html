@@ -42,6 +42,8 @@
     .userTable thead th.sort-active { color:var(--accent-bar); }
     .sort-arrow { font-size:.75rem; opacity:.65; }
     .userTable tbody tr:hover { background:rgba(0,0,0,.025); }
+    .userTable tbody tr.row-disabled { opacity:.45; background:#fafafa; }
+    .userTable tbody tr.row-disabled:hover { background:#f3f4f6; }
     .userTable tbody td { padding:.45rem .7rem; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
 
     /* Avatar i tabel — klikbar */
@@ -235,11 +237,10 @@
               <th data-col="jobTitle">Stilling<span class="sort-arrow"> ⇅</span></th>
               <th data-col="department">Afdeling<span class="sort-arrow"> ⇅</span></th>
               <th data-col="businessPhone">Telefon<span class="sort-arrow"> ⇅</span></th>
-              <th data-col="accountEnabled">Status<span class="sort-arrow"> ⇅</span></th>
             </tr>
           </thead>
           <tbody id="tbody">
-            <tr><td colspan="6">
+            <tr><td colspan="5">
               <div class="stateMsg">
                 <div class="spinner"></div>
                 <div>Henter brugere… foto + manager hentes også</div>
@@ -380,15 +381,13 @@
       const count = document.getElementById("userCount");
       if (count) count.textContent = `${rows.length} brugere`;
       if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="6"><div class="stateMsg">Ingen resultater</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5"><div class="stateMsg">Ingen resultater</div></td></tr>`;
         return;
       }
       tbody.innerHTML = rows.map(u => {
         const av = avatarHTML(u, 36);
-        const statusBadge = u.accountEnabled !== false
-          ? `<span class="badge-ok">Aktiv</span>`
-          : `<span class="badge-off">Deaktiveret</span>`;
-        return `<tr>
+        const disabled = u.accountEnabled === false;
+        return `<tr class="${disabled ? "row-disabled" : ""}">
           <td><div class="nameCell">
             <div class="avatar" onclick="openModal('${esc(u.id)}')" title="Se detaljer">${av}</div>
             <div style="cursor:pointer" onclick="openModal('${esc(u.id)}')">${esc(u.displayName||"–")}</div>
@@ -397,7 +396,6 @@
           <td>${esc(u.jobTitle||"–")}</td>
           <td>${esc(u.department||"–")}</td>
           <td>${esc(bizPhone(u)||"–")}</td>
-          <td>${statusBadge}</td>
         </tr>`;
       }).join("");
     }
@@ -643,7 +641,7 @@
     }
     function renderError(msg) {
       document.getElementById("tbody").innerHTML =
-        `<tr><td colspan="6"><div class="stateMsg" style="color:#c30a14">${esc(msg)}</div></td></tr>`;
+        `<tr><td colspan="5"><div class="stateMsg" style="color:#c30a14">${esc(msg)}</div></td></tr>`;
     }
   </script>
 </body>
