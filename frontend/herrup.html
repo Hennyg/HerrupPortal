@@ -191,42 +191,52 @@
     /* Direkte rapporter */
     .mini-reports { display:flex; flex-direction:column; gap:.4rem; margin-top:.4rem; }
 
-    /* Org-view */
+    /* ── Org chart: afdeling-visning ─────────────────────────────────────────── */
     #orgView { display:none; overflow-x:auto; padding-bottom:1rem; }
     .org-placeholder { color:#9ca3af; font-size:.85rem; text-align:center; padding:2rem; }
 
-    /* Org tree cards */
-    .org-wrap { display:flex; flex-direction:column; align-items:center; }
-    .org-card {
+    .dept-section { margin-bottom:2rem; }
+    .dept-heading {
+      font-size:.78rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:.08em; color:#6b7280;
+      padding-bottom:.45rem; margin-bottom:.85rem;
+      border-bottom:2px solid #e5e7eb;
+      display:flex; align-items:center; gap:.5rem;
+    }
+    .dept-heading .dept-count {
+      font-size:.72rem; font-weight:600; background:#f3f4f6;
+      border:1px solid #e5e7eb; border-radius:999px;
+      padding:1px 8px; color:#9ca3af; text-transform:none; letter-spacing:0;
+    }
+    .dept-row { display:flex; flex-wrap:wrap; gap:.65rem; }
+
+    .dept-card {
       display:flex; flex-direction:column; align-items:center; gap:5px;
       background:#fff; border:1px solid #e5e7eb; border-radius:12px;
-      padding:10px 8px; cursor:pointer; transition:box-shadow .15s, border-color .15s;
-      width:110px; text-align:center;
+      padding:10px 8px; cursor:pointer;
+      transition:box-shadow .15s, border-color .15s;
+      width:92px; text-align:center;
     }
-    .org-card:hover { border-color:#850c18; box-shadow:0 4px 12px rgba(133,12,24,.12); }
-    .org-avatar { width:44px; height:44px; border-radius:50%; background:var(--nav-bg);
-                  color:#fff; display:flex; align-items:center; justify-content:center;
-                  font-size:.82rem; font-weight:700; overflow:hidden; flex-shrink:0; }
-    .org-avatar img { width:44px; height:44px; object-fit:cover; border-radius:50%; }
-    .org-name  { font-size:.72rem; font-weight:700; color:#111827; line-height:1.2; word-break:break-word; }
-    .org-title { font-size:.65rem; color:#6b7280; line-height:1.2; }
-    .org-line-v { width:2px; height:20px; background:#d1d5db; }
-    .org-children-row {
-      display:flex; gap:12px; justify-content:center;
-      position:relative; padding-top:0;
+    .dept-card:hover { border-color:#850c18; box-shadow:0 4px 12px rgba(133,12,24,.12); }
+
+    .dept-avatar {
+      width:48px; height:48px; border-radius:50%; background:var(--nav-bg);
+      color:#fff; display:flex; align-items:center; justify-content:center;
+      font-size:.85rem; font-weight:700; overflow:hidden; flex-shrink:0;
     }
-    .org-children-row::before {
-      content:""; position:absolute; top:0; left:55px; right:55px;
-      height:2px; background:#d1d5db;
-    }
-    .org-children-row.single::before { display:none; }
-    .org-child-col { display:flex; flex-direction:column; align-items:center; }
+    .dept-avatar img { width:48px; height:48px; object-fit:cover; border-radius:50%; }
+
+    .dept-card-name  { font-size:.7rem; font-weight:700; color:#111827; line-height:1.25; word-break:break-word; }
+    .dept-card-title { font-size:.63rem; color:#6b7280; line-height:1.2; margin-top:1px; }
 
     @media (max-width:640px) {
       .userTable thead th:nth-child(3),
       .userTable tbody td:nth-child(3),
       .userTable thead th:nth-child(5),
       .userTable tbody td:nth-child(5) { display:none; }
+      .dept-card { width:80px; }
+      .dept-avatar { width:42px; height:42px; }
+      .dept-avatar img { width:42px; height:42px; }
     }
   </style>
 </head>
@@ -260,7 +270,7 @@
     <!-- Faner -->
     <div class="tabs">
       <button class="tab active" id="tabList" onclick="switchTab('list')">👥 Liste</button>
-      <button class="tab"        id="tabOrg"  onclick="switchTab('org')">🌳 Org chart</button>
+      <button class="tab"        id="tabOrg"  onclick="switchTab('org')">🏢 Org chart</button>
     </div>
 
     <!-- Liste -->
@@ -298,7 +308,7 @@
 
     <!-- Org chart -->
     <div class="panel" id="orgView">
-      <div id="orgTree" style="overflow-x:auto;padding:1rem 0;min-height:200px;">
+      <div id="orgTree" style="padding:1rem 0;min-height:200px;">
         <div class="org-placeholder">Indlæser…</div>
       </div>
     </div>
@@ -519,7 +529,7 @@
       document.getElementById("mBadges").innerHTML = badges
         .map(b => `<span class="modal-badge">${esc(b)}</span>`).join("");
 
-      // Kontaktdetaljer (Arbejde) — Mobil og Kontor er fjernet
+      // Kontaktdetaljer (Arbejde)
       const phone = bizPhone(u);
       const details = [
         { label: "E-mail",   value: u.mail    ? `<a href="mailto:${esc(u.mail)}">${esc(u.mail)}</a>`  : "–" },
@@ -789,7 +799,7 @@
       return div;
     }
 
-    // ── Org chart (fuld) ──────────────────────────────────────────────────────
+    // ── Org chart: afdeling-grupperet visning ─────────────────────────────────
     function renderOrg() {
       const container = document.getElementById("orgTree");
       if (!allUsers.length) {
@@ -797,65 +807,56 @@
         return;
       }
 
-      const groupIds = new Set(allUsers.map(u => u.id));
-      const childMap = new Map();
+      // Gruppér på afdeling
+      const deptMap = new Map();
+      const noDept  = [];
       allUsers.forEach(u => {
-        if (u.managerId && groupIds.has(u.managerId)) {
-          if (!childMap.has(u.managerId)) childMap.set(u.managerId, []);
-          childMap.get(u.managerId).push(u);
-        }
+        const dept = (u.department || "").trim();
+        if (!dept) { noDept.push(u); return; }
+        if (!deptMap.has(dept)) deptMap.set(dept, []);
+        deptMap.get(dept).push(u);
       });
-      childMap.forEach(arr => arr.sort((a,b) => (a.displayName||"").localeCompare(b.displayName||"","da")));
 
-      const roots = allUsers
-        .filter(u => !u.managerId || !groupIds.has(u.managerId))
-        .sort((a,b) => (a.displayName||"").localeCompare(b.displayName||"","da"));
+      // Sorter afdelinger alfabetisk, "Uden afdeling" sidst
+      const entries = [...deptMap.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0], "da"));
+      if (noDept.length) entries.push(["Uden afdeling", noDept]);
 
       container.innerHTML = "";
 
-      function buildNode(user) {
-        const wrap = document.createElement("div");
-        wrap.className = "org-wrap";
+      entries.forEach(([deptName, users]) => {
+        // Sorter brugere alfabetisk inden for afdelingen
+        users.sort((a, b) => (a.displayName||"").localeCompare(b.displayName||"", "da"));
 
-        const card = document.createElement("div");
-        card.className = "org-card";
-        card.innerHTML = `
-          <div class="org-avatar">${avatarHTML(user, 44)}</div>
-          <div class="org-name">${esc(user.displayName||"")}</div>
-          <div class="org-title">${esc(user.jobTitle||"")}</div>`;
-        card.addEventListener("click", () => openModal(user.id));
-        wrap.appendChild(card);
+        // Sektion-wrapper
+        const section = document.createElement("div");
+        section.className = "dept-section";
 
-        const kids = childMap.get(user.id) || [];
-        if (kids.length) {
-          const vLine = document.createElement("div");
-          vLine.className = "org-line-v";
-          wrap.appendChild(vLine);
+        // Afdeling-overskrift med antal
+        const heading = document.createElement("div");
+        heading.className = "dept-heading";
+        heading.innerHTML = `${esc(deptName)} <span class="dept-count">${users.length}</span>`;
+        section.appendChild(heading);
 
-          const row = document.createElement("div");
-          row.className = "org-children-row" + (kids.length === 1 ? " single" : "");
-          kids.forEach(kid => {
-            const col = document.createElement("div");
-            col.className = "org-child-col";
-            const vUp = document.createElement("div");
-            vUp.className = "org-line-v";
-            col.appendChild(vUp);
-            col.appendChild(buildNode(kid));
-            row.appendChild(col);
-          });
-          wrap.appendChild(row);
-        }
-        return wrap;
-      }
-
-      if (roots.length === 1) {
-        container.appendChild(buildNode(roots[0]));
-      } else {
+        // Række med avatar-kort
         const row = document.createElement("div");
-        row.style.cssText = "display:flex;gap:24px;justify-content:center;flex-wrap:wrap;";
-        roots.forEach(r => row.appendChild(buildNode(r)));
-        container.appendChild(row);
-      }
+        row.className = "dept-row";
+
+        users.forEach(u => {
+          const card = document.createElement("div");
+          card.className = "dept-card";
+          card.title = u.displayName || "";
+          card.innerHTML = `
+            <div class="dept-avatar">${avatarHTML(u, 48)}</div>
+            <div class="dept-card-name">${esc(u.displayName||"")}</div>
+            <div class="dept-card-title">${esc(u.jobTitle||"")}</div>`;
+          card.addEventListener("click", () => openModal(u.id));
+          row.appendChild(card);
+        });
+
+        section.appendChild(row);
+        container.appendChild(section);
+      });
     }
 
     // ── Hjælpere ─────────────────────────────────────────────────────────────
