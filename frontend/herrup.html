@@ -264,7 +264,7 @@
     <!-- Faner -->
     <div class="tabs">
       <button class="tab active" id="tabList" onclick="switchTab('list')">👥 Liste</button>
-      <button class="tab"        id="tabOrg"  onclick="switchTab('org')">🏢 Org chart</button>
+      <button class="tab"        id="tabOrg"  onclick="switchTab('org')">🏢 Afdelingsoversigt</button>
     </div>
 
     <!-- Liste -->
@@ -806,7 +806,15 @@ myEmail = (me?.userDetails || "").toLowerCase();
 
       entries.forEach(([deptName, users]) => {
         // Sorter brugere alfabetisk inden for afdelingen
-        users.sort((a, b) => (a.displayName||"").localeCompare(b.displayName||"", "da"));
+        // Sorter ledere/chefer først, derefter alfabetisk
+users.sort((a, b) => {
+  const aLeader = isLeaderTitle(a) ? 1 : 0;
+  const bLeader = isLeaderTitle(b) ? 1 : 0;
+
+  if (aLeader !== bLeader) return bLeader - aLeader;
+
+  return (a.displayName || "").localeCompare(b.displayName || "", "da");
+});
 
         // Sektion-wrapper
         const section = document.createElement("div");
@@ -823,9 +831,9 @@ myEmail = (me?.userDetails || "").toLowerCase();
         row.className = "dept-row";
 
         users.forEach(u => {
-          const card = document.createElement("div");
-          card.className = "dept-card";
-          card.title = u.displayName || "";
+const card = document.createElement("div");
+card.className = "dept-card" + (isLeaderTitle(u) ? " leader" : "");
+card.title = u.displayName || "";
           card.innerHTML = `
             <div class="dept-avatar">${avatarHTML(u, 48)}</div>
             <div class="dept-card-name">${esc(u.displayName||"")}</div>
@@ -840,6 +848,11 @@ myEmail = (me?.userDetails || "").toLowerCase();
     }
 
     // ── Hjælpere ─────────────────────────────────────────────────────────────
+
+    function isLeaderTitle(u) {
+  const title = String(u?.jobTitle || "").toLowerCase();
+  return title.includes("chef") || title.includes("leder");
+}
     function avatarHTML(user, size) {
       if (user.photo) {
         return `<img src="${user.photo}" alt="" style="width:${size}px;height:${size}px;object-fit:cover;border-radius:50%;" />`;
