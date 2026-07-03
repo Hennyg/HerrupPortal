@@ -404,7 +404,7 @@
     // ── Faner ─────────────────────────────────────────────────────────────────
     function switchTab(tab) {
       document.getElementById("listView").style.display = tab === "list" ? "" : "none";
-      document.getElementById("orgView").style.display  = tab === "org"  ? "" : "none";
+      document.getElementById("orgView").style.display  = tab === "org"  ? "block" : "none";
       document.getElementById("tabList").classList.toggle("active", tab === "list");
       document.getElementById("tabOrg").classList.toggle("active",  tab === "org");
     }
