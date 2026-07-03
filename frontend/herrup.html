@@ -292,7 +292,7 @@
             <tr><td colspan="5">
               <div class="stateMsg">
                 <div class="spinner"></div>
-                <div>Henter information - Vent venligst</div>
+                <div>Henter informationer - vent venligst</div>
               </div>
             </td></tr>
           </tbody>
@@ -374,10 +374,9 @@
       const userLine = document.getElementById("userLine");
       if (userLine) userLine.textContent = me?.userDetails || "";
 
-      const roles = expandRoles(rolesFromMe(me));
-      myRoles = roles;
-      myEmail = (me?.userDetails || "").toLowerCase();
-      renderAccessPanel(roles);
+const roles = expandRoles(rolesFromMe(me));
+myRoles = roles;
+myEmail = (me?.userDetails || "").toLowerCase();
 
       try {
         const r = await fetch("/api/entra-users", { cache: "no-store" });
@@ -401,19 +400,6 @@
       document.getElementById("orgView").style.display  = tab === "org"  ? "block" : "none";
       document.getElementById("tabList").classList.toggle("active", tab === "list");
       document.getElementById("tabOrg").classList.toggle("active",  tab === "org");
-    }
-
-    // ── Adgangs-panel ─────────────────────────────────────────────────────────
-    function renderAccessPanel(roles) {
-      const panel  = document.getElementById("accessPanel");
-      const listEl = document.getElementById("roleList");
-      const display = roles.filter(r => r !== "anonymous" && r !== "authenticated");
-      if (!display.length) return;
-      listEl.innerHTML = display.map(r => {
-        const isAdmin = r === "portal_admin";
-        return `<span class="rolePill ${isAdmin?"admin":""}"><span class="dot"></span>${esc(r)}</span>`;
-      }).join("");
-      panel.style.display = "";
     }
 
     // ── businessPhone hjælper ─────────────────────────────────────────────────
