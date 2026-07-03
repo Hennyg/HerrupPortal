@@ -1,5 +1,5 @@
 // api/employee-private/index.js
-// Slår en bruger op i Dataverse-tabellen lch_medarbejdere (i miljøet DATAVERSE_DATACORE_URL)
+// Slår en bruger op i Dataverse-tabellen lch_medarbejdere (i miljøet DV_COREDATA)
 // via lch_mail = mail/UPN.
 //
 // GET   /api/employee-private/{email}  → henter felter, filtreret af vises-flag
@@ -9,7 +9,7 @@
 // Default når en post oprettes/ikke findes: telefonVises og adresseVises = false (Nej),
 // indtil medarbejderen selv (eller en admin) aktivt slår dem til.
 //
-// Miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DATAVERSE_DATACORE_URL
+// Miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_COREDATA
 
 const fetch = globalThis.fetch;
 
@@ -38,13 +38,13 @@ async function getDataverseToken() {
   const tenant       = process.env.DV_TENANT_ID;
   const clientId     = process.env.DV_CLIENT_ID;
   const clientSecret = process.env.DV_CLIENT_SECRET;
-  const dvUrl        = process.env.DATAVERSE_DATACORE_URL;
+  const dvUrl        = process.env.DV_COREDATA;
 
   const missing = [];
   if (!tenant)       missing.push("DV_TENANT_ID");
   if (!clientId)     missing.push("DV_CLIENT_ID");
   if (!clientSecret) missing.push("DV_CLIENT_SECRET");
-  if (!dvUrl)        missing.push("DATAVERSE_DATACORE_URL");
+  if (!dvUrl)        missing.push("DV_COREDATA");
 
   if (missing.length) {
     throw new Error("Manglende miljøvariabler: " + missing.join(", "));
@@ -161,7 +161,7 @@ module.exports = async function (context, req) {
     return json(context, 400, { error: "Mangler email-parameter" });
   }
 
-  const dvUrl = process.env.DATAVERSE_DATACORE_URL;
+  const dvUrl = process.env.DV_COREDATA;
 
   try {
     const token = await getDataverseToken();
