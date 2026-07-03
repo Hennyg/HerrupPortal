@@ -1,13 +1,10 @@
 // api/employee-private/index.js
-// Slår en bruger op i Dataverse-tabellen lch_medarbejdere (i miljøet DV_COREDATA)
-// via lch_mail = mail/UPN.
+// Slår en bruger op i Dataverse-tabellen cr1eb_lch_medarbejderes (i miljøet DV_COREDATA)
+// via cr1eb_lch_mail = mail/UPN.
 //
 // GET   /api/employee-private/{email}  → henter felter, filtreret af vises-flag
 // PATCH /api/employee-private/{email}  → opdaterer felter — kun tilladt for
 //        portal_admin ELLER hvis den indloggede bruger redigerer sig selv
-//
-// Default når en post oprettes/ikke findes: telefonVises og adresseVises = false (Nej),
-// indtil medarbejderen selv (eller en admin) aktivt slår dem til.
 //
 // Miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_COREDATA
 
@@ -19,7 +16,6 @@ function json(context, status, body) {
   context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
 }
 
-// ── Roller + email fra x-ms-client-principal ─────────────────────────────────
 function getRolesFromPrincipal(principal) {
   return [
     ...(principal.userRoles || []),
@@ -33,7 +29,6 @@ function getEmailFromPrincipal(principal) {
   return (principal.userDetails || "").toLowerCase();
 }
 
-// ── Token til Dataverse ───────────────────────────────────────────────────────
 async function getDataverseToken() {
   const tenant       = process.env.DV_TENANT_ID;
   const clientId     = process.env.DV_CLIENT_ID;
@@ -45,10 +40,7 @@ async function getDataverseToken() {
   if (!clientId)     missing.push("DV_CLIENT_ID");
   if (!clientSecret) missing.push("DV_CLIENT_SECRET");
   if (!dvUrl)        missing.push("DV_COREDATA");
-
-  if (missing.length) {
-    throw new Error("Manglende miljøvariabler: " + missing.join(", "));
-  }
+  if (missing.length) throw new Error("Manglende miljøvariabler: " + missing.join(", "));
 
   const r = await fetch(
     `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
@@ -68,20 +60,19 @@ async function getDataverseToken() {
   return j.access_token;
 }
 
-// ── Slå medarbejder op på lch_mail ────────────────────────────────────────────
 async function findEmployeeByMail(token, dvUrl, email) {
   const fields = [
-    "lch_medarbejderid",
-    "lch_mail",
-    "lch_privat_mail",
-    "lch_privat_tlf",
-    "lch_privat_Adresse",
-    "lch_privat_postby",
-    "lch_telefon_vises",
-    "lch_adresse_vises"
+    "cr1eb_lch_medarbejdereid",
+    "cr1eb_lch_mail",
+    "cr1eb_lch_privat_mail",
+    "cr1eb_lch_privat_tlf",
+    "cr1eb_lch_privat_adresse",
+    "cr1eb_lch_privat_postby",
+    "cr1eb_lch_telefon_vises",
+    "cr1eb_lch_adresse_vises"
   ].join(",");
 
-  const filter = encodeURIComponent(`lch_mail eq '${email.replace(/'/g, "''")}'`);
+  const filter = encodeURIComponent(`cr1eb_lch_mail eq '${email.replace(/'/g, "''")}'`);
   const url = `${dvUrl}/api/data/v9.2/${TABLE}?$select=${fields}&$filter=${filter}&$top=1`;
 
   const r = await fetch(url, {
@@ -108,7 +99,7 @@ async function createEmployee(token, dvUrl, email, fields) {
       "Content-Type": "application/json",
       Accept: "application/json"
     },
-    body: JSON.stringify({ lch_mail: email, ...fields })
+    body: JSON.stringify({ cr1eb_lch_mail: email, ...fields })
   });
   if (!r.ok) {
     const j = await r.json().catch(() => ({}));
@@ -134,7 +125,6 @@ async function updateEmployee(token, dvUrl, recordId, fields) {
   }
 }
 
-// ── "Ja"/"Nej" konvertering ───────────────────────────────────────────────────
 function toJaNej(boolVal) { return boolVal ? "Ja" : "Nej"; }
 function fromJaNej(val) {
   if (val === null || val === undefined || val === "") return false;
@@ -142,12 +132,9 @@ function fromJaNej(val) {
   return v === "ja" || v === "yes" || v === "true" || v === "1";
 }
 
-// ── Handler ───────────────────────────────────────────────────────────────────
 module.exports = async function (context, req) {
   const principalB64 = req.headers["x-ms-client-principal"];
-  if (!principalB64) {
-    return json(context, 401, { error: "Ikke logget ind" });
-  }
+  if (!principalB64) return json(context, 401, { error: "Ikke logget ind" });
 
   let principal;
   try {
@@ -157,16 +144,13 @@ module.exports = async function (context, req) {
   }
 
   const email = decodeURIComponent(context.bindingData.email || "").trim();
-  if (!email) {
-    return json(context, 400, { error: "Mangler email-parameter" });
-  }
+  if (!email) return json(context, 400, { error: "Mangler email-parameter" });
 
   const dvUrl = process.env.DV_COREDATA;
 
   try {
     const token = await getDataverseToken();
 
-    // ── GET: hent felter, filtreret af vises-flag ───────────────────────────
     if (req.method === "GET") {
       const emp = await findEmployeeByMail(token, dvUrl, email);
 
@@ -178,26 +162,25 @@ module.exports = async function (context, req) {
         });
       }
 
-      const telefonVises = fromJaNej(emp.lch_telefon_vises);
-      const adresseVises = fromJaNej(emp.lch_adresse_vises);
+      const telefonVises = fromJaNej(emp.cr1eb_lch_telefon_vises);
+      const adresseVises = fromJaNej(emp.cr1eb_lch_adresse_vises);
 
       return json(context, 200, {
         found: true,
-        privatMail:    emp.lch_privat_mail    || null,
-        privatTlf:     telefonVises ? (emp.lch_privat_tlf || null) : null,
-        privatAdresse: adresseVises ? (emp.lch_privat_Adresse || null) : null,
-        privatPostby:  adresseVises ? (emp.lch_privat_postby  || null) : null,
+        privatMail:    emp.cr1eb_lch_privat_mail    || null,
+        privatTlf:     telefonVises ? (emp.cr1eb_lch_privat_tlf     || null) : null,
+        privatAdresse: adresseVises ? (emp.cr1eb_lch_privat_adresse || null) : null,
+        privatPostby:  adresseVises ? (emp.cr1eb_lch_privat_postby  || null) : null,
         telefonVises,
         adresseVises
       });
     }
 
-    // ── PATCH: opdater eller opret — kun portal_admin eller "mig selv" ────────
     if (req.method === "PATCH") {
-      const roles    = getRolesFromPrincipal(principal);
-      const isAdmin  = roles.includes("portal_admin");
-      const myEmail  = getEmailFromPrincipal(principal);
-      const isSelf   = myEmail && myEmail === email.toLowerCase();
+      const roles   = getRolesFromPrincipal(principal);
+      const isAdmin = roles.includes("portal_admin");
+      const myEmail = getEmailFromPrincipal(principal);
+      const isSelf  = myEmail && myEmail === email.toLowerCase();
 
       if (!isAdmin && !isSelf) {
         return json(context, 403, { error: "Du kan kun redigere dine egne oplysninger" });
@@ -205,17 +188,17 @@ module.exports = async function (context, req) {
 
       const body = req.body || {};
       const fields = {
-        lch_privat_mail:    body.privatMail    ?? "",
-        lch_privat_tlf:     body.privatTlf     ?? "",
-        lch_privat_Adresse: body.privatAdresse ?? "",
-        lch_privat_postby:  body.privatPostby  ?? "",
-        lch_telefon_vises:  toJaNej(!!body.telefonVises),
-        lch_adresse_vises:  toJaNej(!!body.adresseVises)
+        cr1eb_lch_privat_mail:    body.privatMail    ?? "",
+        cr1eb_lch_privat_tlf:     body.privatTlf     ?? "",
+        cr1eb_lch_privat_adresse: body.privatAdresse ?? "",
+        cr1eb_lch_privat_postby:  body.privatPostby  ?? "",
+        cr1eb_lch_telefon_vises:  toJaNej(!!body.telefonVises),
+        cr1eb_lch_adresse_vises:  toJaNej(!!body.adresseVises)
       };
 
       const existing = await findEmployeeByMail(token, dvUrl, email);
       if (existing) {
-        await updateEmployee(token, dvUrl, existing.lch_medarbejderid, fields);
+        await updateEmployee(token, dvUrl, existing.cr1eb_lch_medarbejdereid, fields);
       } else {
         await createEmployee(token, dvUrl, email, fields);
       }
