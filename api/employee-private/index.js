@@ -1,5 +1,5 @@
 // api/employee-private/index.js
-// Slår en bruger op i Dataverse-tabellen lch_medarbejdere (i miljøet DV_COREDATA)
+// Slår en bruger op i Dataverse-tabellen lch_medarbejdere (i miljøet DATAVERSE_DATACORE_URL)
 // via lch_mail = mail/UPN.
 //
 // GET   /api/employee-private/{email}  → henter felter, filtreret af vises-flag
@@ -9,7 +9,7 @@
 // Default når en post oprettes/ikke findes: telefonVises og adresseVises = false (Nej),
 // indtil medarbejderen selv (eller en admin) aktivt slår dem til.
 //
-// Miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_COREDATA
+// Miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DATAVERSE_DATACORE_URL
 
 const fetch = globalThis.fetch;
 
@@ -30,7 +30,6 @@ function getRolesFromPrincipal(principal) {
 }
 
 function getEmailFromPrincipal(principal) {
-  // userDetails er typisk UPN/mail ved Entra ID-login
   return (principal.userDetails || "").toLowerCase();
 }
 
@@ -39,13 +38,13 @@ async function getDataverseToken() {
   const tenant       = process.env.DV_TENANT_ID;
   const clientId     = process.env.DV_CLIENT_ID;
   const clientSecret = process.env.DV_CLIENT_SECRET;
-  const dvUrl         = process.env.DV_COREDATA;
+  const dvUrl        = process.env.DATAVERSE_DATACORE_URL;
 
   const missing = [];
   if (!tenant)       missing.push("DV_TENANT_ID");
   if (!clientId)     missing.push("DV_CLIENT_ID");
   if (!clientSecret) missing.push("DV_CLIENT_SECRET");
-  if (!dvUrl)         missing.push("DV_COREDATA");
+  if (!dvUrl)        missing.push("DATAVERSE_DATACORE_URL");
 
   if (missing.length) {
     throw new Error("Manglende miljøvariabler: " + missing.join(", "));
@@ -138,7 +137,6 @@ async function updateEmployee(token, dvUrl, recordId, fields) {
 // ── "Ja"/"Nej" konvertering ───────────────────────────────────────────────────
 function toJaNej(boolVal) { return boolVal ? "Ja" : "Nej"; }
 function fromJaNej(val) {
-  // Ingen værdi i Dataverse = behandles som "Nej" (skjult), jf. ønsket default.
   if (val === null || val === undefined || val === "") return false;
   const v = String(val).trim().toLowerCase();
   return v === "ja" || v === "yes" || v === "true" || v === "1";
@@ -163,7 +161,7 @@ module.exports = async function (context, req) {
     return json(context, 400, { error: "Mangler email-parameter" });
   }
 
-  const dvUrl = process.env.DV_COREDATA;
+  const dvUrl = process.env.DATAVERSE_DATACORE_URL;
 
   try {
     const token = await getDataverseToken();
@@ -192,11 +190,6 @@ module.exports = async function (context, req) {
         telefonVises,
         adresseVises
       });
-    }
-
-    // ── GET-RAW (intern brug): hent ufiltreret til redigeringsformular ───────
-    if (req.method === "GET" && req.query && req.query.raw === "1") {
-      // (dækket af blokken ovenfor — bevidst ikke separat gren, se note i frontend)
     }
 
     // ── PATCH: opdater eller opret — kun portal_admin eller "mig selv" ────────
