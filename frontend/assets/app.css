@@ -231,3 +231,19 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 .adminPage .navbar-inner{
     max-width:1800px;
 }
+
+/* Afdelingsoversigt: markér chef/leder */
+.dept-card.leader {
+  border: 2px solid #c30a14;
+  background: #fff7f7;
+  box-shadow: 0 4px 14px rgba(195,10,20,.14);
+}
+
+.dept-card.leader:hover {
+  border-color: #850c18;
+  box-shadow: 0 6px 18px rgba(195,10,20,.22);
+}
+
+.dept-card.leader .dept-card-name {
+  color: #850c18;
+}
