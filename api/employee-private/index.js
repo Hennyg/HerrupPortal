@@ -13,7 +13,7 @@
 
 const fetch = globalThis.fetch;
 
-const TABLE = "lch_medarbejdere";
+const TABLE = "cr1eb_lch_medarbejderes";
 
 function json(context, status, body) {
   context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
