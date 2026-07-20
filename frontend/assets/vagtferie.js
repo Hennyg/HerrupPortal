@@ -65,20 +65,44 @@
   function upcomingFor(employee, today, limit){ return (employee?.days || []).filter(d => d.date >= today).slice(0, limit); }
   function currentFor(employee, today){ return (employee?.days || []).find(d => d.date === today) || null; }
 
-  function renderMonthDays(days, year, month){
+function renderMonthDays(days, year, month){
     const first = new Date(year, month - 1, 1);
     const last = new Date(year, month, 0);
-    const pad = (first.getDay() + 6) % 7;
-    const byDate = new Map((days || []).map(d => [d.date, d]));
+
+    const mondayIndex = (first.getDay() + 6) % 7;
+
+    const byDate = new Map(
+        (days || []).map(d => [d.date, d])
+    );
+
     let html = "";
-    for (let i = 0; i < pad; i++) html += `<div class="vf-mini-day is-empty"></div>`;
-    for (let day = 1; day <= last.getDate(); day++) {
-      const iso = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-      const x = byDate.get(iso);
-      html += `<div class="vf-mini-day"><div class="vf-mini-number">${day}</div>${x ? badge(x.code, x.text) : ""}</div>`;
+
+    for (let i = 0; i < mondayIndex; i++) {
+        html += `<div class="vf-mini-day is-empty"></div>`;
     }
+
+    for (let day = 1; day <= last.getDate(); day++) {
+
+        const iso =
+            `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+
+        const item = byDate.get(iso);
+
+        const dateObj = new Date(iso + "T00:00:00");
+        const isWeekend =
+            dateObj.getDay() === 0 ||
+            dateObj.getDay() === 6;
+
+        html += `
+            <div class="vf-mini-day ${isWeekend ? 'vf-weekend' : ''}">
+                <div class="vf-mini-number">${day}</div>
+                ${item ? badge(item.code, item.text) : ''}
+            </div>
+        `;
+    }
+
     return html;
-  }
+}
 
   function renderEmployeeButtons(data, state, selectedName){
     const rows = filteredEmployees(data, state);
