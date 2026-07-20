@@ -93,12 +93,18 @@ function renderMonthDays(days, year, month){
             dateObj.getDay() === 0 ||
             dateObj.getDay() === 6;
 
-        html += `
-            <div class="vf-mini-day ${isWeekend ? 'vf-weekend' : ''}">
-                <div class="vf-mini-number">${day}</div>
-                ${item ? badge(item.code, item.text) : ''}
-            </div>
-        `;
+const dateObj = new Date(`${iso}T00:00:00`);
+
+const isWeekend =
+    dateObj.getDay() === 0 ||
+    dateObj.getDay() === 6;
+
+html += `
+    <div class="vf-mini-day ${isWeekend ? 'vf-weekend' : ''}">
+        <div class="vf-mini-number">${day}</div>
+        ${x ? badge(x.code, x.text) : ""}
+    </div>
+`;
     }
 
     return html;
