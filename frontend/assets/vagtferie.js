@@ -1,6 +1,7 @@
 (function(){
   const MONTHS = ["Januar","Februar","Marts","April","Maj","Juni","Juli","August","September","Oktober","November","December"];
   const DAYS = ["Søn","Man","Tir","Ons","Tor","Fre","Lør"];
+  const WEEK_DAYS = ["Man","Tir","Ons","Tor","Fre","Lør","Søn"];
   const yearCache = new Map();
 
   function esc(s){
@@ -21,9 +22,37 @@
     return new URLSearchParams(location.search).get(name) || "";
   }
 
-  function todayIso(){
-    const d = new Date();
+  function dateToIso(d){
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+
+  function todayIso(){
+    return dateToIso(new Date());
+  }
+
+  function parseIso(iso){
+    return new Date(`${iso}T00:00:00`);
+  }
+
+  function addDays(d, days){
+    const x = new Date(d);
+    x.setDate(x.getDate() + days);
+    return x;
+  }
+
+  function mondayOf(d){
+    const x = new Date(d);
+    const day = x.getDay() || 7;
+    x.setDate(x.getDate() - day + 1);
+    return x;
+  }
+
+  function weekNumber(date){
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
   function codeClass(code){
@@ -43,12 +72,16 @@
   }
 
   function fmtDate(iso){
-    const d = new Date(`${iso}T00:00:00`);
+    const d = parseIso(iso);
     return `${String(d.getDate()).padStart(2,"0")} ${MONTHS[d.getMonth()].slice(0,3)}`;
   }
 
+  function fmtShortDate(d){
+    return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+  }
+
   function dayName(iso){
-    return DAYS[new Date(`${iso}T00:00:00`).getDay()];
+    return DAYS[parseIso(iso).getDay()];
   }
 
   function apiUrl(state, refresh){
@@ -67,11 +100,8 @@
     const txt = await r.text();
     let data = null;
 
-    try {
-      data = txt ? JSON.parse(txt) : null;
-    } catch {
-      data = { raw: txt };
-    }
+    try { data = txt ? JSON.parse(txt) : null; }
+    catch { data = { raw: txt }; }
 
     if (!r.ok) throw new Error(data?.message || data?.error || `API fejl ${r.status}`);
 
@@ -109,9 +139,7 @@
     const counts = new Map();
 
     for (const d of days || []) {
-      if (Number(d.year) === Number(year)) {
-        counts.set(d.code, (counts.get(d.code) || 0) + 1);
-      }
+      if (Number(d.year) === Number(year)) counts.set(d.code, (counts.get(d.code) || 0) + 1);
     }
 
     return Array.from(counts.entries())
@@ -138,14 +166,12 @@
     const byDate = new Map((days || []).map(d => [d.date, d]));
     let html = "";
 
-    for (let i = 0; i < mondayIndex; i++) {
-      html += `<div class="vf-mini-day is-empty"></div>`;
-    }
+    for (let i = 0; i < mondayIndex; i++) html += `<div class="vf-mini-day is-empty"></div>`;
 
     for (let day = 1; day <= last.getDate(); day++) {
       const iso = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
       const item = byDate.get(iso);
-      const dateObj = new Date(`${iso}T00:00:00`);
+      const dateObj = parseIso(iso);
       const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
 
       html += `
@@ -157,6 +183,69 @@
     }
 
     return html;
+  }
+
+  function employeeDayMap(employee){
+    return new Map((employee?.days || []).map(d => [d.date, d]));
+  }
+
+  function renderDepartmentWeek(data, state){
+    const rows = filteredEmployees(data, state);
+    const monday = parseIso(state.weekStart || todayIso());
+    const weekStart = mondayOf(monday);
+    const weekDays = Array.from({length:7}, (_,i)=>addDays(weekStart, i));
+    const weekNo = weekNumber(weekStart);
+    const shownSection = state.section || "Alle afdelinger";
+    const shownArea = state.area || "Alle områder";
+
+    return `
+      <section class="vf-dept-view">
+        <div class="vf-dept-head">
+          <div>
+            <h3 class="vf-section-title">Afdelingsoversigt · uge ${weekNo}</h3>
+            <div class="vf-muted">${esc(shownSection)} · ${esc(shownArea)} · ${rows.length} medarbejdere</div>
+          </div>
+          <div class="vf-week-controls">
+            <button class="btn" id="vfPrevWeek" type="button">Forrige uge</button>
+            <button class="btn" id="vfThisWeek" type="button">Denne uge</button>
+            <button class="btn" id="vfNextWeek" type="button">Næste uge</button>
+          </div>
+        </div>
+
+        <div class="vf-dept-table-wrap">
+          <table class="vf-dept-table">
+            <thead>
+              <tr>
+                <th>Medarbejder</th>
+                ${weekDays.map(d => {
+                  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                  return `<th class="${isWeekend ? "vf-weekend-col" : ""}">${WEEK_DAYS[(d.getDay()+6)%7]}<br><span>${fmtShortDate(d)}</span></th>`;
+                }).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(emp => {
+                const byDate = employeeDayMap(emp);
+                return `
+                  <tr>
+                    <td class="vf-dept-name">
+                      <button class="vf-link-btn" type="button" data-vf-employee="${esc(emp.name)}">${esc(emp.name)}</button>
+                      <div class="vf-muted">${esc(emp.area)}</div>
+                    </td>
+                    ${weekDays.map(d => {
+                      const iso = dateToIso(d);
+                      const item = byDate.get(iso);
+                      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                      return `<td class="vf-dept-cell ${isWeekend ? "vf-weekend" : ""}">${item ? badge(item.code, item.text) : ""}</td>`;
+                    }).join("")}
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    `;
   }
 
   function renderEmployeeButtons(data, state, selectedName){
@@ -171,24 +260,75 @@
     `).join("");
   }
 
-  function render(data, state){
-    const employee = findEmployee(data, state);
-    if (!employee) return `<div class="vf-error">Ingen medarbejdere fundet i arket.</div>`;
-
-    state.employee = employee.name;
-
+  function renderPersonView(data, state, employee){
     const today = data.today || todayIso();
     const current = currentFor(employee, today);
     const upcoming = upcomingFor(employee, today, 14);
     const monthDays = monthDaysFor(employee, state.year, state.month);
     const summary = summarize(employee.days || [], state.year, data.legend || {});
+
+    return `
+      <div class="vf-status-card">
+        <div class="vf-label">Nuværende status</div>
+        <div class="vf-current">
+          ${current ? `${badge(current.code, current.text)} <span>${esc(current.text)}</span>` : `<span class="vf-muted">Ingen markering i dag</span>`}
+        </div>
+      </div>
+
+      <div class="vf-grid-2">
+        <section>
+          <h3 class="vf-section-title">Kommende 14 markeringer</h3>
+          <div class="vf-upcoming">
+            ${upcoming.length ? upcoming.map(x => `
+              <div class="vf-row">
+                <div>
+                  <div class="vf-date">${fmtDate(x.date)}</div>
+                  <div class="vf-day">${dayName(x.date)}</div>
+                </div>
+                <div>${esc(x.text)}</div>
+                <div>${badge(x.code, x.text)}</div>
+              </div>
+            `).join("") : `<div class="vf-muted">Ingen kommende markeringer</div>`}
+          </div>
+        </section>
+
+        <section>
+          <h3 class="vf-section-title">Opsummering ${esc(state.year)}</h3>
+          <div class="vf-summary">
+            ${summary.length ? summary.map(x => `
+              <div class="vf-summary-item">${badge(x.code, x.text)} <span>${esc(x.text)}: <b>${x.count}</b></span></div>
+            `).join("") : `<div class="vf-muted">Ingen data</div>`}
+          </div>
+
+          <h3 class="vf-section-title" style="margin-top:18px;">${MONTHS[state.month-1]} ${state.year}</h3>
+          <div class="vf-mini-month">
+            ${WEEK_DAYS.map(d => `<div class="vf-muted" style="text-align:center;font-weight:700;">${d}</div>`).join("")}
+            ${renderMonthDays(monthDays, state.year, state.month)}
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
+  function render(data, state){
+    const employee = findEmployee(data, state);
+    if (!employee) return `<div class="vf-error">Ingen medarbejdere fundet i arket.</div>`;
+
+    if (!state.employee) state.employee = employee.name;
+
     const sections = groupSections(data.employees);
     const areas = groupAreas(data.employees);
     const cacheText = data.cache?.hit ? "server-cache" : "ny læsning";
+    const isDept = state.view === "department";
 
     return `
-      <div class="vf-shell">
+      <div class="vf-shell ${isDept ? "vf-shell-dept" : ""}">
         <aside class="vf-side">
+          <div class="vf-toolbar vf-view-toggle">
+            <button class="btn ${!isDept ? "primary" : ""}" id="vfPersonView" type="button">Person</button>
+            <button class="btn ${isDept ? "primary" : ""}" id="vfDeptView" type="button">Afdeling</button>
+          </div>
+
           <div class="vf-toolbar">
             <select id="vfSection">
               <option value="">Alle afdelinger</option>
@@ -213,9 +353,9 @@
         <main class="vf-main">
           <div class="vf-head">
             <div>
-              <h2 class="vf-title">${esc(employee.name)}</h2>
+              <h2 class="vf-title">${isDept ? "Afdelingsoversigt" : esc(employee.name)}</h2>
               <div class="vf-muted">
-                ${esc(employee.area)}${employee.section && employee.section !== employee.area ? ` · ${esc(employee.section)}` : ""} · Ark: ${esc(data.source?.sheetName || state.year)} · ${esc(data.source?.fileName || "Excel")}
+                ${isDept ? "Ugevis visning for valgt afdeling/område" : `${esc(employee.area)}${employee.section && employee.section !== employee.area ? ` · ${esc(employee.section)}` : ""}`} · Ark: ${esc(data.source?.sheetName || state.year)} · ${esc(data.source?.fileName || "Excel")}
               </div>
             </div>
 
@@ -232,45 +372,7 @@
             </div>
           </div>
 
-          <div class="vf-status-card">
-            <div class="vf-label">Nuværende status</div>
-            <div class="vf-current">
-              ${current ? `${badge(current.code, current.text)} <span>${esc(current.text)}</span>` : `<span class="vf-muted">Ingen markering i dag</span>`}
-            </div>
-          </div>
-
-          <div class="vf-grid-2">
-            <section>
-              <h3 class="vf-section-title">Kommende 14 markeringer</h3>
-              <div class="vf-upcoming">
-                ${upcoming.length ? upcoming.map(x => `
-                  <div class="vf-row">
-                    <div>
-                      <div class="vf-date">${fmtDate(x.date)}</div>
-                      <div class="vf-day">${dayName(x.date)}</div>
-                    </div>
-                    <div>${esc(x.text)}</div>
-                    <div>${badge(x.code, x.text)}</div>
-                  </div>
-                `).join("") : `<div class="vf-muted">Ingen kommende markeringer</div>`}
-              </div>
-            </section>
-
-            <section>
-              <h3 class="vf-section-title">Opsummering ${esc(state.year)}</h3>
-              <div class="vf-summary">
-                ${summary.length ? summary.map(x => `
-                  <div class="vf-summary-item">${badge(x.code, x.text)} <span>${esc(x.text)}: <b>${x.count}</b></span></div>
-                `).join("") : `<div class="vf-muted">Ingen data</div>`}
-              </div>
-
-              <h3 class="vf-section-title" style="margin-top:18px;">${MONTHS[state.month-1]} ${state.year}</h3>
-              <div class="vf-mini-month">
-                ${["Man","Tir","Ons","Tor","Fre","Lør","Søn"].map(d => `<div class="vf-muted" style="text-align:center;font-weight:700;">${d}</div>`).join("")}
-                ${renderMonthDays(monthDays, state.year, state.month)}
-              </div>
-            </section>
-          </div>
+          ${isDept ? renderDepartmentWeek(data, state) : renderPersonView(data, state, employee)}
 
           <div class="vf-legend">
             ${Object.entries(data.legend || {}).map(([c,t]) => `
@@ -291,24 +393,39 @@
     container.querySelectorAll("[data-vf-employee]").forEach(btn => {
       btn.addEventListener("click", () => {
         state.employee = btn.getAttribute("data-vf-employee") || "";
+        state.view = "person";
         rerender();
       });
+    });
+
+    container.querySelector("#vfPersonView")?.addEventListener("click", () => {
+      state.view = "person";
+      rerender();
+    });
+
+    container.querySelector("#vfDeptView")?.addEventListener("click", () => {
+      state.view = "department";
+      rerender();
     });
 
     container.querySelector("#vfSection")?.addEventListener("change", e => {
       state.section = e.target.value;
       state.employee = "";
+      if (state.section) state.view = "department";
       rerender();
     });
 
     container.querySelector("#vfArea")?.addEventListener("change", e => {
       state.area = e.target.value;
       state.employee = "";
+      if (state.area) state.view = "department";
       rerender();
     });
 
     container.querySelector("#vfMonth")?.addEventListener("change", e => {
       state.month = Number(e.target.value);
+      const target = new Date(state.year, state.month - 1, 1);
+      state.weekStart = dateToIso(mondayOf(target));
       rerender();
     });
 
@@ -318,6 +435,7 @@
       state.employee = "";
       state.section = "";
       state.area = "";
+      state.weekStart = dateToIso(mondayOf(new Date(state.year, state.month - 1, 1)));
       refreshFn(false);
     });
 
@@ -327,22 +445,44 @@
       state.search = e.target.value || "";
       rerender();
     });
+
+    container.querySelector("#vfPrevWeek")?.addEventListener("click", () => {
+      state.weekStart = dateToIso(addDays(parseIso(state.weekStart), -7));
+      rerender();
+    });
+
+    container.querySelector("#vfThisWeek")?.addEventListener("click", () => {
+      state.weekStart = dateToIso(mondayOf(new Date()));
+      state.month = parseIso(state.weekStart).getMonth() + 1;
+      rerender();
+    });
+
+    container.querySelector("#vfNextWeek")?.addEventListener("click", () => {
+      state.weekStart = dateToIso(addDays(parseIso(state.weekStart), 7));
+      rerender();
+    });
   }
 
   async function start(container, options){
     const now = new Date();
+    const initialYear = Number(options.year || qs("year") || now.getFullYear());
+    const initialMonth = Number(options.month || qs("month") || now.getMonth() + 1);
+
     const state = {
-      year: Number(options.year || qs("year") || now.getFullYear()),
-      month: Number(options.month || qs("month") || now.getMonth() + 1),
+      year: initialYear,
+      month: initialMonth,
       employee: String(options.employee || qs("employee") || ""),
       sheet: String(options.sheet || qs("sheet") || ""),
-      section: String(options.section || ""),
-      area: String(options.area || ""),
+      section: String(options.section || qs("section") || ""),
+      area: String(options.area || qs("area") || ""),
+      view: String(options.view || qs("view") || "person"),
+      weekStart: dateToIso(mondayOf(new Date(initialYear, initialMonth - 1, now.getDate()))),
       search: ""
     };
 
     async function refresh(force){
       container.innerHTML = `<div class="vf-loading">Henter hele årsarket...</div>`;
+
       try {
         const data = await loadYear(state, force);
         container.innerHTML = render(data, state);
