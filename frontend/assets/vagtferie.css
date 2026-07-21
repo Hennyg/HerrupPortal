@@ -1,1 +1,98 @@
-.vf-badge{display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:4px 9px;border-radius:999px;color:#fff;font-size:12px;font-weight:700;line-height:1.2;white-space:nowrap}.vf-code-T{background:#2563eb}.vf-code-N{background:#dc2626}.vf-code-W{background:#f59e0b;color:#111827}.vf-code-F{background:#16a34a}.vf-code-FF{background:#047857}.vf-code-A{background:#7c3aed}.vf-code-S{background:#991b1b}.vf-code-SB{background:#ec4899}.vf-code-K{background:#0891b2}.vf-code-B{background:#6b7280}.vf-code-H{background:#475569}.vf-code-L{background:#334155}.vf-code-O{background:#0f766e}.vf-code-M{background:#9333ea}.vf-code-other{background:#64748b}.vf-muted{color:#6b7280;font-size:.9rem}.vf-label{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.vf-current{display:flex;align-items:center;gap:8px;font-size:1.25rem;font-weight:700}.vf-summary{display:flex;flex-wrap:wrap;gap:8px}.vf-summary-item{display:flex;align-items:center;gap:7px;border:1px solid #e5e7eb;border-radius:999px;padding:6px 10px;background:#fff}.vf-weekend{background:#f8fafc}.vf-error{border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:10px;padding:12px}.vf-loading{color:#6b7280;padding:18px 0}
+/* assets/vagtferie.css
+   Fælles farver og badges til Vagt/Ferie.
+   Bevidst ikke minified, så filen er let at læse i GitHub og VS Code.
+*/
+
+.vf-muted {
+    color: #6b7280;
+    font-size: .9rem;
+}
+
+.vf-label {
+    font-size: 12px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 4px;
+}
+
+.vf-current {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.vf-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.herrup-vf-daycell .vf-badge,
+.herrup-vf-table .vf-badge {
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 9px;
+    margin: auto;
+}
+
+.vf-code-T  { background: #2563eb; }
+.vf-code-N  { background: #dc2626; }
+.vf-code-W  { background: #f59e0b; color: #111827; }
+.vf-code-F  { background: #16a34a; }
+.vf-code-FF { background: #047857; }
+.vf-code-A  { background: #7c3aed; }
+.vf-code-S  { background: #991b1b; }
+.vf-code-SB { background: #ec4899; }
+.vf-code-K  { background: #0891b2; }
+.vf-code-B  { background: #6b7280; }
+.vf-code-H  { background: #475569; }
+.vf-code-L  { background: #334155; }
+.vf-code-O  { background: #0f766e; }
+.vf-code-M  { background: #9333ea; }
+.vf-code-other { background: #64748b; }
+
+.vf-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.vf-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 6px 10px;
+    background: #fff;
+}
+
+.vf-weekend {
+    background: #f8fafc;
+}
+
+.vf-error {
+    border: 1px solid #fecaca;
+    background: #fff1f2;
+    color: #991b1b;
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.vf-loading {
+    color: #6b7280;
+    padding: 18px 0;
+}
