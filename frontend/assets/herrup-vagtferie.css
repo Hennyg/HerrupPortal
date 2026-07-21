@@ -341,3 +341,17 @@
 .modal-current-status .vf-badge{
     margin-right:6px;
 }
+
+#mCurrentStatusCard{
+    min-width:220px;
+    max-width:260px;
+}
+
+#mCurrentStatusCard .herrup-vf-card{
+    margin:0;
+    padding:12px;
+}
+
+#mCurrentStatusCard .vf-current{
+    font-size:1.1rem;
+}
