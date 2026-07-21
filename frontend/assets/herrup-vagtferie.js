@@ -410,11 +410,17 @@
         const upcomingDays = upcoming(employee);
         const current = (employee.days || []).find(day => day.date === todayIso());
 
+        const headerStatus =
+    document.getElementById("mCurrentStatusCard");
+
+if (headerStatus) {
+    headerStatus.innerHTML =
+        renderStatusCard(current);
+}
+
         return `
             <div class="herrup-vf-title">${esc(employee.name)}</div>
             <div class="herrup-vf-sub">${esc(employee.area || selectedBadgeDepartment() || "")} · ${esc(selectedJobTitle())}</div>
-
-            ${renderStatusCard(current)}
 
             <div class="herrup-vf-grid2">
                 <section class="herrup-vf-card">
@@ -457,8 +463,6 @@
         return `
             <div class="herrup-vf-title">${esc(employee.name)}</div>
             <div class="herrup-vf-sub">${esc(employee.area || selectedBadgeDepartment() || "")} · ${esc(selectedJobTitle())}</div>
-
-            ${renderStatusCard(current)}
 
             <div class="herrup-vf-dept-head">
                 <div>
