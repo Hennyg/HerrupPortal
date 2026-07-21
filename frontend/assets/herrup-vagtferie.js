@@ -709,3 +709,5 @@ if (headerStatus) {
         });
     });
 })();
+window.updateHeaderStatus =
+    updateHeaderStatus;
