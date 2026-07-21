@@ -136,9 +136,13 @@
     margin-bottom: 12px;
 }
 
+.herrup-vf-status-top {
+    margin-bottom: 14px;
+}
+
 .herrup-vf-grid2 {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(260px, .9fr);
+    grid-template-columns: 1fr 1fr;
     gap: 14px;
 }
 
@@ -217,6 +221,10 @@
 
 .herrup-vf-daycell.weekend .herrup-vf-daynr {
     color: #c30a14;
+}
+
+.herrup-vf-summary-under-calendar {
+    margin-top: 14px;
 }
 
 .herrup-vf-dept-head {

@@ -338,6 +338,17 @@
         });
     }
 
+    function renderStatusCard(current) {
+        return `
+            <div class="herrup-vf-card herrup-vf-status herrup-vf-status-top">
+                <div class="vf-label">Nuværende status</div>
+                <div class="vf-current">
+                    ${current ? `${badge(current.code, current.text)} <span>${esc(current.text)}</span>` : `<span class="vf-muted">Ingen markering i dag</span>`}
+                </div>
+            </div>
+        `;
+    }
+
     function renderMiniMonth(employee) {
         const days = monthDays(employee, panelState.year, panelState.month);
         const byDate = new Map(days.map(day => [day.date, day]));
@@ -373,28 +384,40 @@
         return html;
     }
 
+    function renderSummary(data, employee) {
+        const summaryRows = summary(employee, panelState.year);
+
+        return `
+            <div class="herrup-vf-card herrup-vf-summary-under-calendar">
+                <h3 class="herrup-vf-section-title">Opsummering ${panelState.year}</h3>
+                <div class="vf-summary">
+                    ${summaryRows.length ? summaryRows.map(row => `
+                        <div class="vf-summary-item">
+                            ${badge(row.code, row.code)}
+                            <span>${esc((data.legend || {})[row.code] || row.code)}: <b>${row.count}</b></span>
+                        </div>
+                    `).join("") : `<div class="vf-muted">Ingen data</div>`}
+                </div>
+            </div>
+        `;
+    }
+
     function renderPerson(data, employee) {
         if (!employee) {
             return `<div class="herrup-vf-empty">Ingen vagt-/feriedata fundet for ${esc(selectedName())}.</div>`;
         }
 
         const upcomingDays = upcoming(employee);
-        const summaryRows = summary(employee, panelState.year);
         const current = (employee.days || []).find(day => day.date === todayIso());
 
         return `
             <div class="herrup-vf-title">${esc(employee.name)}</div>
             <div class="herrup-vf-sub">${esc(employee.area || selectedBadgeDepartment() || "")} · ${esc(selectedJobTitle())}</div>
 
+            ${renderStatusCard(current)}
+
             <div class="herrup-vf-grid2">
                 <section class="herrup-vf-card">
-                    <div class="herrup-vf-card herrup-vf-status" style="margin-bottom:12px">
-                        <div class="vf-label">Nuværende status</div>
-                        <div class="vf-current">
-                            ${current ? `${badge(current.code, current.text)} <span>${esc(current.text)}</span>` : `<span class="vf-muted">Ingen markering i dag</span>`}
-                        </div>
-                    </div>
-
                     <h3 class="herrup-vf-section-title">Kommende 14 markeringer</h3>
                     <div class="herrup-vf-upcoming">
                         ${upcomingDays.length ? upcomingDays.map(day => `
@@ -411,18 +434,9 @@
                 </section>
 
                 <section class="herrup-vf-card">
-                    <h3 class="herrup-vf-section-title">Opsummering ${panelState.year}</h3>
-                    <div class="vf-summary">
-                        ${summaryRows.length ? summaryRows.map(row => `
-                            <div class="vf-summary-item">
-                                ${badge(row.code, row.code)}
-                                <span>${esc((data.legend || {})[row.code] || row.code)}: <b>${row.count}</b></span>
-                            </div>
-                        `).join("") : `<div class="vf-muted">Ingen data</div>`}
-                    </div>
-
-                    <h3 class="herrup-vf-section-title" style="margin-top:18px">${MONTHS[panelState.month - 1]} ${panelState.year}</h3>
+                    <h3 class="herrup-vf-section-title">${MONTHS[panelState.month - 1]} ${panelState.year}</h3>
                     ${renderMiniMonth(employee)}
+                    ${renderSummary(data, employee)}
                 </section>
             </div>
         `;
@@ -433,6 +447,7 @@
             return `<div class="herrup-vf-empty">Ingen afdeling fundet.</div>`;
         }
 
+        const current = (employee.days || []).find(day => day.date === todayIso());
         const area = employee.area || selectedBadgeDepartment();
         const rows = (data.employees || []).filter(row => (row.area || "") === area);
         const start = mondayOf(parseIso(panelState.weekStart || todayIso()));
@@ -440,6 +455,11 @@
         const weekNo = weekNumber(start);
 
         return `
+            <div class="herrup-vf-title">${esc(employee.name)}</div>
+            <div class="herrup-vf-sub">${esc(employee.area || selectedBadgeDepartment() || "")} · ${esc(selectedJobTitle())}</div>
+
+            ${renderStatusCard(current)}
+
             <div class="herrup-vf-dept-head">
                 <div>
                     <div class="herrup-vf-title">${esc(area || "Afdeling")}</div>
@@ -486,6 +506,8 @@
                     </tbody>
                 </table>
             </div>
+
+            ${renderSummary(data, employee)}
         `;
     }
 
