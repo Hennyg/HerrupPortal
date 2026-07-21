@@ -1,6 +1,6 @@
 /* assets/herrup-vagtferie.css
    Vagt/Ferie-fane i herrup.html.
-   Bevidst ikke minified, så filen er let at læse og ændre.
+   Ikke minified, så filen er let at læse og ændre.
 */
 
 .herrup-load-card {
@@ -221,6 +221,16 @@
 
 .herrup-vf-daycell.weekend .herrup-vf-daynr {
     color: #c30a14;
+}
+
+/* Små badges inde i kalenderfelter, så markeringen ikke fylder mere end dato-feltet. */
+.herrup-vf-daycell .vf-badge,
+.herrup-vf-table .vf-badge {
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 9px;
+    margin: auto;
 }
 
 .herrup-vf-summary-under-calendar {

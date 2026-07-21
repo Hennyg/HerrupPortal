@@ -1,6 +1,7 @@
 // assets/herrup-vagtferie.js
 // Vagt/Ferie-fane i herrup.html.
-// Bevidst ikke minified, så filen er let at læse og fejlfinde.
+// Status vises øverst, og opsummering vises under kalenderen.
+// Ikke minified.
 
 (function () {
     const CURRENT_YEAR = new Date().getFullYear();
@@ -222,7 +223,6 @@
 
     function waitForVisibleImages() {
         startFakeProgress("images");
-
         const images = Array.from(document.images || []);
 
         if (!images.length) {
