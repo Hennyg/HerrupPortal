@@ -615,6 +615,36 @@ if (headerStatus) {
         });
     }
 
+    async function updateHeaderStatus() {
+    try {
+        const data = window.__vagtFerieData || await preloadVagtFerie();
+
+        const employee = findEmployee(
+            data,
+            selectedName()
+        );
+
+        const current =
+            (employee?.days || [])
+            .find(day => day.date === todayIso());
+
+        const statusCard =
+            document.getElementById("mCurrentStatusCard");
+
+        if (!statusCard) return;
+
+        statusCard.innerHTML =
+            renderStatusCard(current)
+                .replace(
+                    "Nuværende status",
+                    "Dagens status"
+                );
+
+    } catch (err) {
+        console.warn(err);
+    }
+}
+
     function addModalTab() {
         const tabs = document.querySelector(".modal-tabs");
         const body = document.querySelector(".modal-body");
