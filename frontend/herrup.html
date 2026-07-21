@@ -541,6 +541,12 @@ myEmail = (me?.userDetails || "").toLowerCase();
       switchModalTab("arbejde");
       loadPrivateTab(u);
 
+      
+if (window.updateHeaderStatus) {
+    window.updateHeaderStatus();
+}
+
+
       document.getElementById("modalBackdrop").classList.add("open");
       document.body.style.overflow = "hidden";
     }
