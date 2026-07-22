@@ -33,6 +33,28 @@
     min-width: 130px;
 }
 
+.vf-view-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.vf-toggle-btn {
+    flex: 1;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: .55rem .75rem;
+    background: #fff;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.vf-toggle-btn.active {
+    background: #c30a14;
+    color: #fff;
+    border-color: #c30a14;
+}
+
 .vf-employee-list {
     display: flex;
     flex-direction: column;
@@ -235,7 +257,8 @@
     color: #374151;
 }
 
-.vf-mini-day .vf-badge {
+.vf-mini-day .vf-badge,
+.vf-table .vf-badge {
     min-width: 16px;
     height: 16px;
     padding: 0 4px;
@@ -261,6 +284,88 @@
 .vf-loading {
     color: #6b7280;
     padding: 18px 0;
+}
+
+.vf-dept-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.vf-week-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.vf-table-wrap {
+    width: 100%;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+}
+
+.vf-table {
+    width: 100%;
+    min-width: 940px;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+}
+
+.vf-table th,
+.vf-table td {
+    border-bottom: 1px solid #e5e7eb;
+    border-right: 1px solid #f1f5f9;
+    padding: 8px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.vf-table th:first-child,
+.vf-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #fff;
+    text-align: left;
+    min-width: 220px;
+}
+
+.vf-table th {
+    background: #f8fafc;
+    color: #111827;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.vf-table th span {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.vf-weekend-col {
+    background: #f1f5f9 !important;
+    color: #c30a14 !important;
+}
+
+.vf-link-btn {
+    border: 0;
+    background: transparent;
+    color: #111827;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+    text-align: left;
+}
+
+.vf-link-btn:hover {
+    color: #c30a14;
+    text-decoration: underline;
 }
 
 @media (max-width: 900px) {
