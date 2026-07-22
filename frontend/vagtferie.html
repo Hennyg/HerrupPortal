@@ -1,18 +1,40 @@
 <!doctype html>
 <html lang="da">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Vagt & Ferie</title>
-    <link rel="stylesheet" href="/assets/app.css">
-    <link rel="stylesheet" href="/assets/vagtferie.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Vagt & Ferie · Herrup Portalen</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/assets/app.css">
+  <link rel="stylesheet" href="/assets/vagtferie.css">
 </head>
 <body>
-    <main class="container">
-        <h1>Vagt & Ferie</h1>
-        <div id="vagtFerieRoot"></div>
-    </main>
+  <div class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <span class="logo"></span>
+        <span>Herrup Portalen</span>
+      </div>
+      <div class="nav">
+        <a href="/index.html">Forside</a>
+        <span class="sep">|</span>
+        <a href="/herrup.html">Medarbejdere</a>
+      </div>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
 
-    <script src="/assets/vagtferie.js"></script>
+  <main class="container">
+    <div class="hero" style="padding-bottom:1.5rem;">
+      <div>
+        <h1>Vagt & Ferie</h1>
+        <p class="muted" style="text-align:center;margin:.5rem 0 0;">Kompakt visning baseret på SharePoint-regnearket.</p>
+      </div>
+    </div>
+
+    <div id="vagtFerieRoot"></div>
+  </main>
+
+  <script src="/assets/vagtferie.js"></script>
 </body>
 </html>
