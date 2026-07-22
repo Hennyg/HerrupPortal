@@ -1,6 +1,6 @@
 // assets/herrup-vagtferie.js
-// Vagt/Ferie-fane i herrup.html.
-// Status vises øverst, og opsummering vises under kalenderen.
+// Rettet version: Dagens status opdateres i modal-headeren når ny person åbnes.
+// Statuskortet vises ikke længere inde i selve Vagt/Ferie-fanens indhold.
 // Ikke minified.
 
 (function () {
@@ -32,6 +32,8 @@
         year: CURRENT_YEAR,
         weekStart: null
     };
+
+    let lastHeaderStatusName = "";
 
     function esc(value) {
         return String(value ?? "").replace(/[&<>"']/g, match => ({
@@ -341,12 +343,88 @@
     function renderStatusCard(current) {
         return `
             <div class="herrup-vf-card herrup-vf-status herrup-vf-status-top">
-                <div class="vf-label">Nuværende status</div>
+                <div class="vf-label">Dagens status</div>
                 <div class="vf-current">
                     ${current ? `${badge(current.code, current.text)} <span>${esc(current.text)}</span>` : `<span class="vf-muted">Ingen markering i dag</span>`}
                 </div>
             </div>
         `;
+    }
+
+    function ensureHeaderStatusCard() {
+        let statusCard = document.getElementById("mCurrentStatusCard");
+
+        if (statusCard) {
+            return statusCard;
+        }
+
+        const badges = document.getElementById("mBadges");
+        const infoBlock = badges?.parentElement;
+        const headerRow = infoBlock?.parentElement;
+
+        if (!headerRow) {
+            return null;
+        }
+
+        statusCard = document.createElement("div");
+        statusCard.id = "mCurrentStatusCard";
+        headerRow.appendChild(statusCard);
+
+        return statusCard;
+    }
+
+    async function updateHeaderStatus() {
+        const name = selectedName();
+        const statusCard = ensureHeaderStatusCard();
+
+        if (!statusCard) {
+            return;
+        }
+
+        if (!name) {
+            statusCard.innerHTML = "";
+            lastHeaderStatusName = "";
+            return;
+        }
+
+        if (name === lastHeaderStatusName && statusCard.innerHTML.trim()) {
+            return;
+        }
+
+        lastHeaderStatusName = name;
+        statusCard.innerHTML = `<div class="vf-loading">Henter dagens status...</div>`;
+
+        try {
+            const data = window.__vagtFerieData || await preloadVagtFerie();
+            const employee = findEmployee(data, name);
+            const current = (employee?.days || []).find(day => day.date === todayIso());
+
+            statusCard.innerHTML = renderStatusCard(current);
+        } catch (error) {
+            console.warn("Kunne ikke opdatere dagens status:", error);
+            statusCard.innerHTML = "";
+        }
+    }
+
+    function watchSelectedPerson() {
+        const nameElement = document.getElementById("mName");
+
+        if (!nameElement || nameElement.__vagtFerieObserver) {
+            return;
+        }
+
+        nameElement.__vagtFerieObserver = true;
+
+        const observer = new MutationObserver(() => {
+            lastHeaderStatusName = "";
+            updateHeaderStatus();
+        });
+
+        observer.observe(nameElement, {
+            childList: true,
+            characterData: true,
+            subtree: true
+        });
     }
 
     function renderMiniMonth(employee) {
@@ -408,15 +486,6 @@
         }
 
         const upcomingDays = upcoming(employee);
-        const current = (employee.days || []).find(day => day.date === todayIso());
-
-        const headerStatus =
-    document.getElementById("mCurrentStatusCard");
-
-if (headerStatus) {
-    headerStatus.innerHTML =
-        renderStatusCard(current);
-}
 
         return `
             <div class="herrup-vf-title">${esc(employee.name)}</div>
@@ -453,7 +522,6 @@ if (headerStatus) {
             return `<div class="herrup-vf-empty">Ingen afdeling fundet.</div>`;
         }
 
-        const current = (employee.days || []).find(day => day.date === todayIso());
         const area = employee.area || selectedBadgeDepartment();
         const rows = (data.employees || []).filter(row => (row.area || "") === area);
         const start = mondayOf(parseIso(panelState.weekStart || todayIso()));
@@ -537,6 +605,8 @@ if (headerStatus) {
                 panelState.weekStart = dateToIso(mondayOf(new Date()));
             }
 
+            updateHeaderStatus();
+
             panel.innerHTML = `
                 <div class="herrup-vf-toolbar">
                     <div class="herrup-vf-toggle">
@@ -589,12 +659,14 @@ if (headerStatus) {
             panelState.year = Number(event.target.value);
             window.__vagtFerieData = null;
             window.__vagtFeriePromise = null;
+            lastHeaderStatusName = "";
             renderPanel();
         });
 
         document.getElementById("herrupVfRefresh")?.addEventListener("click", () => {
             window.__vagtFerieData = null;
             window.__vagtFeriePromise = null;
+            lastHeaderStatusName = "";
             renderPanel();
         });
 
@@ -614,36 +686,6 @@ if (headerStatus) {
             renderPanel();
         });
     }
-
-    async function updateHeaderStatus() {
-    try {
-        const data = window.__vagtFerieData || await preloadVagtFerie();
-
-        const employee = findEmployee(
-            data,
-            selectedName()
-        );
-
-        const current =
-            (employee?.days || [])
-            .find(day => day.date === todayIso());
-
-        const statusCard =
-            document.getElementById("mCurrentStatusCard");
-
-        if (!statusCard) return;
-
-        statusCard.innerHTML =
-            renderStatusCard(current)
-                .replace(
-                    "Nuværende status",
-                    "Dagens status"
-                );
-
-    } catch (err) {
-        console.warn(err);
-    }
-}
 
     function addModalTab() {
         const tabs = document.querySelector(".modal-tabs");
@@ -694,8 +736,12 @@ if (headerStatus) {
         startFakeProgress("images");
         preloadVagtFerie().catch(() => {});
         addModalTab();
+        watchSelectedPerson();
 
-        new MutationObserver(addModalTab).observe(document.documentElement, {
+        new MutationObserver(() => {
+            addModalTab();
+            watchSelectedPerson();
+        }).observe(document.documentElement, {
             childList: true,
             subtree: true
         });
@@ -708,6 +754,6 @@ if (headerStatus) {
             waitForVisibleImages();
         });
     });
+
+    window.updateHeaderStatus = updateHeaderStatus;
 })();
-window.updateHeaderStatus =
-    updateHeaderStatus;

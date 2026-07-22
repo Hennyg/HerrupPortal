@@ -1,7 +1,12 @@
 /* assets/herrup-vagtferie.css
-   Vagt/Ferie-fane i herrup.html.
-   Ikke minified, så filen er let at læse og ændre.
+   Rettet version: statuskort i modal-header, bredere popup og læsbar CSS.
 */
+
+/* Gør popup bredere, så afdelingskalenderen kan være der */
+.modal {
+    width: min(1240px, 95vw) !important;
+    max-width: 1240px !important;
+}
 
 .herrup-load-card {
     position: fixed;
@@ -74,6 +79,26 @@
     border-bottom-color: #850c18;
 }
 
+/* Statuskortet som skal ligge til højre for navn/titel */
+#mCurrentStatusCard {
+    min-width: 250px;
+    max-width: 320px;
+    margin-left: auto;
+}
+
+#mCurrentStatusCard:empty {
+    display: none;
+}
+
+#mCurrentStatusCard .herrup-vf-card {
+    margin: 0;
+    padding: 12px 14px;
+}
+
+#mCurrentStatusCard .vf-current {
+    font-size: 1.1rem;
+}
+
 .herrup-vf-toolbar {
     display: flex;
     justify-content: space-between;
@@ -136,10 +161,6 @@
     margin-bottom: 12px;
 }
 
-.herrup-vf-status-top {
-    margin-bottom: 14px;
-}
-
 .herrup-vf-grid2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -163,10 +184,13 @@
     color: #111827;
 }
 
+/* Ingen rullepanel i kommende 14 markeringer */
 .herrup-vf-upcoming {
     display: flex;
     flex-direction: column;
     gap: 7px;
+    max-height: none;
+    overflow: visible;
 }
 
 .herrup-vf-row {
@@ -221,7 +245,6 @@
     color: #c30a14;
 }
 
-/* Små badges inde i kalenderfelter, så markeringen ikke fylder mere end dato-feltet. */
 .herrup-vf-daycell .vf-badge,
 .herrup-vf-table .vf-badge {
     min-width: 16px;
@@ -266,11 +289,11 @@
 }
 
 .herrup-vf-table {
-    width:100%;
-    border-collapse:separate;
-    border-spacing:0;
-    min-width:1100px;
-    background:#fff;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 1100px;
+    background: #fff;
 }
 
 .herrup-vf-table th,
@@ -326,32 +349,11 @@
         grid-template-columns: 1fr;
         gap: 4px;
     }
-}
 
-
-.modal-current-status{
-    margin-top:8px;
-    display:none;
-}
-
-.modal-current-status.active{
-    display:block;
-}
-
-.modal-current-status .vf-badge{
-    margin-right:6px;
-}
-
-#mCurrentStatusCard{
-    min-width:220px;
-    max-width:260px;
-}
-
-#mCurrentStatusCard .herrup-vf-card{
-    margin:0;
-    padding:12px;
-}
-
-#mCurrentStatusCard .vf-current{
-    font-size:1.1rem;
+    #mCurrentStatusCard {
+        min-width: 100%;
+        max-width: 100%;
+        margin-left: 0;
+        margin-top: 10px;
+    }
 }
