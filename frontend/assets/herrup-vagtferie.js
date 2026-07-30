@@ -194,7 +194,6 @@
         window.__herrupFetchMonitorInstalled = true;
 
         const originalFetch = window.fetch.bind(window);
-        let azurePending = 0;
 
         window.fetch = async function monitoredFetch(input, init) {
             const url = typeof input === "string" ? input : input?.url || "";
@@ -202,8 +201,12 @@
 
             if (urlText.includes("/api/vagtferieplan")) {
                 startFakeProgress("vagt");
-            } else if (urlText.includes("/api/")) {
-                azurePending++;
+            } else if (urlText.includes("/api/entra-users")) {
+                // "azure" markeres først færdig når herrup.html selv har renderet
+                // listen (se window.__herrupOnUsersRendered nedenfor) — ikke bare
+                // når HTTP-headerne for svaret er modtaget, som var upræcist og
+                // fik "Billeder: 100%" til at vise sig før billederne reelt var
+                // hentet og indsat i siden.
                 startFakeProgress("azure");
             }
 
@@ -212,16 +215,18 @@
             } finally {
                 if (urlText.includes("/api/vagtferieplan")) {
                     markDone("vagt");
-                } else if (urlText.includes("/api/")) {
-                    azurePending = Math.max(0, azurePending - 1);
-                    if (azurePending === 0) {
-                        markDone("azure");
-                        waitForVisibleImages();
-                    }
                 }
             }
         };
     }
+
+    // Kaldes fra herrup.html, når personlisten (og org-oversigten) faktisk er
+    // renderet med data fra /api/entra-users — det er her "azure" reelt er færdig,
+    // og først herefter giver det mening at tælle billeder i DOM'et.
+    window.__herrupOnUsersRendered = function herrupOnUsersRendered() {
+        markDone("azure");
+        waitForVisibleImages();
+    };
 
     function waitForVisibleImages() {
         startFakeProgress("images");
