@@ -184,6 +184,12 @@
     color: #111827;
 }
 
+.herrup-vf-summary-subtitle {
+    font-weight: 400;
+    font-size: 0.78em;
+    color: #6b7280;
+}
+
 /* Ingen rullepanel i kommende 14 markeringer */
 .herrup-vf-upcoming {
     display: flex;
