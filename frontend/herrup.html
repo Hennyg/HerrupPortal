@@ -560,7 +560,8 @@ if (window.updateHeaderStatus) {
 
     function canEditUser(u) {
       const targetEmail = (u.mail || u.userPrincipalName || "").toLowerCase();
-      return myRoles.includes("portal_admin") || (myEmail && myEmail === targetEmail);
+      const isAdminGroup = myRoles.includes("portal_admin") || myRoles.includes("portal_herrup_portal_admin");
+      return isAdminGroup || (myEmail && myEmail === targetEmail);
     }
 
     async function loadPrivateTab(u) {
