@@ -29,6 +29,101 @@ function getEmailFromPrincipal(principal) {
   return (principal.userDetails || "").toLowerCase();
 }
 
+// ── Microsoft Graph: afdeling + chef-opslag (samme app-registrering som Dataverse) ─
+async function getGraphToken() {
+  const tenant       = process.env.DV_TENANT_ID;
+  const clientId     = process.env.DV_CLIENT_ID;
+  const clientSecret = process.env.DV_CLIENT_SECRET;
+
+  if (!tenant || !clientId || !clientSecret) {
+    throw new Error("Manglende miljøvariabler til Graph: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET");
+  }
+
+  const r = await fetch(
+    `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type:    "client_credentials",
+        client_id:     clientId,
+        client_secret: clientSecret,
+        scope:         "https://graph.microsoft.com/.default"
+      })
+    }
+  );
+  const j = await r.json();
+  if (!r.ok) throw new Error(`graph_token_error ${r.status}: ${j.error_description || JSON.stringify(j)}`);
+  return j.access_token;
+}
+
+async function getUserDepartment(graphToken, email) {
+  try {
+    const r = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}?$select=department`,
+      { headers: { Authorization: `Bearer ${graphToken}` } }
+    );
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j.department || "").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getUserManagerEmail(graphToken, email) {
+  try {
+    const r = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}/manager?$select=mail,userPrincipalName`,
+      { headers: { Authorization: `Bearer ${graphToken}` } }
+    );
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j.mail || j.userPrincipalName || "").toLowerCase() || null;
+  } catch {
+    return null;
+  }
+}
+
+// Afgør om "myEmail" må se nødkontakterne for "email", givet det valgte synlighedsniveau.
+// isAdmin/isSelf er allerede tjekket af den kaldende kode og giver altid adgang.
+async function resolveNoedVisibility(context, { noedSynlighed, myEmail, myRoles, targetEmail }) {
+  if (noedSynlighed === "alle") {
+    return true;
+  }
+
+  if (noedSynlighed === "afdeling") {
+    try {
+      const graphToken = await getGraphToken();
+      const [myDept, targetDept] = await Promise.all([
+        getUserDepartment(graphToken, myEmail),
+        getUserDepartment(graphToken, targetEmail)
+      ]);
+      return !!myDept && !!targetDept && myDept.toLowerCase() === targetDept.toLowerCase();
+    } catch (e) {
+      context.log("Kunne ikke afgøre afdeling for nødkontakter:", e.message);
+      return false;
+    }
+  }
+
+  if (noedSynlighed === "loen_chef") {
+    if (myRoles.includes("portal_loen")) {
+      return true;
+    }
+    try {
+      const graphToken = await getGraphToken();
+      const managerEmail = await getUserManagerEmail(graphToken, targetEmail);
+      return !!managerEmail && managerEmail === myEmail;
+    } catch (e) {
+      context.log("Kunne ikke afgøre chef for nødkontakter:", e.message);
+      return false;
+    }
+  }
+
+  // "ingen" eller ikke angivet: kun isSelf/isAdmin (håndteret af den kaldende kode)
+  return false;
+}
+
 async function getDataverseToken() {
   const tenant       = process.env.DV_TENANT_ID;
   const clientId     = process.env.DV_CLIENT_ID;
@@ -197,10 +292,12 @@ module.exports = async function (context, req) {
         : "";
       const noedKontakterAll = parseNoedKontakter(emp.cr1eb_lch_noedkontakter);
 
-      // NB: "afdeling" og "loen_chef" kræver opslag af afdeling/chef, som ikke er
-      // koblet på i denne function endnu. Indtil det er på plads, vises nødkontakter
-      // for andre end personen selv/admin KUN når synlighed er sat til "alle".
-      const noedVisibleToMe = isAdmin || isSelf || noedSynlighed === "alle";
+      const noedVisibleToMe = isAdmin || isSelf || await resolveNoedVisibility(context, {
+        noedSynlighed,
+        myEmail,
+        myRoles: roles,
+        targetEmail: email
+      });
 
       return json(context, 200, {
         found: true,
