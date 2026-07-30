@@ -85,6 +85,25 @@ async function getUserManagerEmail(graphToken, email) {
   }
 }
 
+// Henter et skarpt 240x240-billede for ÉN specifik person — kun brugt til
+// personkortet, hvor billedet vises i 80px. Undgår at gøre den samlede
+// personliste (/api/entra-users) tung ved at hente det for alle på én gang.
+async function getBigEntraPhoto(graphToken, email) {
+  try {
+    const r = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}/photos/240x240/$value`,
+      { headers: { Authorization: `Bearer ${graphToken}` } }
+    );
+    if (!r.ok) return null;
+    const buf = await r.arrayBuffer();
+    const b64 = Buffer.from(buf).toString("base64");
+    const ct  = r.headers.get("content-type") || "image/jpeg";
+    return `data:${ct};base64,${b64}`;
+  } catch {
+    return null;
+  }
+}
+
 // Afgør om "myEmail" må se nødkontakterne for "email", givet det valgte synlighedsniveau.
 // isAdmin/isSelf er allerede tjekket af den kaldende kode og giver altid adgang.
 async function resolveNoedVisibility(context, { noedSynlighed, myEmail, myRoles, targetEmail }) {
@@ -166,7 +185,8 @@ async function findEmployeeByMail(token, dvUrl, email) {
     "cr1eb_lch_telefon_vises",
     "cr1eb_lch_adresse_vises",
     "cr1eb_lch_noedkontakter",
-    "cr1eb_lch_noed_synlighed"
+    "cr1eb_lch_noed_synlighed",
+    "cr1eb_lch_foto"
   ].join(",");
 
   const filter = encodeURIComponent(`cr1eb_lch_mail eq '${email.replace(/'/g, "''")}'`);
@@ -281,11 +301,20 @@ module.exports = async function (context, req) {
       const emp = await findEmployeeByMail(token, dvUrl, email);
 
       if (!emp) {
+        let bigPhoto = null;
+        try {
+          const graphToken = await getGraphToken();
+          bigPhoto = await getBigEntraPhoto(graphToken, email);
+        } catch (e) {
+          context.log("Kunne ikke hente stort Entra-billede:", e.message);
+        }
+
         return json(context, 200, {
           found: false,
           privatMail: null, privatTlf: null, privatAdresse: null, privatPostby: null,
           telefonVises: false, adresseVises: false,
-          noedKontakter: [], noedSynlighed: "", noedVisibleToMe: true
+          noedKontakter: [], noedSynlighed: "", noedVisibleToMe: true,
+          bigPhoto, hasCustomPhoto: false
         });
       }
 
@@ -304,6 +333,19 @@ module.exports = async function (context, req) {
         targetEmail: email
       });
 
+      // Skarpt billede til personkortet: brug det uploadede hvis der er et,
+      // ellers hent en 240x240-udgave af Entra-billedet — kun for denne ene person.
+      const hasCustomPhoto = !!emp.cr1eb_lch_foto;
+      let bigPhoto = hasCustomPhoto ? emp.cr1eb_lch_foto : null;
+      if (!bigPhoto) {
+        try {
+          const graphToken = await getGraphToken();
+          bigPhoto = await getBigEntraPhoto(graphToken, email);
+        } catch (e) {
+          context.log("Kunne ikke hente stort Entra-billede:", e.message);
+        }
+      }
+
       return json(context, 200, {
         found: true,
         privatMail:    emp.cr1eb_lch_privat_mail    || null,
@@ -314,7 +356,9 @@ module.exports = async function (context, req) {
         adresseVises,
         noedKontakter:   noedVisibleToMe ? noedKontakterAll : [],
         noedSynlighed,
-        noedVisibleToMe
+        noedVisibleToMe,
+        bigPhoto,
+        hasCustomPhoto
       });
     }
 
