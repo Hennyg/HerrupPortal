@@ -69,7 +69,9 @@ async function findEmployeeByMail(token, dvUrl, email) {
     "cr1eb_lch_privat_adresse",
     "cr1eb_lch_privat_postby",
     "cr1eb_lch_telefon_vises",
-    "cr1eb_lch_adresse_vises"
+    "cr1eb_lch_adresse_vises",
+    "cr1eb_lch_noedkontakter",
+    "cr1eb_lch_noed_synlighed"
   ].join(",");
 
   const filter = encodeURIComponent(`cr1eb_lch_mail eq '${email.replace(/'/g, "''")}'`);
@@ -132,6 +134,25 @@ function fromJaNej(val) {
   return v === "ja" || v === "yes" || v === "true" || v === "1";
 }
 
+const NOED_VISIBILITY_VALUES = new Set(["alle", "afdeling", "loen_chef", "ingen"]);
+
+function parseNoedKontakter(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map(c => ({
+        navn:     String(c?.navn || "").trim(),
+        relation: String(c?.relation || "").trim(),
+        telefon:  String(c?.telefon || "").trim()
+      }))
+      .filter(c => c.navn || c.relation || c.telefon);
+  } catch {
+    return [];
+  }
+}
+
 module.exports = async function (context, req) {
   const principalB64 = req.headers["x-ms-client-principal"];
   if (!principalB64) return json(context, 401, { error: "Ikke logget ind" });
@@ -152,18 +173,34 @@ module.exports = async function (context, req) {
     const token = await getDataverseToken();
 
     if (req.method === "GET") {
+      const roles   = getRolesFromPrincipal(principal);
+      const isAdmin = roles.includes("portal_admin") || roles.includes("portal_herrup_portal_admin");
+      const myEmail = getEmailFromPrincipal(principal);
+      const isSelf  = myEmail && myEmail === email.toLowerCase();
+
       const emp = await findEmployeeByMail(token, dvUrl, email);
 
       if (!emp) {
         return json(context, 200, {
           found: false,
           privatMail: null, privatTlf: null, privatAdresse: null, privatPostby: null,
-          telefonVises: false, adresseVises: false
+          telefonVises: false, adresseVises: false,
+          noedKontakter: [], noedSynlighed: "", noedVisibleToMe: true
         });
       }
 
       const telefonVises = fromJaNej(emp.cr1eb_lch_telefon_vises);
       const adresseVises = fromJaNej(emp.cr1eb_lch_adresse_vises);
+
+      const noedSynlighed = NOED_VISIBILITY_VALUES.has(emp.cr1eb_lch_noed_synlighed)
+        ? emp.cr1eb_lch_noed_synlighed
+        : "";
+      const noedKontakterAll = parseNoedKontakter(emp.cr1eb_lch_noedkontakter);
+
+      // NB: "afdeling" og "loen_chef" kræver opslag af afdeling/chef, som ikke er
+      // koblet på i denne function endnu. Indtil det er på plads, vises nødkontakter
+      // for andre end personen selv/admin KUN når synlighed er sat til "alle".
+      const noedVisibleToMe = isAdmin || isSelf || noedSynlighed === "alle";
 
       return json(context, 200, {
         found: true,
@@ -172,7 +209,10 @@ module.exports = async function (context, req) {
         privatAdresse: adresseVises ? (emp.cr1eb_lch_privat_adresse || null) : null,
         privatPostby:  adresseVises ? (emp.cr1eb_lch_privat_postby  || null) : null,
         telefonVises,
-        adresseVises
+        adresseVises,
+        noedKontakter:   noedVisibleToMe ? noedKontakterAll : [],
+        noedSynlighed,
+        noedVisibleToMe
       });
     }
 
@@ -187,13 +227,28 @@ module.exports = async function (context, req) {
       }
 
       const body = req.body || {};
+
+      const noedKontakter = Array.isArray(body.noedKontakter)
+        ? body.noedKontakter
+            .map(c => ({
+              navn:     String(c?.navn || "").trim(),
+              relation: String(c?.relation || "").trim(),
+              telefon:  String(c?.telefon || "").trim()
+            }))
+            .filter(c => c.navn || c.relation || c.telefon)
+        : [];
+
+      const noedSynlighed = NOED_VISIBILITY_VALUES.has(body.noedSynlighed) ? body.noedSynlighed : "";
+
       const fields = {
         cr1eb_lch_privat_mail:    body.privatMail    ?? "",
         cr1eb_lch_privat_tlf:     body.privatTlf     ?? "",
         cr1eb_lch_privat_adresse: body.privatAdresse ?? "",
         cr1eb_lch_privat_postby:  body.privatPostby  ?? "",
         cr1eb_lch_telefon_vises:  toJaNej(!!body.telefonVises),
-        cr1eb_lch_adresse_vises:  toJaNej(!!body.adresseVises)
+        cr1eb_lch_adresse_vises:  toJaNej(!!body.adresseVises),
+        cr1eb_lch_noedkontakter:  JSON.stringify(noedKontakter),
+        cr1eb_lch_noed_synlighed: noedSynlighed
       };
 
       const existing = await findEmployeeByMail(token, dvUrl, email);
