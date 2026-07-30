@@ -462,25 +462,91 @@
         return html;
     }
 
-    function renderSummary(data, employee) {
+    // ── Adgang til Opsummering (kun personen selv eller admin-grupperne) ───────
+    const SUMMARY_ADMIN_ROLES = ["portal_admin", "portal_herrup_portal_admin"];
+
+    let __meInfoCache = null;
+    async function getMyInfo() {
+        if (__meInfoCache) {
+            return __meInfoCache;
+        }
+
+        try {
+            const r = await fetch("/.auth/me", { cache: "no-store" });
+            const j = r.ok ? await r.json() : null;
+            const principal = j?.clientPrincipal || null;
+            const roles = (principal?.userRoles || []).map(role => String(role).toLowerCase());
+            const email = (principal?.userDetails || "").toLowerCase().trim();
+            __meInfoCache = { roles, email };
+        } catch {
+            __meInfoCache = { roles: [], email: "" };
+        }
+
+        return __meInfoCache;
+    }
+
+    let __myDisplayNameCache = null;
+    async function getMyDisplayName() {
+        if (__myDisplayNameCache !== null) {
+            return __myDisplayNameCache;
+        }
+
+        const me = await getMyInfo();
+        __myDisplayNameCache = "";
+
+        if (!me.email) {
+            return __myDisplayNameCache;
+        }
+
+        try {
+            const r = await fetch("/api/entra-users", { cache: "no-store" });
+            const users = r.ok ? await r.json() : [];
+            const match = (users || []).find(u => {
+                const mail = (u.mail || u.userPrincipalName || "").toLowerCase().trim();
+                return mail === me.email;
+            });
+            __myDisplayNameCache = (match?.displayName || "").toLowerCase().trim();
+        } catch {
+            __myDisplayNameCache = "";
+        }
+
+        return __myDisplayNameCache;
+    }
+
+    async function canSeeSummary(employee) {
+        const me = await getMyInfo();
+
+        if (SUMMARY_ADMIN_ROLES.some(role => me.roles.includes(role))) {
+            return true;
+        }
+
+        const myName = await getMyDisplayName();
+        const empName = (employee?.name || "").toLowerCase().trim();
+
+        return !!myName && myName === empName;
+    }
+
+    function renderSummary(data, employee, canSee) {
         const summaryRows = summary(employee, panelState.year);
 
         return `
             <div class="herrup-vf-card herrup-vf-summary-under-calendar">
-                <h3 class="herrup-vf-section-title">Opsummering ${panelState.year}</h3>
-                <div class="vf-summary">
-                    ${summaryRows.length ? summaryRows.map(row => `
-                        <div class="vf-summary-item">
-                            ${badge(row.code, row.code)}
-                            <span>${esc((data.legend || {})[row.code] || row.code)}: <b>${row.count}</b></span>
-                        </div>
-                    `).join("") : `<div class="vf-muted">Ingen data</div>`}
-                </div>
+                <h3 class="herrup-vf-section-title">Opsummering ${panelState.year} (sammentalt fra Vagt og ferieplan regnearket)</h3>
+                ${canSee ? `
+                    <div class="vf-summary">
+                        ${summaryRows.length ? summaryRows.map(row => `
+                            <div class="vf-summary-item">
+                                ${badge(row.code, row.code)}
+                                <span>${esc((data.legend || {})[row.code] || row.code)}: <b>${row.count}</b></span>
+                            </div>
+                        `).join("") : `<div class="vf-muted">Ingen data</div>`}
+                    </div>
+                ` : `<div class="vf-muted">Kun synlig for medarbejderen selv eller administrator.</div>`}
             </div>
         `;
     }
 
-    function renderPerson(data, employee) {
+    function renderPerson(data, employee, canSee) {
         if (!employee) {
             return `<div class="herrup-vf-empty">Ingen vagt-/feriedata fundet for ${esc(selectedName())}.</div>`;
         }
@@ -511,13 +577,13 @@
                 <section class="herrup-vf-card">
                     <h3 class="herrup-vf-section-title">${MONTHS[panelState.month - 1]} ${panelState.year}</h3>
                     ${renderMiniMonth(employee)}
-                    ${renderSummary(data, employee)}
+                    ${renderSummary(data, employee, canSee)}
                 </section>
             </div>
         `;
     }
 
-    function renderDepartment(data, employee) {
+    function renderDepartment(data, employee, canSee) {
         if (!employee) {
             return `<div class="herrup-vf-empty">Ingen afdeling fundet.</div>`;
         }
@@ -579,7 +645,7 @@
                 </table>
             </div>
 
-            ${renderSummary(data, employee)}
+            ${renderSummary(data, employee, canSee)}
         `;
     }
 
@@ -600,6 +666,7 @@
             }
 
             const employee = findEmployee(data, selectedName());
+            const canSee = await canSeeSummary(employee);
 
             if (!panelState.weekStart) {
                 panelState.weekStart = dateToIso(mondayOf(new Date()));
@@ -628,7 +695,7 @@
                 </div>
 
                 <div id="herrupVfContent">
-                    ${panelState.view === "department" ? renderDepartment(data, employee) : renderPerson(data, employee)}
+                    ${panelState.view === "department" ? renderDepartment(data, employee, canSee) : renderPerson(data, employee, canSee)}
                 </div>
             `;
 
