@@ -185,8 +185,8 @@
 }
 
 .herrup-vf-summary-subtitle {
-    font-weight: 400;
-    font-size: 0.78em;
+    font-weight: 400 !important;
+    font-size: 0.72em;
     color: #6b7280;
 }
 
