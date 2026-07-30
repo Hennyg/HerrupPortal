@@ -178,7 +178,7 @@ module.exports = async function (context, req) {
 
     if (req.method === "PATCH") {
       const roles   = getRolesFromPrincipal(principal);
-      const isAdmin = roles.includes("portal_admin");
+      const isAdmin = roles.includes("portal_admin") || roles.includes("portal_herrup_portal_admin");
       const myEmail = getEmailFromPrincipal(principal);
       const isSelf  = myEmail && myEmail === email.toLowerCase();
 
