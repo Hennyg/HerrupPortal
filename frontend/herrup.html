@@ -513,6 +513,10 @@ myEmail = (me?.userDetails || "").toLowerCase();
         renderOrg();
       } catch (e) {
         renderError("Kunne ikke hente brugere: " + e.message);
+      } finally {
+        // Fortæl fremdrifts-visningen at listen nu reelt er renderet, så
+        // "Azure data" og "Billeder" først markeres færdige på det rigtige tidspunkt.
+        if (window.__herrupOnUsersRendered) window.__herrupOnUsersRendered();
       }
     })();
 
@@ -700,6 +704,13 @@ if (window.updateHeaderStatus) {
         currentPrivateData = data;
         target.innerHTML = renderPrivateView(data);
         noedTarget.innerHTML = renderEmergencyView(data);
+
+        // Skift til det skarpe billede, hvis det er den samme person der stadig er åben
+        if (data.bigPhoto && currentModalUser === u) {
+          u.photo = data.bigPhoto;
+          u.hasCustomPhoto = !!data.hasCustomPhoto;
+          renderModalAvatar(u);
+        }
 
         if (canEditUser(u)) {
           editBtn.style.display = "";
@@ -1266,8 +1277,17 @@ card.title = u.displayName || "";
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
 
-        u.photo = u.entraPhoto || null;
         u.hasCustomPhoto = false;
+
+        // Hent det skarpe Entra-billede igen, i stedet for bare at falde tilbage
+        // til det lille 48x48-billede fra personlisten.
+        try {
+          const rr = await fetch(`/api/employee-private/${encodeURIComponent(lookupEmail)}`, { cache: "no-store" });
+          const data = await rr.json();
+          u.photo = (rr.ok && data.bigPhoto) ? data.bigPhoto : (u.entraPhoto || null);
+        } catch {
+          u.photo = u.entraPhoto || null;
+        }
 
         renderModalAvatar(u);
         renderTable();
