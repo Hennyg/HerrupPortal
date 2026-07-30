@@ -231,6 +231,11 @@ function fromJaNej(val) {
 
 const NOED_VISIBILITY_VALUES = new Set(["alle", "afdeling", "loen_chef", "ingen"]);
 
+// Grænse for base64 data-URI længde på et uploadet billede (ca. 700 KB rå data).
+// Sæt Dataverse-feltet cr1eb_lch_foto til "Multiple Lines of Text" med maks
+// tilladt længde (helst 1.048.576 tegn) så det er plads til dette.
+const MAX_PHOTO_LENGTH = 900000;
+
 function parseNoedKontakter(raw) {
   if (!raw) return [];
   try {
@@ -324,29 +329,50 @@ module.exports = async function (context, req) {
       }
 
       const body = req.body || {};
+      const fields = {};
 
-      const noedKontakter = Array.isArray(body.noedKontakter)
-        ? body.noedKontakter
-            .map(c => ({
-              navn:     String(c?.navn || "").trim(),
-              relation: String(c?.relation || "").trim(),
-              telefon:  String(c?.telefon || "").trim()
-            }))
-            .filter(c => c.navn || c.relation || c.telefon)
-        : [];
+      // Kun de felter der reelt er sendt med opdateres — undgår at et PATCH-kald
+      // der f.eks. kun sender et nyt billede overskriver kontaktinfo/nødkontakter.
+      if ("privatMail" in body)    fields.cr1eb_lch_privat_mail    = body.privatMail    ?? "";
+      if ("privatTlf" in body)     fields.cr1eb_lch_privat_tlf     = body.privatTlf     ?? "";
+      if ("privatAdresse" in body) fields.cr1eb_lch_privat_adresse = body.privatAdresse ?? "";
+      if ("privatPostby" in body)  fields.cr1eb_lch_privat_postby  = body.privatPostby  ?? "";
+      if ("telefonVises" in body)  fields.cr1eb_lch_telefon_vises  = toJaNej(!!body.telefonVises);
+      if ("adresseVises" in body)  fields.cr1eb_lch_adresse_vises  = toJaNej(!!body.adresseVises);
 
-      const noedSynlighed = NOED_VISIBILITY_VALUES.has(body.noedSynlighed) ? body.noedSynlighed : "";
+      if ("noedKontakter" in body) {
+        const noedKontakter = Array.isArray(body.noedKontakter)
+          ? body.noedKontakter
+              .map(c => ({
+                navn:     String(c?.navn || "").trim(),
+                relation: String(c?.relation || "").trim(),
+                telefon:  String(c?.telefon || "").trim()
+              }))
+              .filter(c => c.navn || c.relation || c.telefon)
+          : [];
+        fields.cr1eb_lch_noedkontakter = JSON.stringify(noedKontakter);
+      }
 
-      const fields = {
-        cr1eb_lch_privat_mail:    body.privatMail    ?? "",
-        cr1eb_lch_privat_tlf:     body.privatTlf     ?? "",
-        cr1eb_lch_privat_adresse: body.privatAdresse ?? "",
-        cr1eb_lch_privat_postby:  body.privatPostby  ?? "",
-        cr1eb_lch_telefon_vises:  toJaNej(!!body.telefonVises),
-        cr1eb_lch_adresse_vises:  toJaNej(!!body.adresseVises),
-        cr1eb_lch_noedkontakter:  JSON.stringify(noedKontakter),
-        cr1eb_lch_noed_synlighed: noedSynlighed
-      };
+      if ("noedSynlighed" in body) {
+        fields.cr1eb_lch_noed_synlighed = NOED_VISIBILITY_VALUES.has(body.noedSynlighed) ? body.noedSynlighed : "";
+      }
+
+      if ("customPhoto" in body) {
+        const photo = body.customPhoto;
+        if (photo === null || photo === "") {
+          fields.cr1eb_lch_foto = "";
+        } else if (typeof photo === "string") {
+          if (!photo.startsWith("data:image/")) {
+            return json(context, 400, { error: "Ugyldigt billedformat." });
+          }
+          if (photo.length > MAX_PHOTO_LENGTH) {
+            return json(context, 400, { error: "Billedet er for stort. Prøv et mindre billede." });
+          }
+          fields.cr1eb_lch_foto = photo;
+        } else {
+          return json(context, 400, { error: "Ugyldigt billede." });
+        }
+      }
 
       const existing = await findEmployeeByMail(token, dvUrl, email);
       if (existing) {
