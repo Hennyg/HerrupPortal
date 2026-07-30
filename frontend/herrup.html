@@ -163,6 +163,41 @@
     .detail-value a { color:inherit; text-decoration:none; }
     .detail-value a:hover { text-decoration:underline; }
 
+    /* Nødkontakter */
+    .noedTableWrap { overflow-x:auto; }
+    .noedTable { width:100%; border-collapse:collapse; font-size:.86rem; }
+    .noedTable th {
+      text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.05em;
+      color:#9ca3af; font-weight:600; padding:.35rem .5rem; border-bottom:1px solid #e5e7eb;
+    }
+    .noedTable td { padding:.45rem .5rem; border-bottom:1px solid #f1f2f4; color:#111; }
+    .noedVisibility { margin-top:.75rem; font-size:.86rem; color:#374151; }
+
+    .noedRowsWrap { display:flex; flex-direction:column; gap:.5rem; }
+    .noedRow {
+      display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:.5rem; align-items:center;
+    }
+    @media (max-width:600px) { .noedRow { grid-template-columns:1fr; } }
+    .noedRow input {
+      width:100%; padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:8px; font-size:.85rem;
+    }
+    .noedRow input:focus { outline:2px solid #850c18; outline-offset:-1px; border-color:#850c18; }
+    .btn-remove-row {
+      background:#fff; border:1px solid #d1d5db; border-radius:8px; color:#9ca3af;
+      width:32px; height:32px; cursor:pointer; font-size:1.2rem; font-weight:700; line-height:1;
+    }
+    .btn-remove-row:hover { border-color:#c30a14; color:#c30a14; }
+    .btn-add-row {
+      margin-top:.6rem; background:#fff; border:1px dashed #d1d5db; border-radius:8px;
+      color:#374151; padding:.45rem .9rem; font-size:.84rem; font-weight:600; cursor:pointer;
+    }
+    .btn-add-row:hover { border-color:#850c18; color:#850c18; }
+
+    .visRadioGroup { display:flex; flex-direction:column; gap:.5rem; margin-top:1.1rem; }
+    .visRadioRow { display:flex; align-items:flex-start; gap:.55rem; }
+    .visRadioRow input[type=radio] { width:16px; height:16px; margin-top:.15rem; cursor:pointer; }
+    .visRadioRow label { font-size:.84rem; color:#374151; cursor:pointer; }
+
     /* Mini org-chart i modal */
     .modal-section-title {
       font-size:.8rem; text-transform:uppercase; letter-spacing:.06em;
@@ -350,7 +385,7 @@
         <div class="modal-tab-panel" id="panelPrivat">
           <div>
             <div class="privatHeader">
-              <div class="modal-section-title" style="margin-bottom:0;">Privat kontakt</div>
+              <div class="modal-section-title" style="margin-bottom:0;">Privat kontakt info</div>
               <button class="btn-edit" id="btnEditPrivat" style="display:none;" onclick="toggleEditMode()">Rediger</button>
             </div>
             <div id="mPrivatDetails">
@@ -359,6 +394,11 @@
                 <div>Henter…</div>
               </div>
             </div>
+
+            <div class="modal-section-title" style="margin-top:1.6rem;">Nødkontakter i forbindelse med ulykke</div>
+            <div id="mNoedkontakter"></div>
+
+            <div id="mPrivatEditActions"></div>
           </div>
         </div>
       </div>
@@ -565,15 +605,19 @@ if (window.updateHeaderStatus) {
     }
 
     async function loadPrivateTab(u) {
-      const target  = document.getElementById("mPrivatDetails");
-      const editBtn = document.getElementById("btnEditPrivat");
+      const target      = document.getElementById("mPrivatDetails");
+      const noedTarget   = document.getElementById("mNoedkontakter");
+      const editBtn      = document.getElementById("btnEditPrivat");
       target.innerHTML = `<div class="stateMsg" style="padding:1.5rem 0;">
         <div class="spinner"></div><div>Henter…</div></div>`;
+      noedTarget.innerHTML = "";
+      document.getElementById("mPrivatEditActions").innerHTML = "";
       editBtn.style.display = "none";
 
       const lookupEmail = u.mail || u.userPrincipalName;
       if (!lookupEmail) {
         target.innerHTML = renderPrivateView({});
+        noedTarget.innerHTML = renderEmergencyView({});
         return;
       }
 
@@ -583,6 +627,7 @@ if (window.updateHeaderStatus) {
         if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
         currentPrivateData = data;
         target.innerHTML = renderPrivateView(data);
+        noedTarget.innerHTML = renderEmergencyView(data);
 
         if (canEditUser(u)) {
           editBtn.style.display = "";
@@ -623,10 +668,20 @@ if (window.updateHeaderStatus) {
         editBtn.textContent = "Annuller";
         editBtn.classList.add("cancel");
         renderPrivateEditForm(currentPrivateData || {});
+        renderEmergencyEditForm(currentPrivateData || {});
+        document.getElementById("mPrivatEditActions").innerHTML = `
+          <div class="editActions">
+            <button class="btn-save-inline" id="btnSavePrivat">Gem</button>
+            <span class="saveMsg" id="savePrivatMsg"></span>
+          </div>
+        `;
+        document.getElementById("btnSavePrivat").addEventListener("click", savePrivateEdit);
       } else {
         editBtn.textContent = "Rediger";
         editBtn.classList.remove("cancel");
         document.getElementById("mPrivatDetails").innerHTML = renderPrivateView(currentPrivateData || {});
+        document.getElementById("mNoedkontakter").innerHTML = renderEmergencyView(currentPrivateData || {});
+        document.getElementById("mPrivatEditActions").innerHTML = "";
       }
     }
 
@@ -662,13 +717,128 @@ if (window.updateHeaderStatus) {
             <label for="eAdresseVises">Vis privat adresse + postby for kolleger</label>
           </div>
         </div>
+      `;
+    }
 
-        <div class="editActions">
-          <button class="btn-save-inline" id="btnSavePrivat">Gem</button>
-          <span class="saveMsg" id="savePrivatMsg"></span>
+    // ── Nødkontakter ──────────────────────────────────────────────────────────
+    const NOED_VISIBILITY_LABELS = {
+      alle:      "Alle må se mine nødoplysninger",
+      afdeling:  "Min afdeling må se mine nødoplysninger",
+      loen_chef: "Kun lønningsafdelingen og min chef må se mine nødoplysninger",
+      ingen:     "Jeg ønsker ikke at oplyse om pårørende"
+    };
+
+    let noedRowsState = [];
+
+    function renderEmergencyView(d) {
+      if (d.noedVisibleToMe === false) {
+        return `<div class="stateMsg" style="padding:.6rem 0; color:#6b7280; font-size:.86rem;">Nødoplysninger er ikke synlige for dig.</div>`;
+      }
+
+      const contacts = Array.isArray(d.noedKontakter) ? d.noedKontakter : [];
+      const visLabel = NOED_VISIBILITY_LABELS[d.noedSynlighed] || "Ikke angivet endnu";
+
+      if (!contacts.length && !d.noedSynlighed) {
+        return `<div class="stateMsg" style="padding:.6rem 0; color:#6b7280; font-size:.86rem;">Ingen nødoplysninger registreret endnu.</div>`;
+      }
+
+      return `
+        <div class="noedTableWrap">
+          <table class="noedTable">
+            <thead>
+              <tr><th>Navn</th><th>Relation</th><th>Telefon nr. på pårørende</th></tr>
+            </thead>
+            <tbody>
+              ${contacts.length ? contacts.map(c => `
+                <tr>
+                  <td>${esc(c.navn || "–")}</td>
+                  <td>${esc(c.relation || "–")}</td>
+                  <td>${esc(c.telefon || "–")}</td>
+                </tr>
+              `).join("") : `<tr><td colspan="3" style="color:#9ca3af;">Ingen kontakter tilføjet</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        <div class="noedVisibility"><b>Synlighed:</b> ${esc(visLabel)}</div>
+      `;
+    }
+
+    function renderNoedRow(c, index) {
+      return `
+        <div class="noedRow" data-index="${index}">
+          <input type="text" class="noedNavn" placeholder="Navn" value="${escAttr(c.navn)}" />
+          <input type="text" class="noedRelation" placeholder="Relation" value="${escAttr(c.relation)}" />
+          <input type="tel" class="noedTelefon" placeholder="Telefon nr. på pårørende" value="${escAttr(c.telefon)}" />
+          <button type="button" class="btn-remove-row" data-remove="${index}" title="Slet denne nødkontakt">−</button>
         </div>
       `;
-      document.getElementById("btnSavePrivat").addEventListener("click", savePrivateEdit);
+    }
+
+    function renderNoedRowsHtml() {
+      return noedRowsState.map((c, i) => renderNoedRow(c, i)).join("");
+    }
+
+    function wireNoedRows() {
+      const wrap = document.getElementById("noedRowsWrap");
+      if (!wrap) return;
+
+      wrap.querySelectorAll(".noedRow").forEach(row => {
+        const index = Number(row.getAttribute("data-index"));
+        row.querySelector(".noedNavn").addEventListener("input", e => { noedRowsState[index].navn = e.target.value; });
+        row.querySelector(".noedRelation").addEventListener("input", e => { noedRowsState[index].relation = e.target.value; });
+        row.querySelector(".noedTelefon").addEventListener("input", e => { noedRowsState[index].telefon = e.target.value; });
+      });
+
+      wrap.querySelectorAll(".btn-remove-row").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const index = Number(btn.getAttribute("data-remove"));
+          noedRowsState.splice(index, 1);
+          if (!noedRowsState.length) noedRowsState.push({ navn: "", relation: "", telefon: "" });
+          wrap.innerHTML = renderNoedRowsHtml();
+          wireNoedRows();
+        });
+      });
+    }
+
+    function renderEmergencyEditForm(d) {
+      noedRowsState = (Array.isArray(d.noedKontakter) && d.noedKontakter.length)
+        ? d.noedKontakter.map(c => ({ navn: c.navn || "", relation: c.relation || "", telefon: c.telefon || "" }))
+        : [{ navn: "", relation: "", telefon: "" }];
+
+      const target = document.getElementById("mNoedkontakter");
+      target.innerHTML = `
+        <div class="noedRowsWrap" id="noedRowsWrap">
+          ${renderNoedRowsHtml()}
+        </div>
+        <button type="button" class="btn-add-row" id="btnAddNoedRow">+ Tilføj endnu en nødkontakt</button>
+
+        <div class="visRadioGroup">
+          <div class="visRadioRow">
+            <input type="radio" name="noedSynlighed" id="visAlle" value="alle" ${d.noedSynlighed === "alle" ? "checked" : ""} />
+            <label for="visAlle">${esc(NOED_VISIBILITY_LABELS.alle)}</label>
+          </div>
+          <div class="visRadioRow">
+            <input type="radio" name="noedSynlighed" id="visAfdeling" value="afdeling" ${d.noedSynlighed === "afdeling" ? "checked" : ""} />
+            <label for="visAfdeling">${esc(NOED_VISIBILITY_LABELS.afdeling)}</label>
+          </div>
+          <div class="visRadioRow">
+            <input type="radio" name="noedSynlighed" id="visLoenChef" value="loen_chef" ${d.noedSynlighed === "loen_chef" ? "checked" : ""} />
+            <label for="visLoenChef">${esc(NOED_VISIBILITY_LABELS.loen_chef)}</label>
+          </div>
+          <div class="visRadioRow">
+            <input type="radio" name="noedSynlighed" id="visIngen" value="ingen" ${d.noedSynlighed === "ingen" ? "checked" : ""} />
+            <label for="visIngen">${esc(NOED_VISIBILITY_LABELS.ingen)}</label>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("btnAddNoedRow").addEventListener("click", () => {
+        noedRowsState.push({ navn: "", relation: "", telefon: "" });
+        document.getElementById("noedRowsWrap").innerHTML = renderNoedRowsHtml();
+        wireNoedRows();
+      });
+
+      wireNoedRows();
     }
 
     async function savePrivateEdit() {
@@ -680,13 +850,25 @@ if (window.updateHeaderStatus) {
       msg.textContent = "";
       msg.className = "saveMsg";
 
+      const noedKontakter = noedRowsState
+        .map(c => ({
+          navn:     (c.navn || "").trim(),
+          relation: (c.relation || "").trim(),
+          telefon:  (c.telefon || "").trim()
+        }))
+        .filter(c => c.navn || c.relation || c.telefon);
+
+      const noedSynlighedInput = document.querySelector('input[name="noedSynlighed"]:checked');
+
       const payload = {
         privatMail:    document.getElementById("ePrivatMail").value.trim(),
         privatTlf:     document.getElementById("ePrivatTlf").value.trim(),
         privatAdresse: document.getElementById("ePrivatAdresse").value.trim(),
         privatPostby:  document.getElementById("ePrivatPostby").value.trim(),
         telefonVises:  document.getElementById("eTelefonVises").checked,
-        adresseVises:  document.getElementById("eAdresseVises").checked
+        adresseVises:  document.getElementById("eAdresseVises").checked,
+        noedKontakter,
+        noedSynlighed: noedSynlighedInput ? noedSynlighedInput.value : ""
       };
 
       try {
@@ -708,6 +890,8 @@ if (window.updateHeaderStatus) {
           editBtn.textContent = "Rediger";
           editBtn.classList.remove("cancel");
           document.getElementById("mPrivatDetails").innerHTML = renderPrivateView(currentPrivateData);
+          document.getElementById("mNoedkontakter").innerHTML = renderEmergencyView(currentPrivateData);
+          document.getElementById("mPrivatEditActions").innerHTML = "";
         }, 600);
       } catch (e) {
         msg.textContent = "Fejl: " + e.message;
