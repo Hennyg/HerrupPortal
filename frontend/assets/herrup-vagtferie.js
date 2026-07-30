@@ -475,7 +475,16 @@
             const r = await fetch("/.auth/me", { cache: "no-store" });
             const j = r.ok ? await r.json() : null;
             const principal = j?.clientPrincipal || null;
-            const roles = (principal?.userRoles || []).map(role => String(role).toLowerCase());
+
+            const fromUserRoles = (principal?.userRoles || []).map(role => String(role).toLowerCase());
+            const fromClaims = (principal?.claims || [])
+                .filter(c => {
+                    const t = String(c.typ || "").toLowerCase();
+                    return t === "roles" || t === "role" || t.endsWith("/identity/claims/role");
+                })
+                .map(c => String(c.val || "").toLowerCase());
+
+            const roles = Array.from(new Set([...fromUserRoles, ...fromClaims]));
             const email = (principal?.userDetails || "").toLowerCase().trim();
             __meInfoCache = { roles, email };
         } catch {
@@ -527,21 +536,23 @@
     }
 
     function renderSummary(data, employee, canSee) {
+        if (!canSee) {
+            return "";
+        }
+
         const summaryRows = summary(employee, panelState.year);
 
         return `
             <div class="herrup-vf-card herrup-vf-summary-under-calendar">
-                <h3 class="herrup-vf-section-title">Opsummering ${panelState.year} (sammentalt fra Vagt og ferieplan regnearket)</h3>
-                ${canSee ? `
-                    <div class="vf-summary">
-                        ${summaryRows.length ? summaryRows.map(row => `
-                            <div class="vf-summary-item">
-                                ${badge(row.code, row.code)}
-                                <span>${esc((data.legend || {})[row.code] || row.code)}: <b>${row.count}</b></span>
-                            </div>
-                        `).join("") : `<div class="vf-muted">Ingen data</div>`}
-                    </div>
-                ` : `<div class="vf-muted">Kun synlig for medarbejderen selv eller administrator.</div>`}
+                <h3 class="herrup-vf-section-title">Opsummering ${panelState.year} <span class="herrup-vf-summary-subtitle">(sammentalt fra Vagt og ferieplan regnearket)</span></h3>
+                <div class="vf-summary">
+                    ${summaryRows.length ? summaryRows.map(row => `
+                        <div class="vf-summary-item">
+                            ${badge(row.code, row.code)}
+                            <span>${esc((data.legend || {})[row.code] || row.code)}: <b>${row.count}</b></span>
+                        </div>
+                    `).join("") : `<div class="vf-muted">Ingen data</div>`}
+                </div>
             </div>
         `;
     }
