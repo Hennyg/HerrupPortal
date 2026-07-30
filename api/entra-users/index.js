@@ -77,12 +77,14 @@ async function getGroupMembers(token, groupId) {
 }
 
 // ── Hent foto som base64 (returnerer null hvis ingen) ────────────────────────
-// 240x240 i stedet for 48x48 — undgår sløret opskalering når billedet vises
-// større end 48px (f.eks. i personkortet på herrup.html).
+// Bruges kun til listen/org-oversigten, hvor billedet højst vises i 48px —
+// derfor 48x48, som holder /api/entra-users-svaret lille og hurtigt for ALLE
+// medarbejdere. Det store 240x240-billede til personkortet hentes separat,
+// kun for den ene person man åbner (se api/employee-private/index.js).
 async function getPhoto(token, userId) {
   try {
     const r = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${userId}/photos/240x240/$value`,
+      `https://graph.microsoft.com/v1.0/users/${userId}/photos/48x48/$value`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     if (!r.ok) return null;
