@@ -12,6 +12,35 @@
 <link rel="stylesheet" href="/assets/herrup-vagtferie.css">
 
   <style>
+    /* ── Fast sidelayout: kun personlisten/org-oversigten scroller, ikke hele siden ── */
+    body {
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .navbar { flex-shrink: 0; }
+    .container {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .pageTitle, .pageSub, .tabs { flex-shrink: 0; }
+    #listView {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    .userToolbar { flex-shrink: 0; }
+    .tableWrap {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
     .pageTitle { text-align:center; margin:0; font-size:2rem; color:var(--heading); }
     .pageSub   { text-align:center; margin:6px 0 18px; color:#6b7280; font-size:.9rem; }
 
@@ -235,7 +264,7 @@
     .mini-reports { display:flex; flex-direction:column; gap:.4rem; margin-top:.4rem; }
 
     /* ── Org chart: afdeling-visning ─────────────────────────────────────────── */
-    #orgView { display:none; overflow-x:auto; padding-bottom:1rem; }
+    #orgView { display:none; flex:1; min-height:0; overflow-x:auto; overflow-y:auto; padding-bottom:1rem; }
     .org-placeholder { color:#9ca3af; font-size:.85rem; text-align:center; padding:2rem; }
 
     .dept-section { margin-bottom:2rem; }
