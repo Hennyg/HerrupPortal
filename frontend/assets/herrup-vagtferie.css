@@ -148,6 +148,30 @@
     font-size: .9rem;
 }
 
+.herrup-vf-quicknav {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: -4px 0 14px;
+}
+
+.herrup-vf-quicknav button {
+    appearance: none;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    border-radius: 8px;
+    padding: .4rem .85rem;
+    font-size: .85rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+}
+
+.herrup-vf-quicknav button:hover {
+    border-color: #9b0717;
+    color: #9b0717;
+}
+
 .herrup-vf-title {
     font-size: 1.1rem;
     font-weight: 800;
