@@ -710,6 +710,12 @@
                     </div>
                 </div>
 
+                <div class="herrup-vf-quicknav">
+                    <button type="button" id="herrupVfPrevMonth">← Forrige måned</button>
+                    <button type="button" id="herrupVfThisMonth">Denne måned</button>
+                    <button type="button" id="herrupVfNextMonth">Næste måned →</button>
+                </div>
+
                 <div id="herrupVfContent">
                     ${panelState.view === "department" ? renderDepartment(data, employee, canSee) : renderPerson(data, employee, canSee)}
                 </div>
@@ -719,6 +725,46 @@
         } catch (error) {
             panel.innerHTML = `<div class="vf-error"><b>Kunne ikke hente vagt-/ferieplan.</b><br>${String(error.message || error)}</div>`;
         }
+    }
+
+    // Skifter måned relativt (delta = -1/+1) med korrekt årsskifte, og
+    // nulstiller cachen hvis det medfører et årsskifte (data hentes pr. år).
+    function changeMonth(delta) {
+        let newMonth = panelState.month + delta;
+        let newYear  = panelState.year;
+
+        while (newMonth > 12) { newMonth -= 12; newYear += 1; }
+        while (newMonth < 1)  { newMonth += 12; newYear -= 1; }
+
+        const yearChanged = newYear !== panelState.year;
+        panelState.month  = newMonth;
+        panelState.year   = newYear;
+        panelState.weekStart = dateToIso(mondayOf(new Date(panelState.year, panelState.month - 1, 1)));
+
+        if (yearChanged) {
+            window.__vagtFerieData    = null;
+            window.__vagtFeriePromise = null;
+            lastHeaderStatusName = "";
+        }
+
+        renderPanel();
+    }
+
+    function goToCurrentMonth() {
+        const today = new Date();
+        const yearChanged = today.getFullYear() !== panelState.year;
+
+        panelState.month     = today.getMonth() + 1;
+        panelState.year      = today.getFullYear();
+        panelState.weekStart = dateToIso(mondayOf(today));
+
+        if (yearChanged) {
+            window.__vagtFerieData    = null;
+            window.__vagtFeriePromise = null;
+            lastHeaderStatusName = "";
+        }
+
+        renderPanel();
     }
 
     function wirePanel() {
@@ -737,6 +783,10 @@
             panelState.weekStart = dateToIso(mondayOf(new Date(panelState.year, panelState.month - 1, 1)));
             renderPanel();
         });
+
+        document.getElementById("herrupVfPrevMonth")?.addEventListener("click", () => changeMonth(-1));
+        document.getElementById("herrupVfNextMonth")?.addEventListener("click", () => changeMonth(1));
+        document.getElementById("herrupVfThisMonth")?.addEventListener("click", () => goToCurrentMonth());
 
         document.getElementById("herrupVfYear")?.addEventListener("change", event => {
             panelState.year = Number(event.target.value);
@@ -829,13 +879,13 @@
             subtree: true
         });
 
-        window.addEventListener("load", () => {
-            if (!progress.azureDone) {
-                markDone("azure");
-            }
-
-            waitForVisibleImages();
-        });
+        // Sikkerhedsnet: hvis __herrupOnUsersRendered() af en eller anden grund
+        // aldrig bliver kaldt (fejl i herrup.html's init, script-fejl osv.),
+        // skal baren ikke hænge fast for evigt.
+        setTimeout(() => {
+            if (!progress.azureDone) markDone("azure");
+            if (!progress.imagesDone) waitForVisibleImages();
+        }, 20000);
     });
 
     window.updateHeaderStatus = updateHeaderStatus;
