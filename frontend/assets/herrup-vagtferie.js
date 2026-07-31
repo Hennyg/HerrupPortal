@@ -832,7 +832,7 @@
         tabs.appendChild(button);
 
         const panel = document.createElement("div");
-        panel.className = "modal-tab-panel";
+        panel.className = "modal-tab-panel herrup-vf-tabpanel";
         panel.id = "panelVagtFerie";
         body.appendChild(panel);
 
