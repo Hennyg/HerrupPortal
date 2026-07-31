@@ -8,6 +8,14 @@
     max-width: 1240px !important;
 }
 
+/* Vagt/Ferie-fanen skal ligge tæt op til linjen under Arbejde/Privat/Vagt-Ferie,
+   og have mindre luft mellem toolbar og Kommende/kalender, så Opsummering
+   kommer i sigte uden at skulle rulle. Kun denne fane påvirkes (via id på panelet). */
+.herrup-vf-tabpanel.active {
+    margin-top: -0.85rem;
+    gap: 0.65rem;
+}
+
 .herrup-load-card {
     position: fixed;
     left: 50%;
@@ -105,7 +113,6 @@
     gap: 10px;
     align-items: flex-start;
     flex-wrap: wrap;
-    margin-bottom: 8px;
 }
 
 .herrup-vf-toggle {
