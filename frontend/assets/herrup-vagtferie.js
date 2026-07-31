@@ -322,7 +322,7 @@
 
     function upcoming(employee) {
         const today = todayIso();
-        return (employee?.days || []).filter(day => day.date >= today).slice(0, 14);
+        return (employee?.days || []).filter(day => day.date >= today).slice(0, 7);
     }
 
     function summary(employee, year) {
@@ -570,12 +570,9 @@
         const upcomingDays = upcoming(employee);
 
         return `
-            <div class="herrup-vf-title">${esc(employee.name)}</div>
-            <div class="herrup-vf-sub">${esc(employee.area || selectedBadgeDepartment() || "")} · ${esc(selectedJobTitle())}</div>
-
             <div class="herrup-vf-grid2">
                 <section class="herrup-vf-card">
-                    <h3 class="herrup-vf-section-title">Kommende 14 markeringer</h3>
+                    <h3 class="herrup-vf-section-title">Kommende 7 markeringer</h3>
                     <div class="herrup-vf-upcoming">
                         ${upcomingDays.length ? upcomingDays.map(day => `
                             <div class="herrup-vf-row">
@@ -611,9 +608,6 @@
         const weekNo = weekNumber(start);
 
         return `
-            <div class="herrup-vf-title">${esc(employee.name)}</div>
-            <div class="herrup-vf-sub">${esc(employee.area || selectedBadgeDepartment() || "")} · ${esc(selectedJobTitle())}</div>
-
             <div class="herrup-vf-dept-head">
                 <div>
                     <div class="herrup-vf-title">${esc(area || "Afdeling")}</div>
@@ -697,23 +691,25 @@
                         <button id="herrupVfDept" class="${panelState.view === "department" ? "active" : ""}">Afdeling</button>
                     </div>
 
-                    <div class="herrup-vf-controls">
-                        <select id="herrupVfMonth">
-                            ${MONTHS.map((month, index) => `<option value="${index + 1}" ${(index + 1) === panelState.month ? "selected" : ""}>${month}</option>`).join("")}
-                        </select>
+                    <div class="herrup-vf-controls-wrap">
+                        <div class="herrup-vf-controls">
+                            <select id="herrupVfMonth">
+                                ${MONTHS.map((month, index) => `<option value="${index + 1}" ${(index + 1) === panelState.month ? "selected" : ""}>${month}</option>`).join("")}
+                            </select>
 
-                        <select id="herrupVfYear">
-                            ${[panelState.year - 1, panelState.year, panelState.year + 1].map(year => `<option value="${year}" ${year === panelState.year ? "selected" : ""}>${year}</option>`).join("")}
-                        </select>
+                            <select id="herrupVfYear">
+                                ${[panelState.year - 1, panelState.year, panelState.year + 1].map(year => `<option value="${year}" ${year === panelState.year ? "selected" : ""}>${year}</option>`).join("")}
+                            </select>
 
-                        <button id="herrupVfRefresh">Opdater data</button>
+                            <button id="herrupVfRefresh">Opdater data</button>
+                        </div>
+
+                        <div class="herrup-vf-quicknav">
+                            <button type="button" id="herrupVfPrevMonth">← Forrige måned</button>
+                            <button type="button" id="herrupVfThisMonth">Denne måned</button>
+                            <button type="button" id="herrupVfNextMonth">Næste måned →</button>
+                        </div>
                     </div>
-                </div>
-
-                <div class="herrup-vf-quicknav">
-                    <button type="button" id="herrupVfPrevMonth">← Forrige måned</button>
-                    <button type="button" id="herrupVfThisMonth">Denne måned</button>
-                    <button type="button" id="herrupVfNextMonth">Næste måned →</button>
                 </div>
 
                 <div id="herrupVfContent">
