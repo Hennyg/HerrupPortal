@@ -262,18 +262,18 @@
 .herrup-vf-month {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 5px;
+    gap: 4px;
 }
 
 .herrup-vf-daycell {
-    min-height: 42px;
+    min-height: 32px;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
-    padding: 5px;
+    padding: 3px;
     background: #fff;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .herrup-vf-daycell.weekend {
