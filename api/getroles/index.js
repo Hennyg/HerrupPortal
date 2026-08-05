@@ -1,6 +1,6 @@
 module.exports = async function (context, req) {
   const principalB64 = req.headers["x-ms-client-principal"];
-context.log("getRoles input principal:", JSON.stringify(cp));
+
   if (!principalB64) {
     context.res = {
       status: 200,
@@ -21,6 +21,16 @@ context.log("getRoles input principal:", JSON.stringify(cp));
     };
     return;
   }
+
+  // ── MIDLERTIDIG DEBUG: sender den modtagne principal til webhook.site ──
+  try {
+    await fetch("https://webhook.site/DIN-UNIKKE-URL-HER", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "getroles", cp })
+    });
+  } catch {}
+  // ── SLUT PÅ MIDLERTIDIG DEBUG ──
 
   const rolesFromUserRoles = (cp.userRoles || []).map(r => String(r).toLowerCase());
 
