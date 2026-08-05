@@ -1,6 +1,6 @@
 module.exports = async function (context, req) {
   const principalB64 = req.headers["x-ms-client-principal"];
-
+context.log("getRoles input principal:", JSON.stringify(cp));
   if (!principalB64) {
     context.res = {
       status: 200,
