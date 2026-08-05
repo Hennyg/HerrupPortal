@@ -24,7 +24,7 @@ module.exports = async function (context, req) {
 
   // ── MIDLERTIDIG DEBUG: sender den modtagne principal til webhook.site ──
   try {
-    await fetch("https://webhook.site/DIN-UNIKKE-URL-HER", {
+    await fetch("https://webhook.site/7f3278e9-1032-4355-968b-9bc2980d3c18", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: "getroles", cp })
