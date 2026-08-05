@@ -24,7 +24,7 @@ async function getGraphToken() {
 }
 
 async function getAppServicePrincipal(graphToken) {
-  const clientId = process.env.DV_CLIENT_ID;
+  const clientId = process.env.AZURE_CLIENT_ID;   // ← ændret fra DV_CLIENT_ID
   const r = await fetch(
     `https://graph.microsoft.com/v1.0/servicePrincipals?$filter=appId eq '${clientId}'&$select=id,appId,appRoles`,
     { headers: { Authorization: `Bearer ${graphToken}` } }
@@ -32,7 +32,7 @@ async function getAppServicePrincipal(graphToken) {
   const j = await r.json();
   if (!r.ok) throw new Error(`graph_sp_error ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
   const sp = (j.value || [])[0];
-  if (!sp) throw new Error("Service principal ikke fundet for DV_CLIENT_ID");
+  if (!sp) throw new Error("Service principal ikke fundet for AZURE_CLIENT_ID");
   return sp;
 }
 
