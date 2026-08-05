@@ -4,9 +4,16 @@
 //
 // GET   /api/employee-private/{email}  → henter felter, filtreret af vises-flag
 // PATCH /api/employee-private/{email}  → opdaterer felter — kun tilladt for
-//        portal_admin ELLER hvis den indloggede bruger redigerer sig selv
+//        portal_admin/portal_herrup_portal_admin ELLER hvis den indloggede
+//        bruger redigerer sig selv
 //
-// Miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_COREDATA
+// Roller læses IKKE fra principal.claims (den er altid tom i Azure Functions-
+// backend'en — kun /.auth/me fra browseren har den fulde claims-liste).
+// Roller slås i stedet op direkte via Microsoft Graph (appRoleAssignments)
+// mod login-app'en (AZURE_CLIENT_ID), med samme Graph-token som DV_CLIENT_ID
+// allerede bruger til afdeling/chef/foto-opslag.
+//
+// Miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_COREDATA, AZURE_CLIENT_ID
 
 const fetch = globalThis.fetch;
 
@@ -16,20 +23,11 @@ function json(context, status, body) {
   context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
 }
 
-function getRolesFromPrincipal(principal) {
-  return [
-    ...(principal.userRoles || []),
-    ...(principal.claims || [])
-      .filter(c => String(c.typ || "").toLowerCase() === "roles")
-      .map(c => String(c.val || ""))
-  ].map(r => String(r).toLowerCase());
-}
-
 function getEmailFromPrincipal(principal) {
   return (principal.userDetails || "").toLowerCase();
 }
 
-// ── Microsoft Graph: afdeling + chef-opslag (samme app-registrering som Dataverse) ─
+// ── Microsoft Graph: token, roller, afdeling + chef-opslag ──────────────────
 async function getGraphToken() {
   const tenant       = process.env.DV_TENANT_ID;
   const clientId     = process.env.DV_CLIENT_ID;
@@ -55,6 +53,50 @@ async function getGraphToken() {
   const j = await r.json();
   if (!r.ok) throw new Error(`graph_token_error ${r.status}: ${j.error_description || JSON.stringify(j)}`);
   return j.access_token;
+}
+
+// Slår login-app'ens (AZURE_CLIENT_ID) service principal op, inkl. dens App Roles.
+// Bruges til at kunne oversætte et appRoleId til det læsbare rollenavn (fx "portal_admin").
+async function getAppServicePrincipal(graphToken) {
+  const clientId = process.env.AZURE_CLIENT_ID;
+  if (!clientId) throw new Error("Manglende miljøvariabel: AZURE_CLIENT_ID");
+
+  const r = await fetch(
+    `https://graph.microsoft.com/v1.0/servicePrincipals?$filter=appId eq '${clientId}'&$select=id,appId,appRoles`,
+    { headers: { Authorization: `Bearer ${graphToken}` } }
+  );
+  const j = await r.json();
+  if (!r.ok) throw new Error(`graph_sp_error ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
+  const sp = (j.value || [])[0];
+  if (!sp) throw new Error("Service principal ikke fundet for AZURE_CLIENT_ID");
+  return sp;
+}
+
+// Henter de portal_xxx-roller den indloggede bruger reelt har, via Graph
+// (appRoleAssignments), i stedet for principal.claims (som er tom i backend).
+async function getUserPortalRoles(graphToken, userId) {
+  if (!userId) return [];
+  try {
+    const sp = await getAppServicePrincipal(graphToken);
+
+    const r = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${userId}/appRoleAssignments`,
+      { headers: { Authorization: `Bearer ${graphToken}` } }
+    );
+    const j = await r.json();
+    if (!r.ok) throw new Error(`graph_approles_error ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
+
+    const roleIdToValue = new Map((sp.appRoles || []).map(role => [role.id, String(role.value || "")]));
+
+    return (j.value || [])
+      .filter(a => a.resourceId === sp.id)
+      .map(a => (roleIdToValue.get(a.appRoleId) || "").toLowerCase())
+      .filter(Boolean);
+  } catch (e) {
+    // Fejler Graph-opslaget (rettigheder, netværk osv.), skal brugeren IKKE
+    // automatisk regnes som admin — kun isSelf-vejen er tilgængelig da.
+    return [];
+  }
 }
 
 async function getUserDepartment(graphToken, email) {
@@ -106,14 +148,13 @@ async function getBigEntraPhoto(graphToken, email) {
 
 // Afgør om "myEmail" må se nødkontakterne for "email", givet det valgte synlighedsniveau.
 // isAdmin/isSelf er allerede tjekket af den kaldende kode og giver altid adgang.
-async function resolveNoedVisibility(context, { noedSynlighed, myEmail, myRoles, targetEmail }) {
+async function resolveNoedVisibility(context, { noedSynlighed, myEmail, myRoles, targetEmail, graphToken }) {
   if (noedSynlighed === "alle") {
     return true;
   }
 
   if (noedSynlighed === "afdeling") {
     try {
-      const graphToken = await getGraphToken();
       const [myDept, targetDept] = await Promise.all([
         getUserDepartment(graphToken, myEmail),
         getUserDepartment(graphToken, targetEmail)
@@ -130,7 +171,6 @@ async function resolveNoedVisibility(context, { noedSynlighed, myEmail, myRoles,
       return true;
     }
     try {
-      const graphToken = await getGraphToken();
       const managerEmail = await getUserManagerEmail(graphToken, targetEmail);
       return !!managerEmail && managerEmail === myEmail;
     } catch (e) {
@@ -292,18 +332,19 @@ module.exports = async function (context, req) {
   try {
     const token = await getDataverseToken();
 
-    if (req.method === "GET") {
-      const roles   = getRolesFromPrincipal(principal);
-      const isAdmin = roles.includes("portal_admin") || roles.includes("portal_herrup_portal_admin");
-      const myEmail = getEmailFromPrincipal(principal);
-      const isSelf  = myEmail && myEmail === email.toLowerCase();
+    // Én Graph-token bruges til både rolleopslag, afdeling/chef og foto.
+    const graphToken = await getGraphToken();
+    const roles      = await getUserPortalRoles(graphToken, principal.userId);
+    const isAdmin     = roles.includes("portal_admin") || roles.includes("portal_herrup_portal_admin");
+    const myEmail     = getEmailFromPrincipal(principal);
+    const isSelf       = myEmail && myEmail === email.toLowerCase();
 
+    if (req.method === "GET") {
       const emp = await findEmployeeByMail(token, dvUrl, email);
 
       if (!emp) {
         let bigPhoto = null;
         try {
-          const graphToken = await getGraphToken();
           bigPhoto = await getBigEntraPhoto(graphToken, email);
         } catch (e) {
           context.log("Kunne ikke hente stort Entra-billede:", e.message);
@@ -330,7 +371,8 @@ module.exports = async function (context, req) {
         noedSynlighed,
         myEmail,
         myRoles: roles,
-        targetEmail: email
+        targetEmail: email,
+        graphToken
       });
 
       // Skarpt billede til personkortet: brug det uploadede hvis der er et,
@@ -339,7 +381,6 @@ module.exports = async function (context, req) {
       let bigPhoto = hasCustomPhoto ? emp.cr1eb_lch_foto : null;
       if (!bigPhoto) {
         try {
-          const graphToken = await getGraphToken();
           bigPhoto = await getBigEntraPhoto(graphToken, email);
         } catch (e) {
           context.log("Kunne ikke hente stort Entra-billede:", e.message);
@@ -363,11 +404,6 @@ module.exports = async function (context, req) {
     }
 
     if (req.method === "PATCH") {
-      const roles   = getRolesFromPrincipal(principal);
-      const isAdmin = roles.includes("portal_admin") || roles.includes("portal_herrup_portal_admin");
-      const myEmail = getEmailFromPrincipal(principal);
-      const isSelf  = myEmail && myEmail === email.toLowerCase();
-
       if (!isAdmin && !isSelf) {
         return json(context, 403, { error: "Du kan kun redigere dine egne oplysninger" });
       }
