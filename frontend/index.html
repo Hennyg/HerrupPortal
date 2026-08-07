@@ -13,6 +13,55 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-32x32.png">
   <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  .persDropdown { position: relative; display: inline-block; }
+  .persDropdownToggle { color: inherit; text-decoration: none; cursor: pointer; }
+  .persDropdownMenu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 6px;
+    background: #fff;
+    color: #111;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    min-width: 260px;
+    z-index: 50;
+    overflow: hidden;
+  }
+  .persDropdown.open .persDropdownMenu { display: block; }
+  .persDropdownItem {
+    display: block;
+    padding: 10px 14px;
+    color: #111;
+    text-decoration: none;
+    font-size: .92rem;
+  }
+  .persDropdownItemTop { border-bottom: 1px solid #eee; font-weight: 600; }
+  .persDropdownItem:hover { background: #f5f5f5; }
+  .persSearchWrap { padding: 8px 10px; }
+  .persSearchWrap input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: .88rem;
+  }
+  .persSearchResults { max-height: 260px; overflow-y: auto; margin-top: 4px; }
+  .persSearchResult {
+    padding: 7px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: .86rem;
+  }
+  .persSearchResult:hover { background: #f0f0f0; }
+  .persSearchResultName { font-weight: 600; }
+  .persSearchResultSub { color: #6b7280; font-size: .78rem; }
+  .persSearchEmpty, .persSearchLoading { color: #6b7280; font-size: .82rem; padding: 6px 8px; }
+</style>
 </head>
 
 <body>
@@ -27,7 +76,18 @@
 <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
 <span class="sep">|</span>
 <a href="/guide.html">Genvej</a>
-<a href="/herrup.html" target="_blank" rel="noopener">Personaleliste</a>
+
+<div class="persDropdown" id="persDropdown">
+  <a href="#" id="persDropdownToggle" class="persDropdownToggle">Personaleliste ▾</a>
+  <div class="persDropdownMenu" id="persDropdownMenu">
+    <a href="/herrup.html" target="_blank" rel="noopener" class="persDropdownItem persDropdownItemTop">Vis liste</a>
+    <div class="persSearchWrap">
+      <input type="text" id="persSearchInput" placeholder="Søg medarbejder…" autocomplete="off">
+      <div id="persSearchResults" class="persSearchResults"></div>
+    </div>
+  </div>
+</div>
+
 <a id="adminLink" class="hidden" href="/admin.html">Admin</a>
 <a href="/logout">Log ud</a>
 </div>
@@ -61,8 +121,104 @@
 </div>
 
 <script src="/assets/app.js"></script>
+<script src="/assets/entraCache.js"></script>
 
 <script>
+// Varm browser-cachen op så snart portalen åbnes, så Personaleliste og
+// søgning kan bruge lokale data uden netværkskald.
+entraCacheWarm();
+
+(function () {
+  const dropdown = document.getElementById("persDropdown");
+  const toggle   = document.getElementById("persDropdownToggle");
+  const input    = document.getElementById("persSearchInput");
+  const results  = document.getElementById("persSearchResults");
+  let debounceTimer = null;
+  let activeFetch = 0;
+
+  toggle.addEventListener("click", (e) => {
+    e.preventDefault();
+    dropdown.classList.toggle("open");
+    if (dropdown.classList.contains("open")) {
+      setTimeout(() => input.focus(), 0);
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dropdown.contains(e.target)) {
+      dropdown.classList.remove("open");
+    }
+  });
+
+  input.addEventListener("input", () => {
+    const q = input.value.trim();
+    clearTimeout(debounceTimer);
+    if (q.length < 2) {
+      results.innerHTML = "";
+      return;
+    }
+    debounceTimer = setTimeout(() => runSearch(q), 300);
+  });
+
+  async function runSearch(q) {
+    const myFetchId = ++activeFetch;
+    results.innerHTML = `<div class="persSearchLoading">Søger…</div>`;
+    try {
+      const entry = await entraCacheRead();
+      let list;
+
+      if (entraCacheIsFresh(entry)) {
+        // Cache er varm — filtrer lokalt, ingen server-tur.
+        const ql = q.toLowerCase();
+        list = entry.data
+          .filter(u => (u.displayName || "").toLowerCase().includes(ql) || (u.mail || "").toLowerCase().includes(ql))
+          .slice(0, 15);
+      } else {
+        // Koldt cache — brug det lette søge-endpoint i stedet for at vente på hele listen.
+        const r = await fetch(`/api/entra-users-search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        list = data;
+        entraCacheWarm(); // varm cachen op i baggrunden til næste gang
+      }
+
+      if (myFetchId !== activeFetch) return;
+      renderResults(list);
+    } catch (e) {
+      if (myFetchId !== activeFetch) return;
+      results.innerHTML = `<div class="persSearchEmpty">Kunne ikke søge: ${escHtml(e.message)}</div>`;
+    }
+  }
+
+  function renderResults(list) {
+    if (!list.length) {
+      results.innerHTML = `<div class="persSearchEmpty">Ingen resultater</div>`;
+      return;
+    }
+    results.innerHTML = list.map(u => `
+      <div class="persSearchResult" data-id="${escHtml(u.id)}">
+        <div class="persSearchResultName">${escHtml(u.displayName || "–")}</div>
+        <div class="persSearchResultSub">${escHtml([u.jobTitle, u.department].filter(Boolean).join(" · ") || u.mail || "")}</div>
+      </div>
+    `).join("");
+    results.querySelectorAll(".persSearchResult").forEach(el => {
+      el.addEventListener("click", () => {
+        const id = el.getAttribute("data-id");
+        window.open(`/herrup.html?person=${encodeURIComponent(id)}`, "_blank", "noopener");
+        dropdown.classList.remove("open");
+        input.value = "";
+        results.innerHTML = "";
+      });
+    });
+  }
+
+  function escHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+})();
+
 if ("serviceWorker" in navigator) {
 window.addEventListener("load", async () => {
 try {
