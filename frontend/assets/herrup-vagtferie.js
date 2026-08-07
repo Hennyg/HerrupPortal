@@ -975,4 +975,5 @@ function updateProgress() {
     };
 
     window.updateHeaderStatus = updateHeaderStatus;
+    window.preloadVagtFerie   = preloadVagtFerie;
 })();

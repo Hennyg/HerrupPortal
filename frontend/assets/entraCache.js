@@ -153,3 +153,12 @@ window.herrupCacheWriteKey     = herrupCacheWriteKey;
 window.herrupCacheDeleteKey    = herrupCacheDeleteKey;
 window.herrupCacheEntryIsFresh = herrupCacheEntryIsFresh;
 window.VAGTFERIE_CACHE_TTL_MS  = HERRUP_CACHE_DEFAULT_TTL_MS;
+
+// Sletter medarbejder-cachen, så næste hentning (fra index.html eller
+// herrup.html) altid rammer serveren friskt, uanset TTL. Bruges af
+// "Opdater data"-knappen i herrup.html, fx efter en rettelse i Entra ID
+// eller i regnearket bag vagt/ferie-planen.
+async function entraCacheInvalidate() {
+  await herrupCacheDeleteKey(ENTRA_CACHE_KEY);
+}
+window.entraCacheInvalidate = entraCacheInvalidate;

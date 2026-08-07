@@ -366,6 +366,7 @@
           <button class="x" id="searchClear" type="button" title="Ryd">✕</button>
         </div>
         <select id="deptFilter"><option value="">Alle afdelinger</option></select>
+        <button id="refreshDataBtn" type="button" class="tab" title="Genindlæs medarbejdere og vagt/ferie fra serveren (springer cache over)">🔄 Opdater data</button>
         <span id="userCount" class="muted"></span>
       </div>
       <div class="tableWrap">
@@ -534,6 +535,31 @@
         setTimeout(refreshDagensStatusWhenReady, 200);
       }
     }
+
+    // "Opdater data": bruges når man har rettet noget i Entra ID eller i
+    // regnearket bag vagt/ferie-planen, og ikke vil vente på at browser-
+    // cachen (op til 30 min) udløber selv. Sletter begge cache-poster og
+    // henter alt friskt fra serveren igen.
+    document.getElementById("refreshDataBtn")?.addEventListener("click", async () => {
+      const btn = document.getElementById("refreshDataBtn");
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Opdaterer…";
+      try {
+        if (window.entraCacheInvalidate) await window.entraCacheInvalidate();
+        if (window.herrupCacheDeleteKey) {
+          await window.herrupCacheDeleteKey(`vagtferie:${new Date().getFullYear()}`);
+        }
+        window.__vagtFerieData    = null;
+        window.__vagtFeriePromise = null;
+        dagensStatusHookInstalled = false;
+        if (window.preloadVagtFerie) window.preloadVagtFerie().catch(() => {});
+        await loadFullUserList(false);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    });
 
     async function openSinglePersonThenLoadRest(id, alsoLoadFullList) {
       try {
