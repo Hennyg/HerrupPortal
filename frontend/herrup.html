@@ -462,6 +462,7 @@
   </div>
 
   <script src="/assets/app.js"></script>
+  <script src="/assets/entraCache.js"></script>
   <script>
     let allUsers = [];
     let byId     = new Map();
@@ -473,36 +474,88 @@
     let currentPrivateData = null;
     let editMode = false;
 
-    // ── Init ──────────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────────────────
     (async function init() {
       let me = null;
       try { me = await getMe(); } catch {}
       const userLine = document.getElementById("userLine");
       if (userLine) userLine.textContent = me?.userDetails || "";
 
-const roles = expandRoles(rolesFromMe(me));
-myRoles = roles;
-myEmail = (me?.userDetails || "").toLowerCase();
+      const roles = expandRoles(rolesFromMe(me));
+      myRoles = roles;
+      myEmail = (me?.userDetails || "").toLowerCase();
 
+      const directOpenId = new URLSearchParams(location.search).get("person");
+      const entry = await entraCacheRead();
+
+      if (entraCacheIsFresh(entry)) {
+        // Browser-cachen er varm — render med det samme, intet netværkskald for listen.
+        applyUserList(entry.data);
+        if (directOpenId) {
+          if (byId.has(directOpenId)) {
+            openModal(directOpenId);
+          } else {
+            // Findes ikke i det cachede snapshot (fx en helt ny medarbejder) — slå op direkte.
+            openSinglePersonThenLoadRest(directOpenId, false);
+          }
+        }
+        if (window.__herrupOnUsersRendered) window.__herrupOnUsersRendered();
+        return;
+      }
+
+      if (directOpenId) {
+        openSinglePersonThenLoadRest(directOpenId, true);
+      } else {
+        loadFullUserList(false);
+      }
+    })();
+
+    function applyUserList(data) {
+      allUsers = data;
+      byId = new Map(allUsers.map(u => [u.id, u]));
+      buildDeptFilter(allUsers);
+      renderTable();
+      renderOrg();
+    }
+
+    async function openSinglePersonThenLoadRest(id, alsoLoadFullList) {
       try {
-        const r = await fetch("/api/entra-users", { cache: "no-store" });
+        const r = await fetch(`/api/entra-user?id=${encodeURIComponent(id)}`, { cache: "no-store" });
         if (!r.ok) {
           const b = await r.json().catch(() => ({}));
           throw new Error(b.error || `HTTP ${r.status}`);
         }
-        allUsers = await r.json();
-        byId = new Map(allUsers.map(u => [u.id, u]));
-        buildDeptFilter(allUsers);
-        renderTable();
-        renderOrg();
+        const u = await r.json();
+        byId.set(u.id, u);
+        openModal(u.id);
       } catch (e) {
-        renderError("Kunne ikke hente brugere: " + e.message);
+        renderError("Kunne ikke hente medarbejder: " + e.message);
+      }
+      if (alsoLoadFullList) {
+        loadFullUserList(true);
+      } else if (window.__herrupOnUsersRendered) {
+        window.__herrupOnUsersRendered();
+      }
+    }
+
+    async function loadFullUserList(isBackground) {
+      try {
+        const data = await entraCacheGetUsers();
+        applyUserList(data);
+
+        // Hvis detaljekortet fra et direkte link stadig er åbent, opdater det
+        // nu med de fulde data (manager-kæde og direkte rapporter).
+        if (isBackground && currentModalUser &&
+            document.getElementById("modalBackdrop").classList.contains("open") &&
+            byId.has(currentModalUser.id)) {
+          openModal(currentModalUser.id);
+        }
+      } catch (e) {
+        if (!isBackground) renderError("Kunne ikke hente brugere: " + e.message);
       } finally {
-        // Fortæl fremdrifts-visningen at listen nu reelt er renderet, så
-        // "Azure data" og "Billeder" først markeres færdige på det rigtige tidspunkt.
         if (window.__herrupOnUsersRendered) window.__herrupOnUsersRendered();
       }
-    })();
+    }
 
     // ── Faner ─────────────────────────────────────────────────────────────────
     function switchTab(tab) {
