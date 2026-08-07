@@ -97,44 +97,74 @@
         return `${String(date.getDate()).padStart(2, "0")} ${MONTHS[date.getMonth()].slice(0, 3)}`;
     }
 
-    function ensureProgressCard() {
-        let card = document.getElementById("herrupLoadCard");
+let cardRevealed = false;
+let revealTimer = null;
 
-        if (card) {
-            return card;
+// Kortet vises først hvis det efter 250 ms stadig er relevant — dvs. hvis
+// noget reelt ikke er klar endnu. Er alt (fx fra browser-cache) allerede
+// færdigt inden da, viser vi det aldrig, så der ikke blinker et load-kort
+// forbi for ingenting.
+function maybeRevealCard() {
+    if (cardRevealed || revealTimer) {
+        return;
+    }
+
+    revealTimer = setTimeout(() => {
+        revealTimer = null;
+        if (progress.azureDone && progress.vagtDone && progress.imagesDone) {
+            return;
         }
+        cardRevealed = true;
+        updateProgress();
+    }, 250);
+}
 
-        card = document.createElement("div");
-        card.id = "herrupLoadCard";
-        card.className = "herrup-load-card";
-        card.innerHTML = `
-            <div class="herrup-load-title">Indlæser Herrup...</div>
+function ensureProgressCard() {
+    if (!cardRevealed) {
+        return null;
+    }
 
-            <div class="herrup-load-row">
-                <div>Azure data</div>
-                <div class="herrup-load-bar"><div id="herrupAzureFill" class="herrup-load-fill"></div></div>
-                <div id="herrupAzurePct">0%</div>
-            </div>
+    let card = document.getElementById("herrupLoadCard");
 
-            <div class="herrup-load-row">
-                <div>Vagt & ferie</div>
-                <div class="herrup-load-bar"><div id="herrupVagtFill" class="herrup-load-fill"></div></div>
-                <div id="herrupVagtPct">0%</div>
-            </div>
-
-            <div class="herrup-load-row">
-                <div>Billeder</div>
-                <div class="herrup-load-bar"><div id="herrupImagesFill" class="herrup-load-fill"></div></div>
-                <div id="herrupImagesPct">0%</div>
-            </div>
-        `;
-
-        document.body.appendChild(card);
+    if (card) {
         return card;
     }
 
-    function updateProgress() {
-        const card = ensureProgressCard();
+    card = document.createElement("div");
+    card.id = "herrupLoadCard";
+    card.className = "herrup-load-card";
+    card.innerHTML = `
+        <div class="herrup-load-title">Indlæser Herrup...</div>
+
+        <div class="herrup-load-row">
+            <div>Azure data</div>
+            <div class="herrup-load-bar"><div id="herrupAzureFill" class="herrup-load-fill"></div></div>
+            <div id="herrupAzurePct">0%</div>
+        </div>
+
+        <div class="herrup-load-row">
+            <div>Vagt & ferie</div>
+            <div class="herrup-load-bar"><div id="herrupVagtFill" class="herrup-load-fill"></div></div>
+            <div id="herrupVagtPct">0%</div>
+        </div>
+
+        <div class="herrup-load-row">
+            <div>Billeder</div>
+            <div class="herrup-load-bar"><div id="herrupImagesFill" class="herrup-load-fill"></div></div>
+            <div id="herrupImagesPct">0%</div>
+        </div>
+    `;
+
+    document.body.appendChild(card);
+    return card;
+}
+
+function updateProgress() {
+    maybeRevealCard();
+    const card = ensureProgressCard();
+    if (!card) {
+        return; // Kortet er ikke vist endnu — og bliver måske aldrig — intet at opdatere.
+    }
         const rows = [
             ["azure", "herrupAzureFill", "herrupAzurePct"],
             ["vagt", "herrupVagtFill", "herrupVagtPct"],
