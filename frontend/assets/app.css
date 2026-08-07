@@ -232,6 +232,14 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
     max-width:1800px;
 }
 
+.herrupPage .container{
+    max-width:1800px;
+}
+
+.herrupPage .navbar-inner{
+    max-width:1800px;
+}
+
 /* Afdelingsoversigt: markér chef/leder */
 .dept-card.leader {
   border: 2px solid #c30a14;
