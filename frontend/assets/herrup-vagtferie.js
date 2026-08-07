@@ -294,34 +294,56 @@ function updateProgress() {
             return window.__vagtFeriePromise;
         }
 
+        window.__vagtFeriePromise = loadVagtFerieData();
+        return window.__vagtFeriePromise;
+    }
+
+    // Vagt/ferie-planen for CURRENT_YEAR bruges til "Dagens status" og hentes
+    // altid via denne funktion. Vi tjekker browser-cachen (samme IndexedDB som
+    // medarbejderlisten, se assets/entraCache.js) først — er den frisk, slipper
+    // vi helt for at ramme /api/vagtferieplan, og load-kortets "Vagt & ferie"-
+    // bjælke bliver aldrig vist, ligesom "Azure data" og "Billeder" allerede
+    // ikke bliver det ved varm cache.
+    async function loadVagtFerieData() {
+        const cacheKey = `vagtferie:${CURRENT_YEAR}`;
+
+        try {
+            const entry = await herrupCacheReadKey(cacheKey);
+            if (herrupCacheEntryIsFresh(entry, window.VAGTFERIE_CACHE_TTL_MS)) {
+                window.__vagtFerieData = entry.data;
+                markDone("vagt");
+                return entry.data;
+            }
+        } catch {
+            // Ignoreres — falder bare tilbage til et rigtigt hent nedenfor.
+        }
+
         startFakeProgress("vagt");
 
-        window.__vagtFeriePromise = fetch(`/api/vagtferieplan?year=${CURRENT_YEAR}`, { cache: "no-store" })
-            .then(async response => {
-                const text = await response.text();
-                let data = null;
+        try {
+            const response = await fetch(`/api/vagtferieplan?year=${CURRENT_YEAR}`, { cache: "no-store" });
+            const text = await response.text();
+            let data = null;
 
-                try {
-                    data = text ? JSON.parse(text) : null;
-                } catch {
-                    data = { raw: text };
-                }
+            try {
+                data = text ? JSON.parse(text) : null;
+            } catch {
+                data = { raw: text };
+            }
 
-                if (!response.ok) {
-                    throw new Error(data?.message || data?.error || `API fejl ${response.status}`);
-                }
+            if (!response.ok) {
+                throw new Error(data?.message || data?.error || `API fejl ${response.status}`);
+            }
 
-                window.__vagtFerieData = data;
-                markDone("vagt");
-                return data;
-            })
-            .catch(error => {
-                console.warn("Kunne ikke forudindlæse vagt/ferie:", error);
-                markDone("vagt");
-                throw error;
-            });
-
-        return window.__vagtFeriePromise;
+            window.__vagtFerieData = data;
+            herrupCacheWriteKey(cacheKey, data); // fire-and-forget
+            markDone("vagt");
+            return data;
+        } catch (error) {
+            console.warn("Kunne ikke forudindlæse vagt/ferie:", error);
+            markDone("vagt");
+            throw error;
+        }
     }
 
     function selectedName() {
@@ -823,6 +845,7 @@ function updateProgress() {
         });
 
         document.getElementById("herrupVfRefresh")?.addEventListener("click", () => {
+            herrupCacheDeleteKey(`vagtferie:${CURRENT_YEAR}`); // "Opdater" skal altid ramme serveren, ikke cachen.
             window.__vagtFerieData = null;
             window.__vagtFeriePromise = null;
             lastHeaderStatusName = "";

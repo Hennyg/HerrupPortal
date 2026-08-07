@@ -94,3 +94,62 @@ window.entraCacheGetUsers = entraCacheGetUsers;
 window.entraCacheWarm     = entraCacheWarm;
 window.entraCacheRead     = entraCacheRead;
 window.entraCacheIsFresh  = entraCacheIsFresh;
+
+// ── Generiske hjælpefunktioner ────────────────────────────────────────────────
+// Bruges af andre datatyper end medarbejderlisten (fx vagt/ferie-planen i
+// herrup-vagtferie.js), som vil genbruge samme IndexedDB-lager og TTL-mønster,
+// men under deres egen nøgle.
+const HERRUP_CACHE_DEFAULT_TTL_MS = 30 * 60 * 1000; // 30 minutter
+
+async function herrupCacheReadKey(key) {
+  try {
+    const db = await entraDbOpen();
+    return await new Promise((resolve, reject) => {
+      const tx  = db.transaction(ENTRA_CACHE_STORE, "readonly");
+      const req = tx.objectStore(ENTRA_CACHE_STORE).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror   = () => reject(req.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function herrupCacheWriteKey(key, data) {
+  try {
+    const db = await entraDbOpen();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(ENTRA_CACHE_STORE, "readwrite");
+      tx.objectStore(ENTRA_CACHE_STORE).put({ data, fetchedAt: Date.now() }, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror    = () => reject(tx.error);
+    });
+  } catch {
+    // Cache-skrivning må aldrig vælte resten af siden.
+  }
+}
+
+async function herrupCacheDeleteKey(key) {
+  try {
+    const db = await entraDbOpen();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(ENTRA_CACHE_STORE, "readwrite");
+      tx.objectStore(ENTRA_CACHE_STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror    = () => reject(tx.error);
+    });
+  } catch {
+    // Ignoreres — værste fald er at den gamle cache-post lever videre til TTL udløber.
+  }
+}
+
+function herrupCacheEntryIsFresh(entry, ttlMs) {
+  return !!entry && entry.data !== undefined && entry.data !== null &&
+    (Date.now() - entry.fetchedAt) < (ttlMs ?? HERRUP_CACHE_DEFAULT_TTL_MS);
+}
+
+window.herrupCacheReadKey      = herrupCacheReadKey;
+window.herrupCacheWriteKey     = herrupCacheWriteKey;
+window.herrupCacheDeleteKey    = herrupCacheDeleteKey;
+window.herrupCacheEntryIsFresh = herrupCacheEntryIsFresh;
+window.VAGTFERIE_CACHE_TTL_MS  = HERRUP_CACHE_DEFAULT_TTL_MS;
