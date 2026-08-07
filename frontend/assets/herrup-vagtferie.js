@@ -914,5 +914,20 @@ function updateProgress() {
         }, 20000);
     });
 
+    // Offentlig hjælpefunktion til medarbejderlisten i herrup.html: returnerer
+    // klar HTML for "Dagens status"-cellen, med samme badge-stil som i
+    // personkortets header. Genbruger findEmployee/todayIso, så listen og
+    // personkortet aldrig kan vise forskellige svar.
+    window.renderDagensStatusCell = function renderDagensStatusCell(name) {
+        const data = window.__vagtFerieData;
+        if (!data) return `<span class="vf-muted">…</span>`;
+
+        const employee = findEmployee(data, name);
+        const current = (employee?.days || []).find(day => day.date === todayIso());
+
+        if (!current) return `<span class="vf-muted">–</span>`;
+        return `${badge(current.code, current.text)} <span>${esc(current.text)}</span>`;
+    };
+
     window.updateHeaderStatus = updateHeaderStatus;
 })();
