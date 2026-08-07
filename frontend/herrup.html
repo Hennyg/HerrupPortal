@@ -332,7 +332,7 @@
     }
   </style>
 </head>
-<body>
+<body class="herrupPage">
   <div class="navbar">
     <div class="navbar-inner">
       <div class="brand">
@@ -378,7 +378,7 @@
               <th data-col="jobTitle">Stilling<span class="sort-arrow"> ⇅</span></th>
               <th data-col="department">Afdeling<span class="sort-arrow"> ⇅</span></th>
               <th data-col="businessPhone">Telefon<span class="sort-arrow"> ⇅</span></th>
-              <th>Dagens status</th>
+              <th data-col="dagensStatus">Dagens status<span class="sort-arrow"> ⇅</span></th>
             </tr>
           </thead>
           <tbody id="tbody">
@@ -517,6 +517,23 @@
       buildDeptFilter(allUsers);
       renderTable();
       renderOrg();
+      refreshDagensStatusWhenReady();
+    }
+
+    // "Dagens status" kommer fra en separat, langsommere hentning
+    // (vagt/ferie-planen). Vent på den og gentegn tabellen én gang, så
+    // kolonnen — og sortering på den — er korrekt, uden at man skal
+    // opdatere siden manuelt.
+    let dagensStatusHookInstalled = false;
+    function refreshDagensStatusWhenReady() {
+      if (dagensStatusHookInstalled) return;
+      const promise = window.__vagtFeriePromise;
+      if (promise) {
+        dagensStatusHookInstalled = true;
+        promise.then(() => renderTable()).catch(() => {});
+      } else {
+        setTimeout(refreshDagensStatusWhenReady, 200);
+      }
     }
 
     async function openSinglePersonThenLoadRest(id, alsoLoadFullList) {
@@ -592,8 +609,19 @@
           if (sortCol === "businessPhone") {
             return bizPhone(a).localeCompare(bizPhone(b), "da") * sortDir;
           }
+          if (sortCol === "dagensStatus") {
+            return dagensStatusSortKey(a).localeCompare(dagensStatusSortKey(b), "da") * sortDir;
+          }
           return String(a[sortCol]??"").localeCompare(String(b[sortCol]??""), "da") * sortDir;
         });
+    }
+
+    // Sorteringsnøgle for "Dagens status" — bruger samme datakilde som selve
+    // cellen, så sortering og visning aldrig kan komme i konflikt. Personer
+    // uden markering ("–") sorterer forrest, ligesom de andre "–"-felter.
+    function dagensStatusSortKey(u) {
+      const current = window.getDagensStatusInfo ? window.getDagensStatusInfo(u.displayName) : null;
+      return current ? (current.text || current.code || "") : "";
     }
 
     function renderTable() {
@@ -616,6 +644,7 @@
           <td>${esc(u.jobTitle||"–")}</td>
           <td>${esc(u.department||"–")}</td>
           <td>${esc(bizPhone(u)||"–")}</td>
+          <td>${window.renderDagensStatusCell ? window.renderDagensStatusCell(u.displayName) : "–"}</td>
         </tr>`;
       }).join("");
     }

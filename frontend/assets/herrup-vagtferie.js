@@ -889,7 +889,6 @@ function updateProgress() {
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-        ensureProgressCard();
         monitorFetch();
         startFakeProgress("azure");
         startFakeProgress("images");
@@ -925,6 +924,29 @@ function updateProgress() {
         const employee = findEmployee(data, name);
         const current = (employee?.days || []).find(day => day.date === todayIso());
 
+        if (!current) return `<span class="vf-muted">–</span>`;
+        return `${badge(current.code, current.text)} <span>${esc(current.text)}</span>`;
+    };
+
+    // Offentlig hjælpefunktion: bruges af herrup.html's medarbejderliste til at
+    // finde dagens markering for en person, uden at skulle duplikere logikken.
+    // Returnerer:
+    //   undefined → vagt/ferie-data er ikke hentet endnu
+    //   null      → data er hentet, men personen har ingen markering i dag
+    //   { code, text, ... } → dagens markering
+    window.getDagensStatusInfo = function getDagensStatusInfo(name) {
+        const data = window.__vagtFerieData;
+        if (!data) return undefined;
+
+        const employee = findEmployee(data, name);
+        return (employee?.days || []).find(day => day.date === todayIso()) || null;
+    };
+
+    // Klar HTML til "Dagens status"-cellen i medarbejderlisten — samme
+    // badge-stil som i personkortets header.
+    window.renderDagensStatusCell = function renderDagensStatusCell(name) {
+        const current = window.getDagensStatusInfo(name);
+        if (current === undefined) return `<span class="vf-muted">…</span>`;
         if (!current) return `<span class="vf-muted">–</span>`;
         return `${badge(current.code, current.text)} <span>${esc(current.text)}</span>`;
     };
