@@ -378,10 +378,11 @@
               <th data-col="jobTitle">Stilling<span class="sort-arrow"> ⇅</span></th>
               <th data-col="department">Afdeling<span class="sort-arrow"> ⇅</span></th>
               <th data-col="businessPhone">Telefon<span class="sort-arrow"> ⇅</span></th>
+              <th>Dagens status</th>
             </tr>
           </thead>
           <tbody id="tbody">
-            <tr><td colspan="5">
+            <tr><td colspan="6">
               <div class="stateMsg">
                 <div class="spinner"></div>
                 <div>Henter informationer - vent venligst</div>
@@ -601,7 +602,7 @@
       const count = document.getElementById("userCount");
       if (count) count.textContent = `${rows.length} brugere`;
       if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="5"><div class="stateMsg">Ingen resultater</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6"><div class="stateMsg">Ingen resultater</div></td></tr>`;
         return;
       }
       tbody.innerHTML = rows.map(u => {
