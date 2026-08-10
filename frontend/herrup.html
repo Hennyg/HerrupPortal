@@ -369,20 +369,24 @@
         border-bottom:1pt solid #b91c1c; color:#111;
       }
 
-      /* Personkort i samme stil som på skærmen: rund avatar, navn, titel, telefon — med ramme */
+      /* Personkort i samme stil som på skærmen: rund avatar, navn, titel, telefon — med ramme.
+         Størrelsen skaleres pr. afdeling via --pscale (sat pr. blok i JS), så alle personer
+         får plads. Ved 6 eller færre er --pscale altid 1 (nuværende, større størrelse). */
       .print-person-grid {
-        display:grid; grid-template-columns:repeat(auto-fill, minmax(52mm,1fr));
-        gap:5mm; align-content:flex-start;
+        display:grid; grid-template-columns:repeat(auto-fill, minmax(calc(52mm * var(--pscale,1)),1fr));
+        gap:calc(5mm * var(--pscale,1)); align-content:flex-start;
       }
       .print-person {
-        border:0.75pt solid #d1d5db; border-radius:8px; padding:4mm 3mm;
+        border:0.75pt solid #d1d5db; border-radius:8px;
+        padding:calc(4mm * var(--pscale,1)) calc(3mm * var(--pscale,1));
         display:flex; flex-direction:column; align-items:center; text-align:center;
-        font-size:15pt; line-height:1.25; box-sizing:border-box;
+        font-size:calc(15pt * var(--pscale,1)); line-height:1.25; box-sizing:border-box;
       }
       .print-person .pavatar {
-        width:24mm; height:24mm; border-radius:50%; overflow:hidden; margin-bottom:2.4mm;
+        width:calc(24mm * var(--pscale,1)); height:calc(24mm * var(--pscale,1));
+        border-radius:50%; overflow:hidden; margin-bottom:calc(2.4mm * var(--pscale,1));
         background:#850c18; color:#fff; display:flex; align-items:center; justify-content:center;
-        font-weight:700; font-size:14pt;
+        font-weight:700; font-size:calc(14pt * var(--pscale,1));
       }
       .print-person .pavatar img { width:100% !important; height:100% !important; object-fit:cover; }
       .print-person .pname  { font-weight:700; }
@@ -711,6 +715,14 @@
     function togglePrintSelectAll(checked) {
       document.querySelectorAll(".printDeptCheck").forEach(cb => { cb.checked = checked; });
     }
+    function calcPrintScale(n) {
+      // 6 eller færre: behold nuværende (store) størrelse.
+      if (n <= 6) return 1;
+      // Flere personer: skalér ned så alle er med. Arealet pr. kort skal ca. følge 6/n,
+      // så skalafaktoren (bredde/højde) bliver kvadratroden af det.
+      const scale = Math.sqrt(6 / n);
+      return Math.max(scale, 0.5); // aldrig mindre end halv størrelse (læsbarhed)
+    }
     function runPrintDepartments() {
       const selectedIdx = [...document.querySelectorAll(".printDeptCheck:checked")]
         .map(cb => Number(cb.value));
@@ -735,7 +747,7 @@
         }).join("");
 
         return `
-          <div class="print-dept-block">
+          <div class="print-dept-block" style="--pscale:${calcPrintScale(users.length)}">
             <div class="print-dept-frame">
               <div class="print-dept-title">${esc(deptName)}</div>
               <div class="print-person-grid">${people}</div>
