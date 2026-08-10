@@ -65,6 +65,12 @@
     .userToolbar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-bottom:1rem; }
     .userToolbar .clearable { flex:1; min-width:200px; max-width:380px; }
     #userCount { margin-left:auto; font-size:.85rem; color:#6b7280; white-space:nowrap; }
+    #deptFilter {
+      appearance:none; border:1px solid #d1d5db; background:#fff; padding:.45rem 1rem;
+      border-radius:8px; cursor:pointer; font-size:.92rem; font-weight:600; color:#374151;
+    }
+    #deptFilter:hover { border-color:#850c18; }
+    #deptFilter:focus { outline:2px solid #850c18; outline-offset:-1px; border-color:#850c18; }
 
     /* Tabel */
     .tableWrap { overflow-x:auto; }
@@ -365,18 +371,18 @@
 
       /* Personkort i samme stil som på skærmen: rund avatar, navn, titel, telefon — med ramme */
       .print-person-grid {
-        display:grid; grid-template-columns:repeat(auto-fill, minmax(26mm,1fr));
-        gap:2.5mm; align-content:flex-start;
+        display:grid; grid-template-columns:repeat(auto-fill, minmax(52mm,1fr));
+        gap:5mm; align-content:flex-start;
       }
       .print-person {
-        border:0.75pt solid #d1d5db; border-radius:5px; padding:2mm 1.5mm;
+        border:0.75pt solid #d1d5db; border-radius:8px; padding:4mm 3mm;
         display:flex; flex-direction:column; align-items:center; text-align:center;
-        font-size:7.5pt; line-height:1.25; box-sizing:border-box;
+        font-size:15pt; line-height:1.25; box-sizing:border-box;
       }
       .print-person .pavatar {
-        width:12mm; height:12mm; border-radius:50%; overflow:hidden; margin-bottom:1.2mm;
+        width:24mm; height:24mm; border-radius:50%; overflow:hidden; margin-bottom:2.4mm;
         background:#850c18; color:#fff; display:flex; align-items:center; justify-content:center;
-        font-weight:700; font-size:7pt;
+        font-weight:700; font-size:14pt;
       }
       .print-person .pavatar img { width:100% !important; height:100% !important; object-fit:cover; }
       .print-person .pname  { font-weight:700; }
