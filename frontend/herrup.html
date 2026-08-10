@@ -303,7 +303,7 @@
     .dept-row { display:flex; flex-wrap:wrap; gap:.65rem; }
 
     .dept-card {
-      display:flex; flex-direction:column; align-items:center; gap:5px;
+      display:flex; flex-direction:column; align-items:center; gap:3px;
       background:#fff; border:1px solid #e5e7eb; border-radius:12px;
       padding:10px 8px; cursor:pointer;
       transition:box-shadow .15s, border-color .15s;
@@ -318,8 +318,9 @@
     }
     .dept-avatar img { width:48px; height:48px; object-fit:cover; border-radius:50%; }
 
-    .dept-card-name  { font-size:.7rem; font-weight:700; color:#111827; line-height:1.25; word-break:break-word; }
-    .dept-card-title { font-size:.63rem; color:#6b7280; line-height:1.2; margin-top:1px; }
+    .dept-card-name  { font-size:.7rem; font-weight:700; color:#111827; line-height:1.2; word-break:break-word; }
+    .dept-card-title { font-size:.62rem; color:#6b7280; line-height:1.1; margin-top:0; }
+    .dept-card-phone { font-size:.6rem; color:#9ca3af; line-height:1.1; margin-top:0; }
 
     @media (max-width:640px) {
       .userTable thead th:nth-child(3),
@@ -329,6 +330,39 @@
       .dept-card { width:80px; }
       .dept-avatar { width:42px; height:42px; }
       .dept-avatar img { width:42px; height:42px; }
+    }
+
+    /* ── Udskriv afdelingsoversigt ────────────────────────────────────────── */
+    .orgToolbar { display:flex; justify-content:flex-end; margin-bottom:.75rem; }
+    #printDeptList label {
+      display:flex; align-items:center; gap:8px; font-size:.86rem; color:#374151;
+    }
+    #printArea { display:none; }
+
+    @media print {
+      body.herrupPage > *:not(#printArea) { display:none !important; }
+      #printArea { display:block !important; }
+
+      @page { size: A4 landscape; margin: 8mm; }
+
+      .print-dept-block {
+        width:100%; height:129mm; box-sizing:border-box; padding:6mm 8mm;
+        overflow:hidden; page-break-inside:avoid;
+      }
+      .print-dept-block:nth-of-type(2n) { border-top:1px dashed #ccc; }
+      .print-dept-block:nth-of-type(2n+1):not(:last-child) { page-break-after: always; }
+
+      .print-dept-title {
+        font-size:16pt; font-weight:700; margin:0 0 6mm; padding-bottom:2mm;
+        border-bottom:2px solid #333;
+      }
+      .print-person-grid {
+        display:grid; grid-template-columns:repeat(3, 1fr); gap:4mm 8mm;
+      }
+      .print-person { font-size:10pt; line-height:1.35; }
+      .print-person .pname  { font-weight:700; }
+      .print-person .ptitle { color:#444; }
+      .print-person .pphone { color:#444; }
     }
   </style>
 </head>
@@ -395,11 +429,40 @@
 
     <!-- Org chart -->
     <div class="panel" id="orgView">
+      <div class="orgToolbar">
+        <button id="printOrgBtn" type="button" class="tab" title="Udskriv afdelingsoversigt" onclick="openPrintModal()">🖨️ Udskriv</button>
+      </div>
       <div id="orgTree" style="padding:1rem 0;min-height:200px;">
         <div class="org-placeholder">Indlæser…</div>
       </div>
     </div>
   </div>
+
+  <!-- ── Print-valg popup ───────────────────────────────────────────────────── -->
+  <div class="modal-backdrop" id="printModalBackdrop" onclick="closePrintModalOnBackdrop(event)">
+    <div class="modal" style="width:min(360px,95vw)">
+      <div class="modal-header">
+        <div>
+          <p class="modal-name" style="font-size:1.05rem">Vælg afdelinger til udskrift</p>
+        </div>
+        <button class="modal-close" onclick="closePrintModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:.88rem;">
+          <input type="checkbox" id="printSelectAll" onchange="togglePrintSelectAll(this.checked)" />
+          Vælg alle
+        </label>
+        <div id="printDeptList" style="display:flex;flex-direction:column;gap:.5rem;max-height:320px;overflow-y:auto;"></div>
+        <div class="editActions">
+          <button class="btn-edit cancel" onclick="closePrintModal()">Annuller</button>
+          <button class="btn-save-inline" onclick="runPrintDepartments()">Udskriv</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Skjult print-område ────────────────────────────────────────────────── -->
+  <div id="printArea"></div>
 
   <!-- ── Modal ──────────────────────────────────────────────────────────────── -->
   <div class="modal-backdrop" id="modalBackdrop" onclick="closeModalOnBackdrop(event)">
@@ -601,6 +664,62 @@
     }
 
     // ── Faner ─────────────────────────────────────────────────────────────────
+    // ── Udskriv afdelingsoversigt ────────────────────────────────────────────
+    function openPrintModal() {
+      const list = document.getElementById("printDeptList");
+      list.innerHTML = orgDeptEntries.map(([deptName, users], i) => `
+        <label>
+          <input type="checkbox" class="printDeptCheck" value="${i}" checked />
+          ${esc(deptName)} <span class="muted">(${users.length})</span>
+        </label>`).join("") || `<div class="muted" style="font-size:.85rem">Ingen afdelinger at vise</div>`;
+      document.getElementById("printSelectAll").checked = true;
+      document.getElementById("printModalBackdrop").classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+    function closePrintModal() {
+      document.getElementById("printModalBackdrop").classList.remove("open");
+      document.body.style.overflow = "";
+    }
+    function closePrintModalOnBackdrop(e) {
+      if (e.target === document.getElementById("printModalBackdrop")) closePrintModal();
+    }
+    function togglePrintSelectAll(checked) {
+      document.querySelectorAll(".printDeptCheck").forEach(cb => { cb.checked = checked; });
+    }
+    function runPrintDepartments() {
+      const selectedIdx = [...document.querySelectorAll(".printDeptCheck:checked")]
+        .map(cb => Number(cb.value));
+
+      if (!selectedIdx.length) {
+        alert("Vælg mindst én afdeling.");
+        return;
+      }
+
+      const printArea = document.getElementById("printArea");
+      printArea.innerHTML = selectedIdx.map(i => {
+        const [deptName, users] = orgDeptEntries[i];
+        const people = users.map(u => {
+          const phone = bizPhone(u) || u.mobilePhone || "";
+          return `
+            <div class="print-person">
+              <div class="pname">${esc(u.displayName || "")}</div>
+              ${u.jobTitle ? `<div class="ptitle">${esc(u.jobTitle)}</div>` : ""}
+              ${phone ? `<div class="pphone">${esc(phone)}</div>` : ""}
+            </div>`;
+        }).join("");
+
+        return `
+          <div class="print-dept-block">
+            <div class="print-dept-title">${esc(deptName)}</div>
+            <div class="print-person-grid">${people}</div>
+          </div>`;
+      }).join("");
+
+      closePrintModal();
+      // Lille delay så modal er lukket og printArea er renderet, inden printdialog åbner
+      setTimeout(() => window.print(), 50);
+    }
+
     function switchTab(tab) {
       document.getElementById("listView").style.display = tab === "list" ? "" : "none";
       document.getElementById("orgView").style.display  = tab === "org"  ? "block" : "none";
@@ -1156,6 +1275,8 @@ if (window.updateHeaderStatus) {
     }
 
     // ── Org chart: afdeling-grupperet visning ─────────────────────────────────
+    let orgDeptEntries = []; // gemmes globalt så printmodal kan genbruge samme grupperinger
+
     function renderOrg() {
       const container = document.getElementById("orgTree");
       if (!allUsers.length) {
@@ -1178,6 +1299,7 @@ if (window.updateHeaderStatus) {
         .sort((a, b) => a[0].localeCompare(b[0], "da"));
       if (noDept.length) entries.push(["Uden afdeling", noDept]);
 
+      orgDeptEntries = entries;
       container.innerHTML = "";
 
       entries.forEach(([deptName, users]) => {
@@ -1210,10 +1332,12 @@ users.sort((a, b) => {
 const card = document.createElement("div");
 card.className = "dept-card" + (isLeaderTitle(u) ? " leader" : "");
 card.title = u.displayName || "";
+          const phone = bizPhone(u) || u.mobilePhone || "";
           card.innerHTML = `
             <div class="dept-avatar">${avatarHTML(u, 48)}</div>
             <div class="dept-card-name">${esc(u.displayName||"")}</div>
-            <div class="dept-card-title">${esc(u.jobTitle||"")}</div>`;
+            <div class="dept-card-title">${esc(u.jobTitle||"")}</div>
+            ${phone ? `<div class="dept-card-phone">${esc(phone)}</div>` : ""}`;
           card.addEventListener("click", () => openModal(u.id));
           row.appendChild(card);
         });
