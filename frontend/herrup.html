@@ -715,13 +715,29 @@
     function togglePrintSelectAll(checked) {
       document.querySelectorAll(".printDeptCheck").forEach(cb => { cb.checked = checked; });
     }
-    function calcPrintScale(n) {
-      // 6 eller færre: behold nuværende (store) størrelse.
-      if (n <= 6) return 1;
-      // Flere personer: skalér ned så alle er med. Arealet pr. kort skal ca. følge 6/n,
-      // så skalafaktoren (bredde/højde) bliver kvadratroden af det.
-      const scale = Math.sqrt(6 / n);
-      return Math.max(scale, 0.5); // aldrig mindre end halv størrelse (læsbarhed)
+    function calcPrintLayout(n) {
+      // Tilgængeligt område til personkort inde i hver afdelings-ramme (mm), ved --pscale:1.
+      const AVAIL_W = 125;
+      const AVAIL_H = 176;
+      const BASE_CARD_W = 52;
+      const BASE_CARD_H = 55;
+      const BASE_GAP    = 5;
+
+      // 6 eller færre: behold nuværende opsætning (auto-fill vælger selv 1-2 kolonner).
+      if (n <= 6) return { scale: 1, columns: 0 };
+
+      // Flere end 6: find det antal kolonner der giver den størst mulige (læsbare) skalering,
+      // så alle personer er med — både bredde- og højdebegrænsning tjekkes.
+      let best = { scale: 0, columns: 2 };
+      for (let cols = 1; cols <= 8; cols++) {
+        const rows = Math.ceil(n / cols);
+        const sWidth  = AVAIL_W / (cols * BASE_CARD_W + (cols - 1) * BASE_GAP);
+        const sHeight = AVAIL_H / (rows * BASE_CARD_H + (rows - 1) * BASE_GAP);
+        const scale = Math.min(sWidth, sHeight, 1);
+        if (scale > best.scale) best = { scale, columns: cols };
+      }
+      best.scale = Math.max(best.scale, 0.4); // hold en læsbar bund
+      return best;
     }
     function runPrintDepartments() {
       const selectedIdx = [...document.querySelectorAll(".printDeptCheck:checked")]
@@ -746,11 +762,16 @@
             </div>`;
         }).join("");
 
+        const layout = calcPrintLayout(users.length);
+        const gridStyle = layout.columns
+          ? ` style="grid-template-columns:repeat(${layout.columns}, 1fr)"`
+          : "";
+
         return `
-          <div class="print-dept-block" style="--pscale:${calcPrintScale(users.length)}">
+          <div class="print-dept-block" style="--pscale:${layout.scale}">
             <div class="print-dept-frame">
               <div class="print-dept-title">${esc(deptName)}</div>
-              <div class="print-person-grid">${people}</div>
+              <div class="print-person-grid"${gridStyle}>${people}</div>
             </div>
           </div>`;
       }).join("");
