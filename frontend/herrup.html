@@ -377,7 +377,7 @@
          får plads. Ved 6 eller færre er --pscale altid 1 (nuværende, større størrelse). */
       .print-person-grid {
         display:grid; grid-template-columns:repeat(auto-fill, minmax(calc(52mm * var(--pscale,1)),1fr));
-        gap:calc(5mm * var(--pscale,1)); align-content:flex-start;
+        gap:calc(2.5mm * var(--pscale,1)); align-content:flex-start;
       }
       .print-person {
         border:0.75pt solid #d1d5db; border-radius:8px;
@@ -723,7 +723,7 @@
       const AVAIL_W = 125;
       const BASE_CARD_W = 52;
       const BASE_CARD_H = 55;
-      const BASE_GAP    = 5;
+      const BASE_GAP    = 2.5;
 
       // Ved 10+ personer reduceres top/bund-margin i rammen (se .compact-frame),
       // hvilket frigør ekstra højde til selve kort-gitteret.
