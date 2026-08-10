@@ -475,7 +475,7 @@
 
   <!-- ── Print-valg popup ───────────────────────────────────────────────────── -->
   <div class="modal-backdrop" id="printModalBackdrop" onclick="closePrintModalOnBackdrop(event)">
-    <div class="modal" style="width:min(360px,95vw)">
+    <div class="modal" style="width:min(640px,95vw)">
       <div class="modal-header">
         <div>
           <p class="modal-name" style="font-size:1.05rem">Vælg afdelinger til udskrift</p>
@@ -487,8 +487,8 @@
           <input type="checkbox" id="printSelectAll" onchange="togglePrintSelectAll(this.checked)" />
           Vælg alle
         </label>
-        <div id="printDeptList" style="display:flex;flex-direction:column;gap:.5rem;max-height:320px;overflow-y:auto;"></div>
-        <div class="editActions">
+        <div id="printDeptList" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem .75rem;max-height:320px;overflow-y:auto;"></div>
+        <div class="editActions" style="justify-content:flex-end;">
           <button class="btn-edit cancel" onclick="closePrintModal()">Annuller</button>
           <button class="btn-save-inline" onclick="runPrintDepartments()">Udskriv</button>
         </div>
