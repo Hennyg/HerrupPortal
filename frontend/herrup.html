@@ -363,6 +363,8 @@
         flex:1; box-sizing:border-box; border:1.6pt solid #b91c1c; border-radius:6px;
         padding:5mm 6mm; display:flex; flex-direction:column; overflow:hidden;
       }
+      /* Ved 10 personer eller flere: halveret top/bund-margin i rammen for at give lidt mere plads i højden */
+      .print-dept-frame.compact-frame { padding-top:2.5mm; padding-bottom:2.5mm; }
 
       .print-dept-title {
         font-size:15pt; font-weight:700; margin:0 0 4mm; padding-bottom:2mm;
@@ -718,13 +720,17 @@
     function calcPrintLayout(n) {
       // Tilgængeligt område til personkort inde i hver afdelings-ramme (mm), ved --pscale:1.
       const AVAIL_W = 125;
-      const AVAIL_H = 176;
       const BASE_CARD_W = 52;
       const BASE_CARD_H = 55;
       const BASE_GAP    = 5;
 
+      // Ved 10+ personer halveres top/bund-margin i rammen (se .compact-frame),
+      // hvilket frigør ca. 5mm ekstra højde (2.5mm i toppen + 2.5mm i bunden).
+      const compact = n >= 10;
+      const AVAIL_H = compact ? 181 : 176;
+
       // 6 eller færre: behold nuværende opsætning (auto-fill vælger selv 1-2 kolonner).
-      if (n <= 6) return { scale: 1, columns: 0 };
+      if (n <= 6) return { scale: 1, columns: 0, compact: false };
 
       // Flere end 6: find det antal kolonner der giver den størst mulige (læsbare) skalering,
       // så alle personer er med — både bredde- og højdebegrænsning tjekkes.
@@ -737,6 +743,7 @@
         if (scale > best.scale) best = { scale, columns: cols };
       }
       best.scale = Math.max(best.scale, 0.4); // hold en læsbar bund
+      best.compact = compact;
       return best;
     }
     function runPrintDepartments() {
@@ -766,10 +773,11 @@
         const gridStyle = layout.columns
           ? ` style="grid-template-columns:repeat(${layout.columns}, 1fr)"`
           : "";
+        const frameClass = layout.compact ? " compact-frame" : "";
 
         return `
           <div class="print-dept-block" style="--pscale:${layout.scale}">
-            <div class="print-dept-frame">
+            <div class="print-dept-frame${frameClass}">
               <div class="print-dept-title">${esc(deptName)}</div>
               <div class="print-person-grid"${gridStyle}>${people}</div>
             </div>
