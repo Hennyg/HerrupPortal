@@ -341,13 +341,13 @@
 
     @media print {
       body.herrupPage > *:not(#printArea) { display:none !important; }
-      #printArea { display:block !important; }
+      #printArea { display:flex !important; flex-wrap:wrap; }
 
-      /* margin:0 så de to blokke deler siden 210mm/2 = 105mm nøjagtigt midt på siden */
+      /* margin:0 så de to blokke deler siden 297mm/2 = 148.5mm nøjagtigt midt på siden (lodret snit) */
       @page { size: A4 landscape; margin: 0; }
 
       .print-dept-block {
-        width:100%; height:105mm; box-sizing:border-box; padding:5mm;
+        width:148.5mm; height:210mm; box-sizing:border-box; padding:5mm;
         page-break-inside:avoid; display:flex;
       }
       .print-dept-block:nth-of-type(2n) { page-break-after: always; }
