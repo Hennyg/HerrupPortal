@@ -76,7 +76,7 @@ async function isGroupMember(token, userId, groupId) {
 async function getPhoto(token, userId) {
   try {
     const r = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${userId}/photos/48x48/$value`,
+      `https://graph.microsoft.com/v1.0/users/${userId}/photos/240x240/$value`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
     if (!r.ok) return null;
