@@ -364,8 +364,8 @@
         padding:5mm 6mm; display:flex; flex-direction:column; overflow:hidden;
         justify-content:center; /* fordeler evt. restplads ligeligt top/bund i stedet for at samle den i bunden */
       }
-      /* Ved 10 personer eller flere: halveret top/bund-margin i rammen for at give lidt mere plads i højden */
-      .print-dept-frame.compact-frame { padding-top:2.5mm; padding-bottom:2.5mm; }
+      /* Ved 10 personer eller flere: yderligere reduceret top/bund-margin i rammen for at give mere plads i højden */
+      .print-dept-frame.compact-frame { padding-top:1.5mm; padding-bottom:1.5mm; }
 
       .print-dept-title {
         font-size:15pt; font-weight:700; margin:0 0 4mm; padding-bottom:2mm;
@@ -725,10 +725,10 @@
       const BASE_CARD_H = 55;
       const BASE_GAP    = 5;
 
-      // Ved 10+ personer halveres top/bund-margin i rammen (se .compact-frame),
-      // hvilket frigør ca. 5mm ekstra højde (2.5mm i toppen + 2.5mm i bunden).
+      // Ved 10+ personer reduceres top/bund-margin i rammen (se .compact-frame),
+      // hvilket frigør ekstra højde til selve kort-gitteret.
       const compact = n >= 10;
-      const AVAIL_H = compact ? 181 : 176;
+      const AVAIL_H = compact ? 192 : 176;
 
       // 6 eller færre: behold nuværende opsætning (auto-fill vælger selv 1-2 kolonner).
       if (n <= 6) return { scale: 1, columns: 0, compact: false };
