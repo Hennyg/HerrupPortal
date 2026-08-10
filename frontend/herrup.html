@@ -362,10 +362,13 @@
       .print-dept-frame {
         flex:1; box-sizing:border-box; border:1.6pt solid #b91c1c; border-radius:6px;
         padding:5mm 6mm; display:flex; flex-direction:column; overflow:hidden;
-        justify-content:center; /* fordeler evt. restplads ligeligt top/bund i stedet for at samle den i bunden */
+        justify-content:flex-start; /* top-stillet som standard */
       }
-      /* Ved 10 personer eller flere: yderligere reduceret top/bund-margin i rammen for at give mere plads i højden */
-      .print-dept-frame.compact-frame { padding-top:1.5mm; padding-bottom:1.5mm; }
+      /* Ved 10 personer eller flere: yderligere reduceret top/bund-margin i rammen, og evt. restplads
+         fordeles ligeligt top/bund i stedet for at samle sig i bunden */
+      .print-dept-frame.compact-frame {
+        padding-top:1.5mm; padding-bottom:1.5mm; justify-content:center;
+      }
 
       .print-dept-title {
         font-size:15pt; font-weight:700; margin:0 0 4mm; padding-bottom:2mm;
