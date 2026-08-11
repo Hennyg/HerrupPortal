@@ -162,6 +162,10 @@
                    padding:2px 10px; font-size:.78rem; color:#374151; }
 
     .modal-body { padding:1.25rem 1.5rem; display:flex; flex-direction:column; gap:1.25rem; }
+    /* Samme udseende som .modal-body, men eget klassenavn — bruges af print-modalen
+       for at undgå at herrup-vagtferie.js's document.querySelector(".modal-body")
+       rammer denne modal i stedet for personkortets modal (denne ligger tidligere i DOM'en). */
+    .print-modal-body { padding:1.25rem 1.5rem; display:flex; flex-direction:column; gap:1.25rem; }
 
     /* Modal-faner */
     .modal-tabs { display:flex; gap:.4rem; padding:0 1.5rem; margin-top:.75rem; }
@@ -484,7 +488,7 @@
         </div>
         <button class="modal-close" onclick="closePrintModal()">✕</button>
       </div>
-      <div class="modal-body">
+      <div class="print-modal-body">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:.88rem;">
           <input type="checkbox" id="printSelectAll" onchange="togglePrintSelectAll(this.checked)" />
           Vælg alle
