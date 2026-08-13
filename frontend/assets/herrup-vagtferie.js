@@ -120,43 +120,11 @@ function maybeRevealCard() {
 }
 
 function ensureProgressCard() {
-    if (!cardRevealed) {
-        return null;
-    }
-
-    let card = document.getElementById("herrupLoadCard");
-
-    if (card) {
-        return card;
-    }
-
-    card = document.createElement("div");
-    card.id = "herrupLoadCard";
-    card.className = "herrup-load-card";
-    card.innerHTML = `
-        <div class="herrup-load-title">Indlæser Herrup...</div>
-
-        <div class="herrup-load-row">
-            <div>Azure data</div>
-            <div class="herrup-load-bar"><div id="herrupAzureFill" class="herrup-load-fill"></div></div>
-            <div id="herrupAzurePct">0%</div>
-        </div>
-
-        <div class="herrup-load-row">
-            <div>Vagt & ferie</div>
-            <div class="herrup-load-bar"><div id="herrupVagtFill" class="herrup-load-fill"></div></div>
-            <div id="herrupVagtPct">0%</div>
-        </div>
-
-        <div class="herrup-load-row">
-            <div>Billeder</div>
-            <div class="herrup-load-bar"><div id="herrupImagesFill" class="herrup-load-fill"></div></div>
-            <div id="herrupImagesPct">0%</div>
-        </div>
-    `;
-
-    document.body.appendChild(card);
-    return card;
+    // Det lille "Indlæser Herrup..."-kort er slået fra permanent — det
+    // forstyrrede mere end det hjalp, nu hvor siden alligevel viser data
+    // med det samme. Fremgangs-tracking (progress.*) køres stadig i
+    // baggrunden uden fejl, men der oprettes aldrig noget synligt kort.
+    return null;
 }
 
 function updateProgress() {
