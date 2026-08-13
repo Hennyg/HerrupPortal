@@ -84,6 +84,21 @@
   min-width: 150px;
   white-space: nowrap;
 }
+
+/* Rediger/Slet-kolonnen (10. og sidste kolonne) forbliver synlig i højre
+   kant, mens resten af rækken scroller horisontalt underneden. */
+#tbl th:nth-child(10),
+#tbl td:nth-child(10) {
+  position: sticky;
+  right: 0;
+  background: #fff;
+  white-space: nowrap;
+  box-shadow: -6px 0 6px -6px rgba(0, 0, 0, .25);
+  z-index: 2;
+}
+#tbl tbody tr:hover td:nth-child(10) {
+  background: #f7f7f7;
+}
   </style>
 </head>
 
