@@ -68,7 +68,7 @@ function mapOut(r, { hasSubgroup, descriptionCol } = { hasSubgroup: true, descri
 // frontend -> DV payload
 function mapIn(b, { hasSubgroup, descriptionCol } = { hasSubgroup: true, descriptionCol: DESCRIPTION_COLS[0] }) {
   const category = norm(b.category ?? b.cr175_lch_categorytext ?? "");
-  const isFav = category.toLowerCase() === "favoritter";
+  const isFav = category.toLowerCase() === "lely favoritter";
   const group = isFav ? norm(b.group ?? b.cr175_lch_grouptext ?? "") : "";
   const subgroup = isFav ? norm(b.subgroup ?? b.subGroup ?? b[SUBGROUP_COL] ?? "") : "";
 
