@@ -196,15 +196,28 @@ async function getCustomPhotoMap(context) {
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
+// Query-param "fast=1": returnér KUN gruppemedlemmerne med basale felter —
+// uden foto og manager-opslag (som er de dyre, per-bruger Graph-kald).
+// Bruges af frontend til at vise Entra ID-data med det samme, mens foto/
+// manager hentes bagefter i baggrunden via et normalt (fuldt) kald.
 module.exports = async function (context, req) {
   if (!req.headers["x-ms-client-principal"]) {
     return json(context, 401, { error: "Ikke logget ind" });
   }
 
+  const fast = String(req.query?.fast || "") === "1";
+
   try {
     const token   = await getGraphToken();
     const groupId = await findGroupId(token, GROUP_NAME);
     const members = await getGroupMembers(token, groupId);
+
+    if (fast) {
+      const basic = members
+        .map(u => ({ ...u, photo: null, managerId: null, managerName: null, entraPhoto: null, hasCustomPhoto: false }))
+        .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || "", "da"));
+      return json(context, 200, basic);
+    }
 
     // Hent foto + manager for alle brugere i batches af 10
     const enriched = await runBatched(members, 10, async (user) => {
