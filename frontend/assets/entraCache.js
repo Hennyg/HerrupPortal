@@ -70,6 +70,18 @@ async function entraCacheFetchFresh() {
   return data;
 }
 
+// Henter KUN de basale Entra ID-felter (intet foto, ingen manager-opslag) —
+// hurtigt svar, så siden kan vise navn/mail/titel/afdeling med det samme.
+// Skrives ALDRIG til den delte cache, da dette ikke er de fulde data.
+async function entraCacheFetchFast() {
+  const r = await fetch("/api/entra-users?fast=1", { cache: "no-store" });
+  if (!r.ok) {
+    const b = await r.json().catch(() => ({}));
+    throw new Error(b.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
 // Kaldes fra index.html ved load: varmer cachen op i baggrunden hvis den er
 // tom/forældet. Kaster aldrig en fejl videre — det er "best effort".
 async function entraCacheWarm() {
@@ -90,10 +102,11 @@ async function entraCacheGetUsers() {
   return entraCacheFetchFresh();
 }
 
-window.entraCacheGetUsers = entraCacheGetUsers;
-window.entraCacheWarm     = entraCacheWarm;
-window.entraCacheRead     = entraCacheRead;
-window.entraCacheIsFresh  = entraCacheIsFresh;
+window.entraCacheGetUsers  = entraCacheGetUsers;
+window.entraCacheWarm      = entraCacheWarm;
+window.entraCacheRead      = entraCacheRead;
+window.entraCacheIsFresh   = entraCacheIsFresh;
+window.entraCacheFetchFast = entraCacheFetchFast;
 
 // ── Generiske hjælpefunktioner ────────────────────────────────────────────────
 // Bruges af andre datatyper end medarbejderlisten (fx vagt/ferie-planen i
