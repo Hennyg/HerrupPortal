@@ -685,20 +685,40 @@
       }
     }
 
+    // To-faset hentning: viser Entra ID-data (navn/mail/titel/afdeling) med
+    // det samme, og henter derefter foto + manager-kæde i baggrunden — uden
+    // at brugeren skal vente på dem for at kunne se/søge i listen.
+    // Billederne "popper" simpelthen ind i tabellen/org-oversigten, når de
+    // er hentet, via det almindelige gentegn (renderTable/renderOrg).
     async function loadFullUserList(isBackground) {
+      let shownSomething = false;
+
+      // Fase 1: hurtigt hent uden foto/manager — springes kun over hvis den
+      // fejler (fx offline), i så fald går vi direkte til det fulde hent.
+      try {
+        const fastData = await entraCacheFetchFast();
+        applyUserList(fastData);
+        shownSomething = true;
+      } catch (e) {
+        // Ignoreres — det fulde hent nedenfor forsøges stadig.
+      }
+
+      // Fase 2: fulde, berigede data (foto + manager) — opdaterer stille,
+      // uden at rykke ved brugerens aktuelle søgning/filter/valg.
       try {
         const data = await entraCacheGetUsers();
         applyUserList(data);
+        shownSomething = true;
 
         // Hvis detaljekortet fra et direkte link stadig er åbent, opdater det
-        // nu med de fulde data (manager-kæde og direkte rapporter).
-        if (isBackground && currentModalUser &&
+        // nu med de fulde data (foto, manager-kæde og direkte rapporter).
+        if (currentModalUser &&
             document.getElementById("modalBackdrop").classList.contains("open") &&
             byId.has(currentModalUser.id)) {
           openModal(currentModalUser.id);
         }
       } catch (e) {
-        if (!isBackground) renderError("Kunne ikke hente brugere: " + e.message);
+        if (!isBackground && !shownSomething) renderError("Kunne ikke hente brugere: " + e.message);
       } finally {
         if (window.__herrupOnUsersRendered) window.__herrupOnUsersRendered();
       }
@@ -876,10 +896,17 @@
       const depts = [...new Set(users.map(u => u.department).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, "da"));
       const sel = document.getElementById("deptFilter");
+      if (!sel) return;
+      // Listen genopbygges (kaldes både ved det hurtige og det fulde hent),
+      // så bevar det valgte filter og ryd tidligere tilføjede options —
+      // ellers dubleres afdelingerne i dropdownen ved anden opbygning.
+      const previousValue = sel.value;
+      sel.innerHTML = `<option value="">Alle afdelinger</option>`;
       depts.forEach(d => {
         const o = document.createElement("option");
         o.value = d; o.textContent = d; sel.appendChild(o);
       });
+      if (previousValue && depts.includes(previousValue)) sel.value = previousValue;
     }
 
     const searchEl = document.getElementById("search");
