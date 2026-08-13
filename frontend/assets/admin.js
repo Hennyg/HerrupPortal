@@ -59,7 +59,7 @@ function updateIconPreview() {
 
 function updateFavVisibility() {
   const cat = ($("category")?.value || "").trim().toLowerCase();
-  const isFav = cat === "favoritter";
+  const isFav = cat === "lely favoritter";
 
   const groupRow = $("groupRow");
   const subgroupRow = $("subgroupRow");
@@ -77,7 +77,7 @@ function updateFavVisibility() {
 
 function readForm() {
   const category = $("category").value || "";
-  const isFav = category.trim().toLowerCase() === "favoritter";
+  const isFav = category.trim().toLowerCase() === "lely favoritter";
 
   return {
     id: $("id").value || null,
@@ -124,7 +124,7 @@ function resetForm() {
 
 function seedPickersNow() {
   setSelectOptions($("category"),
-    ["Web Apps","Favoritter","Værktøjer","PowerApps","Andet"],
+    ["Web Apps","Lely favoritter","Værktøjer","PowerApps","Andet"],
     { includeEmpty:true, emptyText:"(vælg kategori)" }
   );
 
@@ -161,20 +161,20 @@ function seedPickersNow() {
 }
 
 function buildPickers(rows) {
-  const cats = uniq(["Web Apps","Favoritter","Værktøjer","PowerApps","Andet", ...rows.map(r => r.category)]);
+  const cats = uniq(["Web Apps","Lely favoritter","Værktøjer","PowerApps","Andet", ...rows.map(r => r.category)]);
   setSelectOptions($("category"), cats, { includeEmpty:true, emptyText:"(vælg kategori)" });
 
   const subs = uniq([
     "Dokumentation",
     ...rows
-      .filter(r => (r.category || "").toLowerCase() === "favoritter")
+      .filter(r => (r.category || "").toLowerCase() === "lely favoritter")
       .map(r => r.subgroup)
   ]);
   setSelectOptions($("subgroup"), subs, { includeEmpty:true, emptyText:"(ingen undergruppe)" });
 
   const grps = uniq([
     "Lely","Salg","Tekniker","FMS","Administration",
-    ...rows.filter(r => (r.category || "").toLowerCase() === "favoritter").map(r => r.group)
+    ...rows.filter(r => (r.category || "").toLowerCase() === "lely favoritter").map(r => r.group)
   ]);
   setSelectOptions($("group"), grps, { includeEmpty:true, emptyText:"(ingen gruppe)" });
 
@@ -301,7 +301,7 @@ function maybeAutoSort() {
   if (($("id")?.value || "").trim()) return;
 
   const cat = ($("category")?.value || "").trim().toLowerCase();
-  if (cat !== "favoritter") return;
+  if (cat !== "lely favoritter") return;
 
   const grp = ($("group")?.value || "").trim();
   if (!grp) return;
@@ -314,7 +314,7 @@ function maybeAutoSort() {
   const maxSort = Math.max(
     0,
     ...lastRows
-      .filter(r => (r.category || "").toLowerCase() === "favoritter")
+      .filter(r => (r.category || "").toLowerCase() === "lely favoritter")
       .filter(r => (r.group || "").trim() === grp)
       .filter(r => String(r.subgroup || "").trim() === sub)
       .map(r => Number(r.sort ?? 0))
