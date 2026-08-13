@@ -686,36 +686,64 @@
     }
 
     // To-faset hentning: viser Entra ID-data (navn/mail/titel/afdeling) med
-    // det samme, og henter derefter foto + manager-kæde i baggrunden — uden
-    // at brugeren skal vente på dem for at kunne se/søge i listen.
-    // Billederne "popper" simpelthen ind i tabellen/org-oversigten, når de
-    // er hentet, via det almindelige gentegn (renderTable/renderOrg).
+    // det samme, og henter derefter foto + manager-kæde i mindre bidder —
+    // så billederne dukker løbende op i tabellen/org-oversigten, i stedet
+    // for at komme på én gang når alle er hentet.
     async function loadFullUserList(isBackground) {
       let shownSomething = false;
+      let baseData = null;
 
       // Fase 1: hurtigt hent uden foto/manager — springes kun over hvis den
-      // fejler (fx offline), i så fald går vi direkte til det fulde hent.
+      // fejler (fx offline); i så fald går vi direkte til det fulde hent.
       try {
-        const fastData = await entraCacheFetchFast();
-        applyUserList(fastData);
+        baseData = await entraCacheFetchFast();
+        applyUserList(baseData);
         shownSomething = true;
       } catch (e) {
-        // Ignoreres — det fulde hent nedenfor forsøges stadig.
+        // Ignoreres — fase 2 forsøges stadig nedenfor.
       }
 
-      // Fase 2: fulde, berigede data (foto + manager) — opdaterer stille,
-      // uden at rykke ved brugerens aktuelle søgning/filter/valg.
+      // Fase 2: foto + manager-kæde, hentet i bidder så de "popper" ind
+      // løbende i stedet for alle på én gang.
       try {
-        const data = await entraCacheGetUsers();
-        applyUserList(data);
-        shownSomething = true;
+        const ids = (baseData || allUsers).map(u => u.id);
 
-        // Hvis detaljekortet fra et direkte link stadig er åbent, opdater det
-        // nu med de fulde data (foto, manager-kæde og direkte rapporter).
-        if (currentModalUser &&
-            document.getElementById("modalBackdrop").classList.contains("open") &&
-            byId.has(currentModalUser.id)) {
-          openModal(currentModalUser.id);
+        if (!ids.length) {
+          // Fase 1 gav os intet at berige — fald tilbage til ét samlet hent.
+          const data = await entraCacheGetUsers();
+          applyUserList(data);
+          shownSomething = true;
+        } else {
+          await entraCacheFetchEnrichedInChunks(ids, (chunk) => {
+            let touchedOpenModal = false;
+
+            for (const enrichedUser of chunk) {
+              const existing = byId.get(enrichedUser.id);
+              if (!existing) continue;
+              existing.photo          = enrichedUser.photo;
+              existing.managerId      = enrichedUser.managerId;
+              existing.managerName    = enrichedUser.managerName;
+              existing.entraPhoto     = enrichedUser.entraPhoto;
+              existing.hasCustomPhoto = enrichedUser.hasCustomPhoto;
+              if (currentModalUser && currentModalUser.id === enrichedUser.id) touchedOpenModal = true;
+            }
+
+            renderTable();
+            renderOrg();
+
+            // Opdater et evt. åbent personkort løbende, når personen selv
+            // netop er beriget (foto + manager-kæde/rapporter).
+            if (touchedOpenModal &&
+                document.getElementById("modalBackdrop").classList.contains("open")) {
+              openModal(currentModalUser.id);
+            }
+          });
+
+          shownSomething = true;
+
+          // Gem det nu fuldt berigede snapshot i den delte cache, så et nyt
+          // besøg inden for TTL'en er øjeblikkeligt med billeder og det hele.
+          if (window.entraCacheWrite) window.entraCacheWrite(allUsers);
         }
       } catch (e) {
         if (!isBackground && !shownSomething) renderError("Kunne ikke hente brugere: " + e.message);
