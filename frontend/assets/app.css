@@ -74,24 +74,37 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 @media (max-width: 520px){ .grid{grid-template-columns:repeat(1,minmax(0,1fr));} .filters{grid-template-columns:1fr;} .brand{font-size:1.1rem}}
 
 .tile{
-  display:flex;flex-direction:column;gap:.4rem;
+  position:relative;
+  display:flex;flex-direction:column;
   border:1px solid #e5e7eb;border-radius:10px;padding:.85rem;
-  text-decoration:none;color:inherit;background:#fff;
+  background:#fff;
 }
 .tile:hover{filter:brightness(.98)}
 .tile--admin-only{border:2px solid #c30a14;box-shadow:0 0 0 1px rgba(195,10,20,.25)}
-.tileTop{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.tileLink{display:flex;flex-direction:column;gap:.4rem;text-decoration:none;color:inherit}
+.tileTop{display:flex;align-items:center;gap:.5rem}
 .icon{font-size:22px}
-.badge{font-size:12px;color:#6b7280}
-.tileTitle{font-weight:700}
+.tileTitle{font-weight:700;padding-right:1.4rem}
 .tileUrl{font-size:12px;color:#6b7280;word-break:break-all}
+
+/* Stjerne i tile-kortets hjørne — ligger UDEN for .tileLink, så et klik på
+   stjernen aldrig åbner selve linket, kun skifter favorit-status. */
+.favStar{
+  position:absolute; top:.55rem; right:.55rem;
+  appearance:none; border:0; background:transparent;
+  font-size:18px; line-height:1; cursor:pointer;
+  color:#c7cbd1; padding:2px 3px; border-radius:6px;
+}
+.favStar:hover{ color:#9ca3af; background:rgba(0,0,0,.05); }
+.favStar.is-active{ color:#d4a017; }
+.favStar.is-active:hover{ color:#b8860b; }
 
 .hidden{display:none !important}
 
 .section { margin: 18px 0 26px; }
 .sectionTitle { margin: 8px 0 12px; font-size: 18px; font-weight: 700; }
 
-/* ===== Favoritter: grupper (fold ud/ind) ===== */
+/* ===== Lely favoritter: grupper (fold ud/ind) ===== */
 .favGroup { border:1px solid var(--fav-border); border-radius: 10px; overflow:hidden; margin: 10px 0; background:#fff; }
 .favGroupHdr {
   width:100%;
