@@ -38,7 +38,17 @@
     #tbl thead th[data-col]:hover { background: rgba(0,0,0,.04); }
     #tbl thead th.sort-active { color: var(--accent-bar); }
     .sort-arrow { font-size: .75rem; opacity: .7; }
-    .tableWrap { overflow-x: auto; }
+
+    /* Boks med egen højde-grænse, så den horisontale scrollbar altid er lige
+       under de synlige rækker — man skal ikke scrolle hele siden ned for at
+       nå den, uanset hvor mange records listen indeholder. */
+    .tableWrap {
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 65vh;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+    }
     .table { width: 100%; border-collapse: collapse; font-size: .9rem; }
     .table thead th {
       text-align: left;
@@ -46,6 +56,12 @@
       border-bottom: 2px solid #e5e7eb;
       white-space: nowrap;
       user-select: none;
+      /* Header'en følger med når man scroller ned i den (nu afgrænsede)
+         liste, så man altid kan se hvilken kolonne man kigger på. */
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1;
     }
     .table tbody tr:hover { background: rgba(0,0,0,.025); }
     .table tbody td { padding: .45rem .6rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
