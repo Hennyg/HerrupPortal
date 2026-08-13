@@ -3,6 +3,51 @@
 // Slå tracking til/fra (du har pt. ikke /api/track => hold den false)
 const TRACKING_ENABLED = false;
 
+// ── "Mine favoritter" (stjernemarkering) ─────────────────────────────────────
+// Hvilke link-id'er den indloggede bruger har markeret med stjernen. Gemmes
+// centralt via /api/favoritter, så valget følger brugeren på tværs af enheder.
+let favoriteIds = new Set();
+let favSaveTimer = null;
+// Sat af init() til dens lokale render(), så toggleFavorite() (som ligger
+// uden for init-closuren) kan bede om et gentegn efter en stjerne skifter.
+let rerenderMain = () => {};
+
+async function loadFavorites() {
+  try {
+    const r = await fetch("/api/favoritter", { cache: "no-store" });
+    if (!r.ok) { favoriteIds = new Set(); return; }
+    const data = await r.json();
+    favoriteIds = new Set(Array.isArray(data.ids) ? data.ids : []);
+  } catch {
+    // Offline/fejl: ingen favoritter markeret ved denne indlæsning — påvirker
+    // ikke resten af siden, og intet gemmes før brugeren selv klikker en stjerne.
+    favoriteIds = new Set();
+  }
+}
+
+function saveFavoritesDebounced() {
+  clearTimeout(favSaveTimer);
+  favSaveTimer = setTimeout(async () => {
+    try {
+      await fetch("/api/favoritter", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(favoriteIds) })
+      });
+    } catch (e) {
+      console.warn("Kunne ikke gemme favoritter:", e);
+    }
+  }, 400);
+}
+
+function toggleFavorite(id) {
+  if (!id) return;
+  if (favoriteIds.has(id)) favoriteIds.delete(id);
+  else favoriteIds.add(id);
+  saveFavoritesDebounced();
+  rerenderMain();
+}
+
 function safeUrl(u) {
   try {
     const url = new URL(u, location.origin);
@@ -155,28 +200,37 @@ function normSubgroup(it) { return normKey(it.subgroup || it.subGroup || ""); }
 function renderTileHTML(it) {
   const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
   const adminClass = it.adminOnly ? " tile--admin-only" : "";
+  const isFavStarred = favoriteIds.has(it.id);
   const wrapper = document.createElement("div");
   wrapper.innerHTML = `
-    <a class="tile${adminClass}"
-       href="${esc(it.url)}"
-       target="${target}"
-       rel="noopener"
-       data-track="tile"
-       data-title="${esc(it.title || "")}"
-       data-url="${esc(it.url || "")}"
-       data-category="${esc(it.category || "")}"
-       data-group="${esc(it.group || "")}">
-      <div class="tileTop">
-        <div class="icon"></div>
-        <div class="badge">${esc(it.category || "")}</div>
-      </div>
-      <div class="tileTitle">${esc(it.title || "Uden titel")}</div>
-      <div class="tileUrl">${esc(it.description || it.forklaring || "")}</div>
-    </a>
+    <div class="tile${adminClass}">
+      <button
+        class="favStar${isFavStarred ? " is-active" : ""}"
+        type="button"
+        data-fav-id="${esc(it.id)}"
+        aria-pressed="${isFavStarred ? "true" : "false"}"
+        title="${isFavStarred ? "Fjern fra Mine favoritter" : "Tilføj til Mine favoritter"}"
+      >${isFavStarred ? "★" : "☆"}</button>
+      <a class="tileLink"
+         href="${esc(it.url)}"
+         target="${target}"
+         rel="noopener"
+         data-track="tile"
+         data-title="${esc(it.title || "")}"
+         data-url="${esc(it.url || "")}"
+         data-category="${esc(it.category || "")}"
+         data-group="${esc(it.group || "")}">
+        <div class="tileTop">
+          <div class="icon"></div>
+        </div>
+        <div class="tileTitle">${esc(it.title || "Uden titel")}</div>
+        <div class="tileUrl">${esc(it.description || it.forklaring || "")}</div>
+      </a>
+    </div>
   `;
-  const a = wrapper.firstElementChild;
-  setIcon(a.querySelector(".icon"), it.icon);
-  return a.outerHTML;
+  const tileEl = wrapper.firstElementChild;
+  setIcon(tileEl.querySelector(".icon"), it.icon);
+  return tileEl.outerHTML;
 }
 
 function renderFavGroupHTML(groupName, links, key) {
@@ -224,7 +278,7 @@ function renderFavGroupHTML(groupName, links, key) {
 function renderCategorySectionHTML(categoryName, links, sectionIndex) {
   const rawCat = categoryName || "Andet";
   const cat = rawCat.toLowerCase() === "static apps" ? "Web Apps" : rawCat;
-  const isFav = cat.toLowerCase() === "favoritter";
+  const isFav = cat.toLowerCase() === "lely favoritter";
   if (isFav) {
     const byGroup = groupBy(links, x => normKey(x.group) || "Uden gruppe");
     const groups = Array.from(byGroup.entries()).sort((a, b) => a[0].localeCompare(b[0], "da"));
@@ -247,6 +301,22 @@ function renderCategorySectionHTML(categoryName, links, sectionIndex) {
   `;
 }
 
+// "Mine favoritter" er ikke en rigtig kategori i Dataverse — det er en
+// virtuel, brugerspecifik sektion styret af stjernemarkeringen, og den
+// vises altid allerførst, uanset hvilke kategorier de stjernemarkerede
+// links faktisk hører til.
+function renderMyFavoritesSectionHTML(links) {
+  const body = links.length
+    ? `<div class="grid">${sortLinks(links).map(renderTileHTML).join("")}</div>`
+    : `<div class="muted" style="padding:.4rem 0 .2rem">Klik på stjernen ☆ på et link for at samle dine mest brugte her.</div>`;
+  return `
+    <section class="section" id="mineFavoritterSection">
+      <div class="accent-bar" style="margin-bottom:10px;">Mine favoritter</div>
+      <div class="sectionBody">${body}</div>
+    </section>
+  `;
+}
+
 function wireAccordions(root) {
   root.querySelectorAll("[data-toggle]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -262,7 +332,7 @@ function wireAccordions(root) {
 }
 
 function wireTileTracking(root) {
-  root.querySelectorAll('a.tile[data-track="tile"]').forEach(a => {
+  root.querySelectorAll('.tileLink[data-track="tile"]').forEach(a => {
     a.addEventListener("click", () => {
       track("Click", {
         targetUrl: safeUrl(a.getAttribute("data-url") || a.href || ""),
@@ -274,19 +344,35 @@ function wireTileTracking(root) {
   });
 }
 
-function renderSections(items) {
+// Stjerne-knapperne sidder inde i selve tile-kortet, men UDEN for det
+// klikbare link (se renderTileHTML) — så et klik på stjernen aldrig åbner
+// linket, kun skifter favorit-status.
+function wireFavoriteStars(root) {
+  root.querySelectorAll(".favStar").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFavorite(btn.getAttribute("data-fav-id"));
+    });
+  });
+}
+
+function renderSections(items, myFavItems) {
   const root = document.getElementById("sections");
   if (!root) return;
   const byCat = groupBy(items, x => normKey(x.category) || "Andet");
   const entries = Array.from(byCat.entries()).sort((a, b) => {
     const an = a[0].toLowerCase(), bn = b[0].toLowerCase();
-    if (an === "favoritter" && bn !== "favoritter") return -1;
-    if (bn === "favoritter" && an !== "favoritter") return 1;
+    if (an === "lely favoritter" && bn !== "lely favoritter") return -1;
+    if (bn === "lely favoritter" && an !== "lely favoritter") return 1;
     return a[0].localeCompare(b[0], "da");
   });
-  root.innerHTML = entries.map(([cat, links], i) => renderCategorySectionHTML(cat, links, i)).join("");
+  const catHTML = entries.map(([cat, links], i) => renderCategorySectionHTML(cat, links, i)).join("");
+  const favHTML = renderMyFavoritesSectionHTML(myFavItems || []);
+  root.innerHTML = favHTML + catHTML;
   wireAccordions(root);
   wireTileTracking(root);
+  wireFavoriteStars(root);
 }
 
 (async function init() {
@@ -302,14 +388,20 @@ function renderSections(items) {
   const adminLink = document.getElementById("adminLink");
   if (adminLink) adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
 
+  // Hent brugerens stjernemarkerede favoritter parallelt med links, så
+  // "Mine favoritter" er korrekt allerede ved første tegning af siden.
+  const favoritesPromise = loadFavorites();
+
   let raw = [];
   try {
     raw = await loadLinks();
   } catch (e) {
     console.warn("Kunne ikke hente links:", e);
-    renderSections([]);
+    await favoritesPromise;
+    renderSections([], []);
     return;
   }
+  await favoritesPromise;
 
   const platform = detectPlatform();
 
@@ -352,14 +444,25 @@ function renderSections(items) {
     const qq = (q?.value || "").toLowerCase();
     const cat = catSel?.value || "";
     const grp = grpSel?.value || "";
+    const matchesSearch = (x) => !qq
+      || (x.title || "").toLowerCase().includes(qq)
+      || (x.url || "").toLowerCase().includes(qq);
+
     const filtered = itemsAll.filter(x => {
       if (cat && (x.category || "") !== cat) return false;
       if (grp && (x.group || "") !== grp) return false;
-      if (!qq) return true;
-      return (x.title || "").toLowerCase().includes(qq) || (x.url || "").toLowerCase().includes(qq);
+      return matchesSearch(x);
     });
-    renderSections(filtered);
+
+    // "Mine favoritter" er brugerens egen samling og ignorerer derfor
+    // kategori/gruppe-filtrene (ellers kunne man "filtrere favoritterne
+    // væk" ved et uheld) — men respekterer stadig søgefeltet.
+    const myFav = itemsAll.filter(x => favoriteIds.has(x.id) && matchesSearch(x));
+
+    renderSections(filtered, myFav);
   }
+
+  rerenderMain = render;
 
   if (q) q.addEventListener("input", () => { syncClearBtn(); render(); });
   if (qx) qx.addEventListener("click", () => { q.value = ""; syncClearBtn(); render(); });
