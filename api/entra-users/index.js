@@ -195,22 +195,62 @@ async function getCustomPhotoMap(context) {
   return map;
 }
 
+// ── Kort-tids in-memory cache (pr. Function-instans) ─────────────────────────
+// Bruges når frontend henter foto/manager i mindre bidder (via "ids"), så vi
+// ikke slår gruppe-id og brugerdefinerede billeder op i Dataverse for hver
+// eneste bid — kun første gang inden for et par sekunder.
+const SHORT_CACHE_TTL_MS = 20 * 1000;
+let groupIdCache = null; // { value, at }
+let customPhotoCache = null; // { value: Map, at }
+
+async function findGroupIdCached(token, name) {
+  if (groupIdCache && (Date.now() - groupIdCache.at) < SHORT_CACHE_TTL_MS) {
+    return groupIdCache.value;
+  }
+  const id = await findGroupId(token, name);
+  groupIdCache = { value: id, at: Date.now() };
+  return id;
+}
+
+async function getCustomPhotoMapCached(context) {
+  if (customPhotoCache && (Date.now() - customPhotoCache.at) < SHORT_CACHE_TTL_MS) {
+    return customPhotoCache.value;
+  }
+  const map = await getCustomPhotoMap(context);
+  customPhotoCache = { value: map, at: Date.now() };
+  return map;
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 // Query-param "fast=1": returnér KUN gruppemedlemmerne med basale felter —
 // uden foto og manager-opslag (som er de dyre, per-bruger Graph-kald).
 // Bruges af frontend til at vise Entra ID-data med det samme, mens foto/
-// manager hentes bagefter i baggrunden via et normalt (fuldt) kald.
+// manager hentes bagefter i baggrunden.
+//
+// Query-param "ids=<id1,id2,...>": berig KUN de angivne bruger-id'er (foto +
+// manager) og returnér dem. Bruges af frontend til at hente billeder i mindre
+// bidder, så de dukker løbende op på siden i stedet for alle på én gang.
 module.exports = async function (context, req) {
   if (!req.headers["x-ms-client-principal"]) {
     return json(context, 401, { error: "Ikke logget ind" });
   }
 
-  const fast = String(req.query?.fast || "") === "1";
+  const fast    = String(req.query?.fast || "") === "1";
+  const idsParam = String(req.query?.ids || "").trim();
+  const idsFilter = idsParam
+    ? new Set(idsParam.split(",").map(s => s.trim()).filter(Boolean))
+    : null;
 
   try {
     const token   = await getGraphToken();
-    const groupId = await findGroupId(token, GROUP_NAME);
-    const members = await getGroupMembers(token, groupId);
+    const groupId = idsFilter
+      ? await findGroupIdCached(token, GROUP_NAME)
+      : await findGroupId(token, GROUP_NAME);
+    let members = await getGroupMembers(token, groupId);
+
+    if (idsFilter) {
+      members = members.filter(u => idsFilter.has(u.id));
+    }
 
     if (fast) {
       const basic = members
@@ -230,7 +270,9 @@ module.exports = async function (context, req) {
 
     // Overskriv med brugerdefineret billede fra Dataverse, hvis medarbejderen har uploadet et.
     // entraPhoto gemmes altid uændret, så vi kan gå tilbage til den hvis brugerdefineret billede fjernes.
-    const customPhotos = await getCustomPhotoMap(context);
+    const customPhotos = idsFilter
+      ? await getCustomPhotoMapCached(context)
+      : await getCustomPhotoMap(context);
     for (const user of enriched) {
       const mail = String(user.mail || user.userPrincipalName || "").toLowerCase().trim();
       const custom = mail ? customPhotos.get(mail) : null;
