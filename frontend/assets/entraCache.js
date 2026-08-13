@@ -82,6 +82,38 @@ async function entraCacheFetchFast() {
   return r.json();
 }
 
+// Henter foto + manager for et afgrænset sæt bruger-id'er (én "bid" af
+// listen). Bruges til at hente billeder løbende i stedet for alle på én
+// gang — se entraCacheFetchEnrichedInChunks nedenfor.
+async function entraCacheFetchEnrichmentChunk(ids) {
+  const r = await fetch(`/api/entra-users?ids=${encodeURIComponent(ids.join(","))}`, { cache: "no-store" });
+  if (!r.ok) {
+    const b = await r.json().catch(() => ({}));
+    throw new Error(b.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+// Henter foto/manager for ALLE givne bruger-id'er i bidder af "chunkSize",
+// og kalder onChunk(enrichedUsersForThatChunk) hver gang en bid er klar —
+// så den kaldende side kan opdatere billederne løbende i stedet for at
+// vente på at det hele er hentet.
+async function entraCacheFetchEnrichedInChunks(ids, onChunk, chunkSize = 12) {
+  const all = [];
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunkIds = ids.slice(i, i + chunkSize);
+    try {
+      const chunkData = await entraCacheFetchEnrichmentChunk(chunkIds);
+      all.push(...chunkData);
+      if (typeof onChunk === "function") onChunk(chunkData);
+    } catch {
+      // En enkelt bid der fejler (fx forbigående netværksfejl) må ikke
+      // stoppe resten — de øvrige bidder hentes stadig.
+    }
+  }
+  return all;
+}
+
 // Kaldes fra index.html ved load: varmer cachen op i baggrunden hvis den er
 // tom/forældet. Kaster aldrig en fejl videre — det er "best effort".
 async function entraCacheWarm() {
@@ -102,11 +134,13 @@ async function entraCacheGetUsers() {
   return entraCacheFetchFresh();
 }
 
-window.entraCacheGetUsers  = entraCacheGetUsers;
-window.entraCacheWarm      = entraCacheWarm;
-window.entraCacheRead      = entraCacheRead;
-window.entraCacheIsFresh   = entraCacheIsFresh;
-window.entraCacheFetchFast = entraCacheFetchFast;
+window.entraCacheGetUsers               = entraCacheGetUsers;
+window.entraCacheWarm                    = entraCacheWarm;
+window.entraCacheRead                    = entraCacheRead;
+window.entraCacheIsFresh                 = entraCacheIsFresh;
+window.entraCacheFetchFast               = entraCacheFetchFast;
+window.entraCacheFetchEnrichedInChunks   = entraCacheFetchEnrichedInChunks;
+window.entraCacheWrite                   = entraCacheWrite;
 
 // ── Generiske hjælpefunktioner ────────────────────────────────────────────────
 // Bruges af andre datatyper end medarbejderlisten (fx vagt/ferie-planen i
