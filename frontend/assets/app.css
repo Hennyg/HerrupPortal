@@ -29,9 +29,31 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 .nav a:hover{opacity:1;text-decoration:underline}
 .nav-accent{height:10px;background:var(--nav-accent)}
 .container{max-width:var(--maxw);margin:0 auto;padding:3rem 1rem 2rem}
-.hero{display:grid;place-items:center;padding:2rem 0 3rem}
+.hero{
+  display:grid;
+  grid-template-columns: minmax(140px,1fr) auto minmax(140px,1fr);
+  align-items:center;
+  gap:1.25rem;
+  padding:2rem 0 3rem;
+}
 .hero h1{text-align:center;color:var(--heading);font-size:2rem;margin:0}
 .hero .muted{margin-top:.5rem}
+
+/* De 2 primær-app-bokse i toppen (styret fra Admin: "Primær-boks 1/2") */
+.primaryBox{ display:flex; justify-content:center; min-height:1px; }
+.primaryTile{
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  gap:.4rem; text-decoration:none; color:inherit;
+  border:1px solid #e5e7eb; border-radius:12px;
+  padding:.9rem 1.3rem; background:#fff; min-width:150px;
+}
+.primaryTile:hover{ filter:brightness(.97); }
+.primaryTile .icon{ font-size:30px; }
+.primaryTile .primaryTitle{ font-weight:700; font-size:.92rem; }
+
+@media (max-width: 720px){
+  .hero{ grid-template-columns: 1fr; gap:.75rem; }
+}
 
 .accent-bar{
   width:100%;
@@ -167,18 +189,24 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
   margin: 6px 0 18px;
 }
 
-/* 1-kolonne form */
+/* 2-kolonne form — hver .formRow ligger i sin egen celle (label over felt);
+   .formRow--full spænder over begge kolonner (bruges til Ikon-feltet, som
+   har brug for mere plads pga. preview-billedet). */
 .adminForm{
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 28px;
 }
 
 .formRow{
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 12px;
-  align-items: center;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  align-items: start;
+}
+
+.formRow--full{
+  grid-column: 1 / -1;
 }
 
 .formRow label{
@@ -220,6 +248,7 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 }
 
 .formActions{
+  grid-column: 1 / -1;
   display:flex;
   gap:10px;
   align-items:center;
@@ -232,9 +261,9 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
   font-size:.85rem;
 }
 
-/* Mobil: label over felt */
+/* Mobil: én kolonne i stedet for 2 */
 @media (max-width: 720px){
-  .formRow{ grid-template-columns: 1fr; }
+  .adminForm{ grid-template-columns: 1fr; }
 }
 
 .adminPage .container{
