@@ -233,6 +233,44 @@ function renderTileHTML(it) {
   return tileEl.outerHTML;
 }
 
+// ── Primær-bokse i toppen af forsiden (Admin: "Primær-boks 1/2") ────────────
+function renderPrimaryTileHTML(it) {
+  const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `
+    <a class="primaryTile tileLink"
+       href="${esc(it.url)}"
+       target="${target}"
+       rel="noopener"
+       data-track="tile"
+       data-title="${esc(it.title || "")}"
+       data-url="${esc(it.url || "")}"
+       data-category="${esc(it.category || "")}"
+       data-group="${esc(it.group || "")}">
+      <div class="icon"></div>
+      <div class="primaryTitle">${esc(it.title || "")}</div>
+    </a>
+  `;
+  const a = wrapper.firstElementChild;
+  setIcon(a.querySelector(".icon"), it.icon);
+  return a.outerHTML;
+}
+
+function renderPrimaryBoxes(items) {
+  const left = document.getElementById("primaryBoxLeft");
+  const right = document.getElementById("primaryBoxRight");
+  if (!left && !right) return;
+
+  const p1 = items.find(x => x.primaer === 1);
+  const p2 = items.find(x => x.primaer === 2);
+
+  if (left)  left.innerHTML  = p1 ? renderPrimaryTileHTML(p1) : "";
+  if (right) right.innerHTML = p2 ? renderPrimaryTileHTML(p2) : "";
+
+  // Samme klik-tracking som de almindelige tiles (no-op når TRACKING_ENABLED er false).
+  wireTileTracking(document.querySelector(".hero"));
+}
+
 function renderFavGroupHTML(groupName, links, key) {
   const id = `fav_${key}`;
   const label = groupName || "Uden gruppe";
@@ -426,6 +464,10 @@ function renderSections(items, myFavItems) {
 
   const categories = uniq(itemsAll.map(x => x.category));
   const groups = uniq(itemsAll.map(x => x.group).filter(Boolean));
+
+  // De 2 "primære app"-bokse i toppen af siden — uafhængige af søgning/
+  // kategori-filter, sættes én gang her.
+  renderPrimaryBoxes(itemsAll);
 
   const catSel = document.getElementById("categoryFilter");
   const grpSel = document.getElementById("groupFilter");
