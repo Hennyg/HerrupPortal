@@ -402,4 +402,71 @@ async function refresh() {
     $("msg").textContent = `API /api/links-admin virker ikke endnu. Fejl (${err?.status || "?"}).`;
     console.warn("refresh() fejlede:", err);
   }
+
+  initTipPopup();
 })();
+
+// ── "Ny nyhed/tip"-popup ──────────────────────────────────────────────────
+function initTipPopup() {
+  const overlay = $("tipOverlay");
+  if (!overlay) return;
+
+  function resetTipForm() {
+    $("tipForm").reset();
+    $("tipValgNyhed").checked = true;
+    updateTipUdlobVisibility();
+    $("tipMsg").textContent = "";
+  }
+
+  function updateTipUdlobVisibility() {
+    const isNyhed = $("tipValgNyhed").checked;
+    $("tipUdlobRow").style.display = isNyhed ? "" : "none";
+  }
+
+  function openTipPopup() {
+    resetTipForm();
+    overlay.style.display = "flex";
+    setTimeout(() => $("tipIndhold")?.focus(), 100);
+  }
+
+  function closeTipPopup() {
+    overlay.style.display = "none";
+  }
+
+  $("newTipLink")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    openTipPopup();
+  });
+
+  $("tipCloseBtn")?.addEventListener("click", closeTipPopup);
+  $("tipCancelBtn")?.addEventListener("click", closeTipPopup);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeTipPopup();
+  });
+
+  $("tipValgNyhed")?.addEventListener("change", updateTipUdlobVisibility);
+  $("tipValgTip")?.addEventListener("change", updateTipUdlobVisibility);
+
+  $("tipForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const indhold = $("tipIndhold").value.trim();
+    if (!indhold) {
+      $("tipMsg").textContent = "Indhold er påkrævet.";
+      return;
+    }
+
+    const valg = $("tipValgNyhed").checked ? "Nyhed" : "Tip";
+    const udlobsdato = valg === "Nyhed" ? ($("tipUdlobsdato").value || null) : null;
+
+    $("tipMsg").textContent = "Gemmer...";
+    try {
+      await api("POST", "/api/tips-admin", { indhold, valg, udlobsdato, aktiv: true });
+      $("tipMsg").textContent = "Gemt ✅";
+      setTimeout(closeTipPopup, 500);
+    } catch (err) {
+      $("tipMsg").textContent =
+        `Fejl (${err?.status || "?"}): ` + (err?.data?.message || JSON.stringify(err?.data || err));
+      console.warn("tip save fejl:", err);
+    }
+  });
+}
