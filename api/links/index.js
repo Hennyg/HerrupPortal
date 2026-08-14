@@ -3,10 +3,16 @@ const { dvFetch } = require("../_dv");
 const TABLE = "cr175_lch_portallinks";
 const IDCOL = "cr175_lch_portallinkid";
 const SUBGROUP_COL = "cr175_lch_subgroup";
+const PRIMAER_COL = "cr175_lch_primaer";
 
 // Forklaring-feltet er normalt prefikset med publisher-prefix i Dataverse.
 // Hvis dit logical name faktisk er lch_forklaring, håndterer fallback det også.
 const DESCRIPTION_COLS = ["cr175_lch_forklaring", "lch_forklaring"];
+
+function normPrimaer(v) {
+  const n = Number(v);
+  return (n === 1 || n === 2) ? n : null;
+}
 
 function mapRow(r, { hasSubgroup, descriptionCol }) {
   return {
@@ -20,6 +26,7 @@ function mapRow(r, { hasSubgroup, descriptionCol }) {
     group:        r.cr175_lch_grouptext    || "",
     subgroup:     hasSubgroup ? (r[SUBGROUP_COL] || "") : "",
     parent:       r._cr175_lch_parent_value || null,
+    primaer:      normPrimaer(r[PRIMAER_COL]),
     allowedRoles: r.cr175_lch_allowedroles || "",
     enabled:      r.cr175_lch_enabled !== false,
     sort:         r.cr175_lch_sortorder ?? 1000,
@@ -38,7 +45,8 @@ async function getLinks() {
     "cr175_lch_allowedroles",
     "cr175_lch_enabled",
     "cr175_lch_sortorder",
-    "cr175_lch_openmodetext"
+    "cr175_lch_openmodetext",
+    PRIMAER_COL
   ];
 
   const variants = [];
