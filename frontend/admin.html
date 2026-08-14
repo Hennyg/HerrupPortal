@@ -8,7 +8,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
 
-  <link rel="stylesheet" href="/assets/app.css?v=20260813" />
+  <link rel="stylesheet" href="/assets/app.css?v=20260813-2" />
   <style>
     .tableToolbar {
       display: flex;
@@ -164,13 +164,18 @@
         </div>
 
         <div class="formRow">
-          <label for="parent">Parent</label>
-          <select id="parent" class="field">
-            <option value="">(ingen parent)</option>
-          </select>
+          <label>Primær-boks (forsiden)</label>
+          <div class="formInline" style="gap:18px">
+            <label class="formInline" style="gap:6px; font-weight:600">
+              <input id="primaer1" type="checkbox" /> 1
+            </label>
+            <label class="formInline" style="gap:6px; font-weight:600">
+              <input id="primaer2" type="checkbox" /> 2
+            </label>
+          </div>
         </div>
 
-        <div class="formRow">
+        <div class="formRow formRow--full">
           <label for="icon">Ikon (emoji eller tekst)</label>
           <div class="previewBox">
             <input id="icon" class="field" list="iconList" />
@@ -222,7 +227,7 @@
         <div class="left">
           <div class="sectionTitle" style="margin:0">Links</div>
         </div>
-        <div class="muted">Tip: "Parent" kræver en række uden URL (mappe)</div>
+        <div class="muted">Tip: kun ét link kan være Primær 1, og ét Primær 2 — vælger du et nyt, fjernes markeringen automatisk fra det forrige</div>
       </div>
 
       <!-- Søg og filtre -->
@@ -252,10 +257,10 @@
               <th data-col="group">Gruppe<span class="sort-arrow"> ⇅</span></th>
               <th data-col="subgroup">Undergruppe<span class="sort-arrow"> ⇅</span></th>
               <th data-col="platformHint">Platform<span class="sort-arrow"> ⇅</span></th>
-              <th>Parent</th>
+              <th data-col="primaer">Primær<span class="sort-arrow"> ⇅</span></th>
               <th data-col="enabled">Aktiv<span class="sort-arrow"> ⇅</span></th>
               <th data-col="allowedRoles">Roles<span class="sort-arrow"> ⇅</span></th>
-              <th data-col="sort">Sort<span class="sort-arrow"> ▲</span></th>
+              <th>Handling</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -265,6 +270,6 @@
 
   </div>
 
-  <script src="/assets/admin.js?v=20260813"></script>
+  <script src="/assets/admin.js?v=20260813-3"></script>
 </body>
 </html>
