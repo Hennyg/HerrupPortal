@@ -79,6 +79,8 @@ function readForm() {
   const category = $("category").value || "";
   const isFav = category.trim().toLowerCase() === "lely favoritter";
 
+  const primaer = $("primaer1")?.checked ? 1 : ($("primaer2")?.checked ? 2 : null);
+
   return {
     id: $("id").value || null,
     title: $("title").value.trim(),
@@ -87,13 +89,13 @@ function readForm() {
     category,
     group: isFav ? ($("group").value || "") : "",
     subgroup: isFav ? ($("subgroup")?.value || "").trim() : "",
-    parent: $("parent").value || null,
     icon: $("icon").value.trim(),
     allowedRoles: $("roles").value.trim(),
     enabled: $("enabled").checked,
     sort: Number($("sort").value || 100),
     openMode: $("openMode").value,
-    platformHint: $("platformHint")?.value || "All"
+    platformHint: $("platformHint")?.value || "All",
+    primaer
   };
 }
 
@@ -105,7 +107,6 @@ function fillForm(x) {
   $("category").value = x?.category || "";
   $("group").value = x?.group || "";
   if ($("subgroup")) $("subgroup").value = x?.subgroup || "";
-  $("parent").value = x?.parent || "";
   $("icon").value = x?.icon || "";
   updateIconPreview();
   $("roles").value = Array.isArray(x?.allowedRoles) ? x.allowedRoles.join(";") : (x?.allowedRoles || "");
@@ -113,12 +114,16 @@ function fillForm(x) {
   $("sort").value = x?.sort ?? 100;
   $("openMode").value = x?.openMode || "newTab";
   if ($("platformHint")) $("platformHint").value = x?.platformHint || "All";
+  if ($("primaer1")) $("primaer1").checked = x?.primaer === 1;
+  if ($("primaer2")) $("primaer2").checked = x?.primaer === 2;
   updateFavVisibility();
   maybeAutoSort();
 }
 
 function resetForm() {
-  fillForm({ enabled:true, sort:100, openMode:"newTab", platformHint:"All", subgroup:"" });
+  // Nyt link: Ikon-feltet foreslås forudfyldt med "/icons/", da alle ikoner
+  // ligger i den mappe — så skal man kun skrive filnavnet selv.
+  fillForm({ enabled:true, sort:100, openMode:"newTab", platformHint:"All", subgroup:"", icon:"/icons/" });
   $("msg").textContent = "";
 }
 
@@ -142,9 +147,6 @@ function seedPickersNow() {
     ["All","Desktop","Mobile"],
     { includeEmpty:false }
   );
-
-  const p = $("parent");
-  if (p) p.innerHTML = `<option value="">(ingen parent)</option>`;
 
   const fixedIcons = ["🔗","🧩","🐄","🪑","📄","📊","⚙️","🧰","🧑‍💼","📱","🗂️","🌐","🏷️"];
   const dl = document.getElementById("iconList");
@@ -180,16 +182,6 @@ function buildPickers(rows) {
 
   const hints = uniq(["All","Desktop","Mobile", ...rows.map(r => r.platformHint)]);
   setSelectOptions($("platformHint"), hints, { includeEmpty:false });
-
-  const parentCandidates = rows.filter(r => !r.url).map(r => ({ id:r.id, title:r.title }));
-  const parentSelect = $("parent");
-  parentSelect.innerHTML = `<option value="">(ingen parent)</option>`;
-  parentCandidates.forEach(p => {
-    const o = document.createElement("option");
-    o.value = p.id;
-    o.textContent = p.title;
-    parentSelect.appendChild(o);
-  });
 
   updateFavVisibility();
 }
@@ -243,7 +235,6 @@ function updateSortHeaders() {
 }
 
 function renderTable(rows) {
-  const byId = new Map(lastRows.map(r => [r.id, r]));
   const tb = $("tbl").querySelector("tbody");
   tb.innerHTML = "";
 
@@ -258,7 +249,7 @@ function renderTable(rows) {
   }
 
   rows.forEach(x => {
-    const parentTitle = x.parent ? (byId.get(x.parent)?.title || x.parent) : "";
+    const primaerDisplay = (x.primaer === 1 || x.primaer === 2) ? String(x.primaer) : "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${x.title || ""}</td>
@@ -267,7 +258,7 @@ function renderTable(rows) {
       <td>${x.group || ""}</td>
       <td>${x.subgroup || ""}</td>
       <td>${x.platformHint || ""}</td>
-      <td>${parentTitle}</td>
+      <td style="text-align:center">${primaerDisplay}</td>
       <td>${x.enabled !== false ? "Ja" : "Nej"}</td>
       <td>${Array.isArray(x.allowedRoles) ? x.allowedRoles.join(";") : (x.allowedRoles || "")}</td>
       <td style="white-space:nowrap">
@@ -346,6 +337,15 @@ async function refresh() {
 
   $("group").addEventListener("change", maybeAutoSort);
   if ($("subgroup")) $("subgroup").addEventListener("change", maybeAutoSort);
+
+  // Kun ét af de to primær-felter kan være markeret på samme link (feltet
+  // i Dataverse kan kun holde én værdi: 1, 2 eller ingen).
+  $("primaer1")?.addEventListener("change", () => {
+    if ($("primaer1").checked && $("primaer2")) $("primaer2").checked = false;
+  });
+  $("primaer2")?.addEventListener("change", () => {
+    if ($("primaer2").checked && $("primaer1")) $("primaer1").checked = false;
+  });
 
   // Tabel: søg og filtre
   $("tableSearch")?.addEventListener("input", applyTableFilters);
