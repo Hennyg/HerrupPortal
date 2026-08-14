@@ -25,6 +25,26 @@ async function loadFavorites() {
   }
 }
 
+// ── Nyhed/tip i "Velkommen"-banneret ─────────────────────────────────────────
+// Rent dekorativ — går ALDRIG i stykker for resten af siden. Findes ingen
+// aktiv nyhed/tip (eller kaldet fejler), bliver den statiske standardtekst
+// i markup'et bare stående uændret.
+async function loadNewsOrTip() {
+  const el = document.getElementById("newsTip");
+  if (!el) return;
+  try {
+    const r = await fetch("/api/tips", { cache: "no-store" });
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data && data.indhold) {
+      const prefix = data.type === "nyhed" ? "📢 " : "💡 ";
+      el.textContent = prefix + data.indhold;
+    }
+  } catch {
+    // Ignoreres — standardteksten forbliver synlig.
+  }
+}
+
 function saveFavoritesDebounced() {
   clearTimeout(favSaveTimer);
   favSaveTimer = setTimeout(async () => {
@@ -429,6 +449,10 @@ function renderSections(items, myFavItems) {
   // Hent brugerens stjernemarkerede favoritter parallelt med links, så
   // "Mine favoritter" er korrekt allerede ved første tegning af siden.
   const favoritesPromise = loadFavorites();
+
+  // Nyhed/tip er ren dekoration i "Velkommen"-teksten — kaldes uafhængigt og
+  // blokerer ikke resten af siden, uanset om den lykkes eller ikke.
+  loadNewsOrTip();
 
   let raw = [];
   try {
