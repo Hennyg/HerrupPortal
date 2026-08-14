@@ -10,6 +10,10 @@ const PLATFORM_COL = "cr175_lch_platformhinttext";
 // Undergruppe tekstfelt (ret hvis dit felt hedder noget andet)
 const SUBGROUP_COL = "cr175_lch_subgroup";
 
+// Primær-boks (1 eller 2) på forsiden. Heltal — kun ét link i alt kan have
+// værdien 1, og kun ét kan have værdien 2 (håndhæves i clearOtherPrimaer).
+const PRIMAER_COL = "cr175_lch_primaer";
+
 // Forklaring-feltet er normalt prefikset med publisher-prefix i Dataverse.
 // Hvis dit logical name faktisk er lch_forklaring, håndterer fallback det også.
 const DESCRIPTION_COLS = ["cr175_lch_forklaring", "lch_forklaring"];
@@ -25,6 +29,12 @@ function json(context, status, body) {
 function norm(s) { return String(s ?? "").trim(); }
 function isGuid(s) {
   return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(s || ""));
+}
+
+// Kun 1 eller 2 er gyldige værdier — alt andet (tom streng, 0, undefined) bliver null.
+function normPrimaer(v) {
+  const n = Number(v);
+  return (n === 1 || n === 2) ? n : null;
 }
 
 function normPlatformHint(v) {
@@ -54,6 +64,8 @@ function mapOut(r, { hasSubgroup, descriptionCol } = { hasSubgroup: true, descri
     subgroup: hasSubgroup ? (r?.[SUBGROUP_COL] || "") : "",
 
     parent: r?._cr175_lch_parent_value || null,
+
+    primaer: normPrimaer(r?.[PRIMAER_COL]),
 
     allowedRoles: r?.cr175_lch_allowedroles || "",
     enabled: r?.cr175_lch_enabled !== false,
@@ -87,7 +99,8 @@ function mapIn(b, { hasSubgroup, descriptionCol } = { hasSubgroup: true, descrip
     cr175_lch_enabled: (b.enabled ?? b.cr175_lch_enabled) !== false,
     cr175_lch_sortorder: Number.isFinite(Number(b.sort ?? b.cr175_lch_sortorder))
       ? Number(b.sort ?? b.cr175_lch_sortorder)
-      : 1000
+      : 1000,
+    [PRIMAER_COL]: normPrimaer(b.primaer ?? b[PRIMAER_COL])
   };
 
   if (descriptionCol) {
@@ -122,7 +135,8 @@ async function dvGetLinksWithFallback() {
     "_cr175_lch_parent_value",
     "cr175_lch_allowedroles",
     "cr175_lch_enabled",
-    "cr175_lch_sortorder"
+    "cr175_lch_sortorder",
+    PRIMAER_COL
   ];
 
   const variants = [];
@@ -145,6 +159,21 @@ async function dvGetLinksWithFallback() {
     }
   }
   throw lastError;
+}
+
+// Sikrer at kun ÉT link i alt har primaer=1, og kun ÉT har primaer=2.
+// Finder evt. andet link med samme værdi og nulstiller det, så en ny
+// markering automatisk "stjæler" boksen fra det forrige link.
+async function clearOtherPrimaer(primaerValue, exceptId) {
+  if (primaerValue !== 1 && primaerValue !== 2) return;
+  const filter = encodeURIComponent(`${PRIMAER_COL} eq ${primaerValue}`);
+  const data = await dvFetch(`${TABLE}?$select=${IDCOL}&$filter=${filter}`);
+  const rows = data.value || [];
+  for (const row of rows) {
+    if (row[IDCOL] !== exceptId) {
+      await dvFetch(`${TABLE}(${row[IDCOL]})`, { method: "PATCH", body: { [PRIMAER_COL]: null } });
+    }
+  }
 }
 
 module.exports = async function (context, req) {
@@ -179,6 +208,8 @@ module.exports = async function (context, req) {
       const created = await writeWithFallback("POST", null);
       // returnér noget brugbart
       if (created && created[IDCOL]) {
+        const primaer = normPrimaer((req.body || {}).primaer);
+        if (primaer) await clearOtherPrimaer(primaer, created[IDCOL]);
         // hent igen så vi får ens output
         const { hasSubgroup, descriptionCol, rows } = await dvGetLinksWithFallback();
         const row = rows.find(r => r[IDCOL] === created[IDCOL]);
@@ -191,6 +222,8 @@ module.exports = async function (context, req) {
       const b = req.body || {};
       if (!b.id) return json(context, 400, { error: "missing_id" });
       const res = await writeWithFallback("PATCH", b.id);
+      const primaer = normPrimaer(b.primaer);
+      if (primaer) await clearOtherPrimaer(primaer, b.id);
       return json(context, 200, res);
     }
 
