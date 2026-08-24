@@ -1,7 +1,11 @@
 {
-  "name": "herrupportal-api",
+  "name": "lager-optaelling-api",
   "version": "1.0.0",
-  "private": true,
-  "engines": { "node": ">=18" },
-  "dependencies": {}
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  }
 }

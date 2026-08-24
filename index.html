@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lager Optælling</title>
+<link rel="stylesheet" href="css/style.css?v=1" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- SKÆRM: Vælg optælling (fil) -->
+  <section id="screen-filevalg" class="screen">
+    <div class="content-center">
+      <h1 class="app-title">Lager Optælling</h1>
+      <p class="subtitle">Vælg hvilken optælling du vil arbejde på:</p>
+      <div id="filListe" class="file-list"></div>
+      <p id="fileError" class="error-text"></p>
+    </div>
+  </section>
+
+  <!-- SKÆRM: Start (farvevalg) -->
+  <section id="screen-start" class="screen">
+    <div class="color-row">
+      <button id="btnGul" class="btn-farve" data-farve="Gul">Vælg gul</button>
+      <button id="btnGron" class="btn-farve" data-farve="Gron">Vælg grøn</button>
+    </div>
+
+    <p class="info-text">Denne app arbejder ud fra listen:</p>
+    <p class="info-text bold" id="lblAktivFil">–</p>
+
+    <p id="lblVidere" class="warning-banner">VÆLG FARVE FØR DU FORTSÆTTER</p>
+
+    <button id="btnHentData" class="btn-primary">Hent data</button>
+    <button id="btnSkiftFil" class="btn-link">Skift optælling</button>
+
+    <p class="version-label">v 1.0</p>
+  </section>
+
+  <!-- SKÆRM: Datagalleri -->
+  <section id="screen-galleri" class="screen">
+    <div id="headlineGalleri" class="headline-bar">
+      <span id="arrowBack" class="icon-btn">&#8592;</span>
+      <span class="headline-title">Optællingsdata</span>
+      <span id="iconRefresh" class="icon-btn" title="Refresh list">&#8635;</span>
+      <span id="iconSort" class="icon-btn" title="Sortér">&#8645;</span>
+    </div>
+    <div class="search-row">
+      <span id="iconVFI" class="icon-btn warn-icon" title="Vare findes ikke">&#8599;</span>
+      <input id="txtSearchVare" type="text" placeholder="Søg varenummer / varenavn" />
+      <span id="iconClearSearch" class="icon-btn">&#10006;</span>
+    </div>
+    <div id="gallery1" class="gallery"></div>
+  </section>
+
+  <!-- SKÆRM: Vare findes -->
+  <section id="screen-varefindes" class="screen">
+    <div id="headlineFindes" class="headline-bar">
+      <span id="arrowBackFindes" class="icon-btn">&#8592;</span>
+      <span class="headline-title">Vare findes</span>
+    </div>
+    <div class="card">
+      <div id="vareInfo"></div>
+    </div>
+    <div class="card counter-card">
+      <span id="iconMinus" class="counter-btn">&#9660;</span>
+      <input id="txtOptaltFindes" type="number" class="counter-input" />
+      <span id="iconPlus" class="counter-btn">&#9650;</span>
+    </div>
+    <textarea id="txtErNotat" placeholder="Skriv evt. en note"></textarea>
+    <div class="toggle-row">
+      <label class="switch">
+        <input type="checkbox" id="toggleLabel" />
+        <span class="slider"></span>
+      </label>
+      <span>Label?</span>
+    </div>
+    <button id="btnOpdaterVare" class="btn-opdater">OPDATER</button>
+  </section>
+
+  <!-- SKÆRM: Vare findes ikke -->
+  <section id="screen-varefindesikke" class="screen">
+    <div class="headline-bar headline-blue">
+      <span id="arrowBackIkke" class="icon-btn">&#8592;</span>
+      <span class="headline-title">Vare findes ikke</span>
+    </div>
+    <div class="card">
+      <p class="text-center">Varenummer:</p>
+      <p class="text-center bold" id="lblVarenrIkke"></p>
+      <p class="text-center">Varen findes ikke på listen.</p>
+      <p class="text-center">Skal den oprettes på differencelisten, så opdater antal og opdater</p>
+    </div>
+    <div class="card counter-card">
+      <span id="iconMinusIkke" class="counter-btn">&#9660;</span>
+      <input id="txtOptaltFindesIkke" type="number" class="counter-input" value="0" />
+      <span id="iconPlusIkke" class="counter-btn">&#9650;</span>
+    </div>
+    <textarea id="txtIkkeNotat" placeholder="Skriv evt. en note"></textarea>
+    <div class="toggle-row">
+      <label class="switch">
+        <input type="checkbox" id="toggleLabelIkke" />
+        <span class="slider"></span>
+      </label>
+      <span>Label?</span>
+    </div>
+    <button id="btnOpdaterIkke" class="btn-opdater">OPDATER</button>
+  </section>
+
+  <div id="spinner" class="spinner hidden">⏳</div>
+  <div id="toast" class="toast hidden"></div>
+
+</div>
+
+<script src="js/api.js?v=1"></script>
+<script src="js/app.js?v=1"></script>
+</body>
+</html>

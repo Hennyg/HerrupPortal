@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+
+    "AZURE_TENANT_ID": "<tenant-guid>",
+    "AZURE_CLIENT_ID": "<app-registration-client-id>",
+    "AZURE_CLIENT_SECRET": "<app-registration-secret>",
+
+    "SPO_SiteId": "<site-id, fx contoso.sharepoint.com,guid,guid>",
+    "SPO_FolderPath": "Optaellinger"
+  },
+  "Host": {
+    "CORS": "*"
+  }
+}
