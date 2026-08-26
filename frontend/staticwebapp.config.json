@@ -1,7 +1,7 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/admin.html","/herrup.html","/guide.html","/assets/*","/manifest.json","/sw.js","/icons/*","/.auth/*","/api/*"]
+    "exclude": ["/admin.html","/herrup.html","/guide.html","/ai.html","/assets/*","/manifest.json","/sw.js","/icons/*","/.auth/*","/api/*"]
   },
   "routes": [
     {"route":"/login","redirect":"/.auth/login/aad?post_login_redirect_uri=.referrer","statusCode":302},
