@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI – Herrup Portalen</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#c30a14">
+  <link rel="stylesheet" href="/assets/app.css?v=20260826" />
+  <link rel="stylesheet" href="/assets/ai.css?v=20260826" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+</head>
+<body>
+  <div class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <div class="logo" aria-label="Herrup Portal"></div>
+        <div>Herrup AI</div>
+      </div>
+      <div class="nav">
+        <a href="/index.html">Forside</a>
+        <span class="sep">|</span>
+        <a href="/herrup.html">Medarbejdere</a>
+        <a href="/logout">Log ud</a>
+      </div>
+    </div>
+    <div class="nav-accent"></div>
+  </div>
+
+  <main class="container aiPage">
+    <div class="hero aiHero">
+      <div></div>
+      <div>
+        <h1>AI hjælp</h1>
+        <div class="muted" style="text-align:center">Skriv hvad du vil have hjælp til – eller indsæt en tekst, der skal forbedres.</div>
+      </div>
+      <div></div>
+    </div>
+
+    <section class="panel aiComposer">
+      <h2>Formuler dit spørgsmål</h2>
+
+      <label class="aiLabel" for="aiTask">Hvad skal AI hjælpe med?</label>
+      <select id="aiTask" class="aiField">
+        <option value="rewrite" selected>Ret tekst – stavning og formulering</option>
+        <option value="improve">Skriv teksten mere professionelt og tydeligt</option>
+        <option value="email">Lav teksten om til en god mail</option>
+        <option value="summarize">Opsummer teksten</option>
+        <option value="explain">Forklar indholdet enkelt</option>
+        <option value="free">Frit spørgsmål</option>
+      </select>
+
+      <label class="aiLabel" for="aiPrompt">Tekst eller spørgsmål</label>
+      <textarea id="aiPrompt" class="aiField aiTextarea" rows="10" placeholder="Indsæt f.eks. teksten fra en PowerPoint her …"></textarea>
+
+      <div class="aiUploadRow">
+        <label class="aiUploadBtn" for="aiImages">＋ Tilføj billede</label>
+        <input id="aiImages" type="file" accept="image/*" multiple hidden>
+        <span class="muted">Du kan vedhæfte op til 3 billeder.</span>
+      </div>
+      <div id="aiImagePreview" class="aiImagePreview"></div>
+
+      <div class="aiActions">
+        <button id="aiSend" class="aiSend" type="button">Send</button>
+        <button id="aiClear" class="aiSecondary" type="button">Ryd</button>
+        <span id="aiStatus" class="muted" role="status" aria-live="polite"></span>
+      </div>
+
+      <div class="aiHint">
+        <strong>Tip:</strong> Til almindelig korrektur behøver du ikke skrive en instruktion. Vælg <em>Ret tekst</em>, indsæt teksten og tryk Send.
+        Undgå at indsætte passwords, API-nøgler eller andre hemmeligheder.
+      </div>
+    </section>
+
+    <section id="aiAnswerPanel" class="panel aiAnswerPanel" hidden>
+      <div class="aiAnswerHeader">
+        <h2>Svar</h2>
+        <button id="aiCopy" class="aiSecondary" type="button">Kopiér svar</button>
+      </div>
+      <div id="aiAnswer" class="aiAnswer"></div>
+    </section>
+  </main>
+
+  <script src="/assets/ai.js?v=20260826"></script>
+</body>
+</html>
