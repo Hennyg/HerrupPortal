@@ -1,0 +1,27 @@
+.aiPage { max-width: 980px; }
+.aiHero { padding-top: .6rem; }
+.aiComposer h2, .aiAnswerPanel h2 { margin: 0 0 1rem; color: var(--heading); }
+.aiLabel { display:block; font-weight:700; margin:.85rem 0 .35rem; color:#374151; }
+.aiField { width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:10px; padding:.75rem .85rem; font:inherit; background:#fff; color:#222; }
+.aiField:focus { outline:2px solid var(--nav-accent); outline-offset:1px; border-color:transparent; }
+.aiTextarea { resize:vertical; min-height:220px; line-height:1.5; }
+.aiUploadRow { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; margin-top:1rem; }
+.aiUploadBtn, .aiSecondary, .aiSend { appearance:none; border-radius:9px; padding:.65rem 1rem; font:inherit; font-weight:700; cursor:pointer; }
+.aiUploadBtn, .aiSecondary { border:1px solid #d1d5db; background:#fff; color:#374151; }
+.aiUploadBtn:hover, .aiSecondary:hover { background:#f7f7f7; }
+.aiSend { border:0; background:var(--nav-bg); color:#fff; min-width:110px; }
+.aiSend:hover { filter:brightness(1.08); }
+.aiSend:disabled, .aiSecondary:disabled { opacity:.55; cursor:not-allowed; }
+.aiActions { display:flex; gap:.65rem; align-items:center; flex-wrap:wrap; margin-top:1.15rem; }
+.aiHint { margin-top:1rem; padding:.8rem 1rem; border-radius:9px; background:#f7f7f7; color:#4b5563; font-size:.9rem; }
+.aiImagePreview { display:flex; flex-wrap:wrap; gap:.65rem; margin-top:.75rem; }
+.aiThumb { position:relative; width:110px; height:86px; border:1px solid #e5e7eb; border-radius:9px; overflow:hidden; background:#f3f4f6; }
+.aiThumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.aiThumb button { position:absolute; top:4px; right:4px; width:25px; height:25px; border:0; border-radius:999px; background:rgba(0,0,0,.65); color:#fff; cursor:pointer; }
+.aiAnswerPanel { margin-top:1rem; }
+.aiAnswerHeader { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+.aiAnswerHeader h2 { margin:0; }
+.aiAnswer { margin-top:1rem; white-space:pre-wrap; line-height:1.55; background:#fafafa; border:1px solid #eee; border-radius:10px; padding:1rem; min-height:60px; }
+.aiSpinner { display:inline-block; width:15px; height:15px; border:2px solid #ddd; border-top-color:var(--nav-bg); border-radius:50%; animation:aiSpin .7s linear infinite; vertical-align:-2px; margin-right:6px; }
+@keyframes aiSpin { to { transform:rotate(360deg); } }
+@media (max-width: 650px) { .aiTextarea { min-height:180px; } .aiAnswerHeader { align-items:flex-start; } }
