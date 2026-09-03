@@ -1,6 +1,7 @@
 (() => {
   const task = document.getElementById("aiTask");
   const taskWrap = document.getElementById("aiTaskWrap");
+  const taskOptionsEl = document.getElementById("aiTaskOptions");
   const prompt = document.getElementById("aiPrompt");
   const promptLabel = document.getElementById("aiPromptLabel");
   const imageInput = document.getElementById("aiImages");
@@ -18,11 +19,46 @@
   const hint = document.getElementById("aiHint");
   const originalPromptEl = document.getElementById("aiOriginalPrompt");
   const originalTaskEl = document.getElementById("aiOriginalTask");
+  const originalOptionsEl = document.getElementById("aiOriginalOptions");
   const originalTextEl = document.getElementById("aiOriginalText");
   const originalImagesEl = document.getElementById("aiOriginalImages");
 
   const MAX_IMAGES = 3;
   const MAX_FILE_BYTES = 4 * 1024 * 1024;
+  const TASK_OPTIONS = {
+    rewrite: [
+      { key: "tone", label: "Tone", default: "preserve", values: [["preserve", "Bevar tone"], ["professional", "Mere professionel"], ["natural", "Mere naturlig"]] }
+    ],
+    improve: [
+      { key: "tone", label: "Tone", default: "neutral", values: [["neutral", "Neutral"], ["professional", "Professionel"], ["informal", "Uformel"]] },
+      { key: "length", label: "Længde", default: "same", values: [["shorter", "Kortere"], ["same", "Samme længde"], ["detailed", "Mere uddybende"]] }
+    ],
+    professional: [
+      { key: "audience", label: "Målgruppe", default: "colleague", values: [["colleague", "Intern kollega"], ["customer", "Kunde"], ["management", "Ledelse"]] }
+    ],
+    email: [
+      { key: "recipient", label: "Modtager", default: "internal", values: [["internal", "Intern kollega"], ["customer", "Kunde"], ["supplier", "Leverandør / ekstern"]] },
+      { key: "length", label: "Længde", default: "normal", values: [["short", "Kort"], ["normal", "Normal"], ["detailed", "Uddybende"]] }
+    ],
+    email_reply: [
+      { key: "intent", label: "Hvad skal svaret gøre?", default: "neutral", values: [["accept", "Accepter"], ["reject", "Afvis"], ["clarify", "Spørg ind"], ["neutral", "Neutralt svar"]] },
+      { key: "rejectTone", label: "Tone på afslag", default: "friendly", showWhen: { key: "intent", value: "reject" }, values: [["friendly", "Venligt"], ["firm", "Bestemt"]] }
+    ],
+    summarize: [
+      { key: "compression", label: "Komprimering", default: "medium", values: [["light", "Let"], ["medium", "Middel"], ["heavy", "Meget"]] }
+    ],
+    translate: [
+      { key: "language", label: "Oversæt til", default: "en", values: [["da", "Dansk"], ["en", "Engelsk"], ["de", "Tysk"], ["nl", "Hollandsk"], ["ro", "Rumænsk"], ["uk", "Ukrainsk"], ["fr", "Fransk"], ["es", "Spansk"], ["pl", "Polsk"]] },
+      { key: "tone", label: "Tone", default: "preserve", values: [["preserve", "Bevar original tone"], ["professional", "Professionel"], ["natural", "Naturligt sprog"]] }
+    ],
+    explain: [
+      { key: "level", label: "Detaljeniveau", default: "normal", values: [["simple", "Helt enkelt"], ["normal", "Normal"], ["technical", "Teknisk"]] }
+    ],
+    bullets: [
+      { key: "detail", label: "Detaljer", default: "short", values: [["short", "Kort"], ["detailed", "Detaljeret"]] },
+      { key: "headings", label: "Overskrifter", default: "yes", values: [["yes", "Med overskrifter"], ["no", "Kun punkter"]] }
+    ]
+  };
 
   let images = [];
   let previousResponseId = null;
@@ -41,6 +77,60 @@
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  function updateConditionalOptions() {
+    const values = {};
+    taskOptionsEl.querySelectorAll("select[data-option-key]").forEach(el => values[el.dataset.optionKey] = el.value);
+    taskOptionsEl.querySelectorAll(".aiOptionGroup[data-show-key]").forEach(group => {
+      group.hidden = values[group.dataset.showKey] !== group.dataset.showValue;
+    });
+  }
+
+  function renderTaskOptions() {
+    taskOptionsEl.innerHTML = "";
+    const defs = TASK_OPTIONS[task.value] || [];
+    defs.forEach(def => {
+      const group = document.createElement("div");
+      group.className = "aiOptionGroup";
+      if (def.showWhen) {
+        group.dataset.showKey = def.showWhen.key;
+        group.dataset.showValue = def.showWhen.value;
+      }
+
+      const label = document.createElement("label");
+      label.className = "aiLabel";
+      label.textContent = def.label;
+
+      const select = document.createElement("select");
+      select.className = "aiField";
+      select.dataset.optionKey = def.key;
+      select.dataset.optionLabel = def.label;
+      def.values.forEach(([value, text]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        if (value === def.default) option.selected = true;
+        select.appendChild(option);
+      });
+      select.addEventListener("change", updateConditionalOptions);
+      group.append(label, select);
+      taskOptionsEl.appendChild(group);
+    });
+    updateConditionalOptions();
+  }
+
+  function getSelectedTaskOptions() {
+    const values = {};
+    const labels = [];
+    taskOptionsEl.querySelectorAll(".aiOptionGroup").forEach(group => {
+      if (group.hidden) return;
+      const select = group.querySelector("select[data-option-key]");
+      if (!select) return;
+      values[select.dataset.optionKey] = select.value;
+      labels.push({ label: select.dataset.optionLabel, value: select.options[select.selectedIndex]?.text || select.value });
+    });
+    return { values, labels };
   }
 
   function renderImages() {
@@ -70,6 +160,13 @@
   function showOriginalPrompt() {
     if (!originalPrompt) return;
     originalTaskEl.textContent = originalPrompt.taskLabel;
+    originalOptionsEl.innerHTML = "";
+    (originalPrompt.optionLabels || []).forEach(item => {
+      const chip = document.createElement("span");
+      chip.className = "aiOriginalOption";
+      chip.textContent = `${item.label}: ${item.value}`;
+      originalOptionsEl.appendChild(chip);
+    });
     originalTextEl.textContent = originalPrompt.text || (originalPrompt.images.length ? "Billede vedhæftet" : "");
     originalImagesEl.innerHTML = "";
     originalPrompt.images.forEach(img => {
@@ -153,6 +250,7 @@
     conversationEl.hidden = true;
     originalPromptEl.hidden = true;
     originalTaskEl.textContent = "";
+    originalOptionsEl.innerHTML = "";
     originalTextEl.textContent = "";
     originalImagesEl.innerHTML = "";
     taskWrap.hidden = false;
@@ -257,7 +355,11 @@
       y += 8;
 
       writeText("Oprindeligt spørgsmål", { size: 13, style: "bold", gapAfter: 3 });
-      writeText(`Valg: ${originalPrompt.taskLabel}`, { size: 9, style: "bold", gapAfter: 4 });
+      writeText(`Valg: ${originalPrompt.taskLabel}`, { size: 9, style: "bold", gapAfter: 2 });
+      for (const item of (originalPrompt.optionLabels || [])) {
+        writeText(`${item.label}: ${item.value}`, { size: 9, gapAfter: 1 });
+      }
+      y += 2;
       if (originalPrompt.text) writeText(originalPrompt.text, { size: 10, gapAfter: 5 });
       writeImages(originalPrompt.images);
 
@@ -321,6 +423,9 @@
     const sentImages = images.map(x => ({ ...x }));
     const sentTask = task.value;
     const sentTaskLabel = task.options[task.selectedIndex]?.text || sentTask;
+    const selectedTaskOptions = getSelectedTaskOptions();
+    const sentOptions = selectedTaskOptions.values;
+    const sentOptionLabels = selectedTaskOptions.labels;
     const currentPreviousResponseId = previousResponseId;
     const isFirstMessage = !conversationStarted;
 
@@ -340,6 +445,7 @@
           task: sentTask,
           prompt: text,
           images: sentImages.map(x => x.dataUrl),
+          options: sentOptions,
           previousResponseId: currentPreviousResponseId
         })
       });
@@ -353,6 +459,8 @@
         originalPrompt = {
           task: sentTask,
           taskLabel: sentTaskLabel,
+          optionLabels: sentOptionLabels,
+          options: sentOptions,
           text,
           images: sentImages
         };
@@ -390,6 +498,9 @@
       savePdfBottomBtn.disabled = false;
     }
   }
+
+  task.addEventListener("change", renderTaskOptions);
+  renderTaskOptions();
 
   sendBtn.addEventListener("click", send);
   prompt.addEventListener("keydown", (e) => {

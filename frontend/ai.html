@@ -7,7 +7,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
   <link rel="stylesheet" href="/assets/app.css?v=20260826" />
-  <link rel="stylesheet" href="/assets/ai.css?v=20260903-2" />
+  <link rel="stylesheet" href="/assets/ai.css?v=20260903-3" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 </head>
 <body>
@@ -50,17 +50,24 @@
         <label class="aiLabel" for="aiTask">Hvad skal AI hjælpe med?</label>
         <select id="aiTask" class="aiField">
           <option value="rewrite" selected>Ret tekst – stavning og formulering</option>
-          <option value="improve">Skriv teksten mere professionelt og tydeligt</option>
-          <option value="email">Lav teksten om til en god mail</option>
+          <option value="improve">Forbedr formulering</option>
+          <option value="professional">Gør teksten mere professionel</option>
+          <option value="informal">Gør teksten mere uformel</option>
+          <option value="email">Lav det til en mail</option>
+          <option value="email_reply">Lav et svar på en mail</option>
           <option value="summarize">Opsummer teksten</option>
-          <option value="explain">Forklar indholdet enkelt</option>
+          <option value="translate">Oversæt tekst</option>
+          <option value="explain">Forklar indholdet</option>
+          <option value="bullets">Lav punktliste</option>
           <option value="free">Frit spørgsmål</option>
         </select>
+        <div id="aiTaskOptions" class="aiTaskOptions"></div>
       </div>
 
       <div id="aiOriginalPrompt" class="aiOriginalPrompt" hidden>
         <div class="aiOriginalPromptTitle">Oprindeligt spørgsmål</div>
         <div class="aiOriginalChoice"><span>Valg:</span> <strong id="aiOriginalTask"></strong></div>
+        <div id="aiOriginalOptions" class="aiOriginalOptions"></div>
         <div id="aiOriginalText" class="aiOriginalText"></div>
         <div id="aiOriginalImages" class="aiOriginalImages"></div>
       </div>
@@ -96,6 +103,6 @@
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="/assets/ai.js?v=20260903-2"></script>
+  <script src="/assets/ai.js?v=20260903-3"></script>
 </body>
 </html>

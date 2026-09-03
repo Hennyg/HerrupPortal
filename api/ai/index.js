@@ -9,12 +9,112 @@ function json(context, status, body) {
 }
 
 const TASKS = {
-  rewrite: "Ret stavefejl, grammatik og dårlig formulering. Bevar betydning og tone. Returnér kun den forbedrede tekst, medmindre noget er uklart.",
-  improve: "Omskriv teksten, så den bliver tydelig, professionel og naturlig på samme sprog som inputtet. Bevar betydningen.",
-  email: "Omskriv indholdet til en venlig, tydelig og professionel mail. Brug samme sprog som inputtet.",
-  summarize: "Lav en kort og overskuelig opsummering af indholdet. Brug samme sprog som inputtet.",
-  explain: "Forklar indholdet enkelt og praktisk, så en almindelig kollega nemt kan forstå det. Brug samme sprog som inputtet.",
-  free: "Besvar brugerens spørgsmål hjælpsomt, kortfattet og på samme sprog som brugeren."
+  rewrite: "Ret stavefejl, grammatik og dårlig formulering. Bevar betydningen. Returner som udgangspunkt kun den forbedrede tekst, medmindre noget er uklart.",
+  improve: "Forbedr formuleringen, så teksten bliver tydelig, naturlig og velskrevet. Bevar betydningen.",
+  professional: "Omskriv teksten, så den fremstår professionel, troværdig og tydelig uden at blive stiv eller kunstig.",
+  informal: "Omskriv teksten i en mere uformel, naturlig og kollegial tone. Bevar betydningen og undgå slang, medmindre brugeren selv bruger det.",
+  email: "Omskriv indholdet til en venlig, tydelig og professionel mail. Medtag kun emnelinje, hvis det er nyttigt.",
+  email_reply: "Skriv et passende svar på den mail eller tekst, brugeren indsætter. Svar skal kunne bruges direkte efter let tilpasning.",
+  summarize: "Opsummer indholdet klart og struktureret på samme sprog som inputtet.",
+  translate: "Oversæt brugerens tekst korrekt og naturligt. Bevar betydning, navne, tal og relevant formatering.",
+  explain: "Forklar indholdet praktisk og letforståeligt på samme sprog som brugeren.",
+  bullets: "Omskriv indholdet til en overskuelig punktliste uden at opfinde nye oplysninger.",
+  free: "Besvar brugerens spørgsmål hjælpsomt, konkret og på samme sprog som brugeren."
+};
+
+const OPTION_PROMPTS = {
+  rewrite: {
+    tone: {
+      preserve: "Bevar tekstens nuværende tone så tæt som muligt.",
+      professional: "Gør samtidig tonen mere professionel.",
+      natural: "Gør samtidig sproget mere naturligt og flydende."
+    }
+  },
+  improve: {
+    tone: {
+      neutral: "Brug en neutral og naturlig tone.",
+      professional: "Brug en professionel tone.",
+      informal: "Brug en mere uformel og kollegial tone."
+    },
+    length: {
+      shorter: "Gør teksten kortere og mere præcis.",
+      same: "Bevar omtrent samme længde som originalen.",
+      detailed: "Du må gerne gøre teksten lidt mere uddybende, hvis det forbedrer forståelsen."
+    }
+  },
+  professional: {
+    audience: {
+      colleague: "Skriv til en intern kollega.",
+      customer: "Skriv med en kunde som målgruppe.",
+      management: "Skriv med ledelse eller beslutningstagere som målgruppe."
+    }
+  },
+  email: {
+    recipient: {
+      internal: "Mailen er til en intern kollega.",
+      customer: "Mailen er til en kunde.",
+      supplier: "Mailen er til en leverandør eller ekstern samarbejdspartner."
+    },
+    length: {
+      short: "Hold mailen kort og direkte.",
+      normal: "Brug en normal, passende længde.",
+      detailed: "Gør mailen mere uddybende og forklarende."
+    }
+  },
+  email_reply: {
+    intent: {
+      accept: "Svar positivt og accepter det, afsenderen foreslår eller spørger om.",
+      reject: "Skriv et afslag eller en afvisning på en ordentlig måde.",
+      clarify: "Svar ved at bede om de nødvendige oplysninger eller afklaringer.",
+      neutral: "Skriv et neutralt, sagligt svar baseret på indholdet."
+    },
+    rejectTone: {
+      friendly: "Afslaget skal være venligt og imødekommende.",
+      firm: "Afslaget skal være tydeligt og bestemt, men stadig professionelt."
+    }
+  },
+  summarize: {
+    compression: {
+      light: "Komprimer let. Bevar næsten alle væsentlige detaljer, nuancer og forklaringer, men fjern gentagelser og fyld.",
+      medium: "Komprimer middel. Bevar hovedpointerne og de vigtigste detaljer, men forkort tydeligt.",
+      heavy: "Komprimer meget. Returner kun de vigtigste pointer, konklusioner og nødvendige fakta."
+    }
+  },
+  translate: {
+    language: {
+      da: "Oversæt til dansk.",
+      en: "Oversæt til engelsk.",
+      de: "Oversæt til tysk.",
+      nl: "Oversæt til hollandsk.",
+      ro: "Oversæt til rumænsk.",
+      uk: "Oversæt til ukrainsk.",
+      fr: "Oversæt til fransk.",
+      es: "Oversæt til spansk.",
+      pl: "Oversæt til polsk."
+    },
+    tone: {
+      preserve: "Bevar originalens tone og stil.",
+      professional: "Brug en professionel og naturlig tone på målsproget.",
+      natural: "Prioriter et naturligt og flydende sprog frem for en ordret oversættelse."
+    }
+  },
+  explain: {
+    level: {
+      simple: "Forklar det meget enkelt og uden unødvendige fagudtryk.",
+      normal: "Forklar det i et normalt detaljeniveau for en almindelig kollega.",
+      technical: "Forklar det mere teknisk og detaljeret, og brug relevante fagbegreber."
+    }
+  },
+  bullets: {
+    detail: {
+      short: "Lav en kort punktliste med kun de vigtigste punkter.",
+      detailed: "Lav en mere detaljeret punktliste, hvor væsentlige underpunkter bevares."
+    },
+    headings: {
+      yes: "Brug korte overskrifter til at gruppere punkterne, når det giver mening.",
+      no: "Brug kun punkter uden ekstra overskrifter."
+    }
+  }
 };
 
 function extractOutputText(data) {
@@ -34,6 +134,17 @@ function validResponseId(value) {
   return /^resp_[A-Za-z0-9_-]+$/.test(id) ? id : null;
 }
 
+function optionInstructions(task, options) {
+  const taskOptions = OPTION_PROMPTS[task] || {};
+  const input = options && typeof options === "object" && !Array.isArray(options) ? options : {};
+  const out = [];
+  for (const [key, value] of Object.entries(input)) {
+    const prompt = taskOptions?.[key]?.[String(value)];
+    if (prompt) out.push(prompt);
+  }
+  return out;
+}
+
 module.exports = async function (context, req) {
   if (!req.headers["x-ms-client-principal"]) {
     return json(context, 401, { error: "Ikke logget ind" });
@@ -49,6 +160,7 @@ module.exports = async function (context, req) {
   const prompt = String(body.prompt || "").trim();
   const images = Array.isArray(body.images) ? body.images.slice(0, 3) : [];
   const previousResponseId = validResponseId(body.previousResponseId);
+  const options = body.options && typeof body.options === "object" ? body.options : {};
 
   if (!prompt && images.length === 0) {
     return json(context, 400, { error: "empty_input", message: "Skriv et spørgsmål eller tilføj et billede." });
@@ -59,7 +171,6 @@ module.exports = async function (context, req) {
 
   const content = [];
   if (prompt) content.push({ type: "input_text", text: prompt });
-
   for (const image of images) {
     if (typeof image !== "string" || !image.startsWith("data:image/")) {
       return json(context, 400, { error: "invalid_image", message: "Et af billederne har et ugyldigt format." });
@@ -72,10 +183,11 @@ module.exports = async function (context, req) {
 
   const instructions = [
     "Du er den interne AI-hjælper i Herrup Portalen.",
-    "Svar som udgangspunkt på samme sprog som brugeren.",
+    "Svar som udgangspunkt på samme sprog som brugeren, medmindre opgaven er oversættelse.",
     "Vær konkret og brugbar. Opfind ikke fakta, hvis information mangler.",
     "Når dette er en opfølgning, skal du bruge den tidligere samtale som kontekst og forstå henvisninger som 'den', 'det', 'ovenstående' og lignende ud fra samtalen.",
-    TASKS[task]
+    TASKS[task],
+    ...optionInstructions(task, options)
   ].join(" ");
 
   try {
@@ -85,17 +197,11 @@ module.exports = async function (context, req) {
       input: [{ role: "user", content }],
       max_output_tokens: 2500
     };
-
-    if (previousResponseId) {
-      requestBody.previous_response_id = previousResponseId;
-    }
+    if (previousResponseId) requestBody.previous_response_id = previousResponseId;
 
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(requestBody)
     });
 
@@ -112,14 +218,9 @@ module.exports = async function (context, req) {
     }
 
     const answer = extractOutputText(data);
-    if (!answer) {
-      return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget tekstsvar." });
-    }
+    if (!answer) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget tekstsvar." });
 
-    return json(context, 200, {
-      answer,
-      responseId: data.id || null
-    });
+    return json(context, 200, { answer, responseId: data.id || null });
   } catch (e) {
     context.log("AI endpoint fejl:", e.message);
     return json(context, 500, { error: "ai_failed", message: e.message });
