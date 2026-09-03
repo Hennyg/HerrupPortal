@@ -9,6 +9,9 @@
   const clearBtn = document.getElementById("aiClear");
   const newConversationBtn = document.getElementById("aiNewConversation");
   const savePdfBtn = document.getElementById("aiSavePdf");
+  const bottomActions = document.getElementById("aiBottomActions");
+  const newConversationBottomBtn = document.getElementById("aiNewConversationBottom");
+  const savePdfBottomBtn = document.getElementById("aiSavePdfBottom");
   const status = document.getElementById("aiStatus");
   const conversationEl = document.getElementById("aiConversation");
   const composerTitle = document.getElementById("aiComposerTitle");
@@ -132,6 +135,7 @@
     taskWrap.hidden = true;
     newConversationBtn.hidden = false;
     savePdfBtn.hidden = false;
+    bottomActions.hidden = false;
     composerTitle.textContent = "Fortsæt samtalen";
     promptLabel.textContent = "Opfølgende spørgsmål";
     prompt.placeholder = "Stil et opfølgende spørgsmål …";
@@ -154,6 +158,7 @@
     taskWrap.hidden = false;
     newConversationBtn.hidden = true;
     savePdfBtn.hidden = true;
+    bottomActions.hidden = true;
     composerTitle.textContent = "Formuler dit spørgsmål";
     promptLabel.textContent = "Tekst eller spørgsmål";
     prompt.placeholder = "Indsæt f.eks. teksten fra en PowerPoint her …";
@@ -302,6 +307,8 @@
 
   newConversationBtn.addEventListener("click", resetConversation);
   savePdfBtn.addEventListener("click", saveConversationPdf);
+  newConversationBottomBtn.addEventListener("click", resetConversation);
+  savePdfBottomBtn.addEventListener("click", saveConversationPdf);
 
   async function send() {
     const text = prompt.value.trim();
@@ -321,6 +328,8 @@
     clearBtn.disabled = true;
     newConversationBtn.disabled = true;
     savePdfBtn.disabled = true;
+    newConversationBottomBtn.disabled = true;
+    savePdfBottomBtn.disabled = true;
     setStatus("AI arbejder …", true);
 
     try {
@@ -377,6 +386,8 @@
       clearBtn.disabled = false;
       newConversationBtn.disabled = false;
       savePdfBtn.disabled = false;
+      newConversationBottomBtn.disabled = false;
+      savePdfBottomBtn.disabled = false;
     }
   }
 
