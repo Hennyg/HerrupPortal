@@ -2,6 +2,7 @@
 .aiHero { padding-top: .6rem; }
 .aiComposer h2 { margin: 0; color: var(--heading); }
 .aiComposerHeader { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:.2rem; }
+.aiHeaderActions { display:flex; gap:.55rem; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 .aiLabel { display:block; font-weight:700; margin:.85rem 0 .35rem; color:#374151; }
 .aiField { width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:10px; padding:.75rem .85rem; font:inherit; background:#fff; color:#222; }
 .aiField:focus { outline:2px solid var(--nav-accent); outline-offset:1px; border-color:transparent; }
@@ -22,6 +23,15 @@
 .aiThumb button { position:absolute; top:4px; right:4px; width:25px; height:25px; border:0; border-radius:999px; background:rgba(0,0,0,.65); color:#fff; cursor:pointer; }
 .aiSpinner { display:inline-block; width:15px; height:15px; border:2px solid #ddd; border-top-color:var(--nav-bg); border-radius:50%; animation:aiSpin .7s linear infinite; vertical-align:-2px; margin-right:6px; }
 
+.aiOriginalPrompt { margin:1rem 0 .45rem; padding:1rem; border:1px solid #d8dee5; border-left:4px solid var(--nav-accent); border-radius:10px; background:#f8fafc; }
+.aiOriginalPromptTitle { font-weight:800; color:var(--heading); margin-bottom:.45rem; }
+.aiOriginalChoice { color:#4b5563; font-size:.92rem; margin-bottom:.55rem; }
+.aiOriginalChoice span { color:#6b7280; }
+.aiOriginalText { white-space:pre-wrap; line-height:1.5; color:#222; overflow-wrap:anywhere; }
+.aiOriginalImages { display:flex; gap:.45rem; flex-wrap:wrap; margin-top:.65rem; }
+.aiOriginalImages:empty { display:none; }
+.aiOriginalImages img { width:84px; height:66px; object-fit:cover; border-radius:8px; border:1px solid #e5e7eb; }
+
 .aiConversation { display:flex; flex-direction:column; gap:.9rem; margin:1rem 0 .35rem; padding:.25rem 0; }
 .aiMessage { display:flex; flex-direction:column; gap:.3rem; max-width:90%; }
 .aiMessageUser { align-self:flex-end; align-items:flex-end; }
@@ -40,5 +50,6 @@
   .aiTextarea { min-height:180px; }
   .aiTextarea.aiFollowup { min-height:100px; }
   .aiMessage { max-width:96%; }
-  .aiComposerHeader { align-items:flex-start; }
+  .aiComposerHeader { align-items:flex-start; flex-direction:column; }
+  .aiHeaderActions { width:100%; justify-content:flex-start; }
 }

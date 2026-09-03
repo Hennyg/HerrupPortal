@@ -7,7 +7,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
   <link rel="stylesheet" href="/assets/app.css?v=20260826" />
-  <link rel="stylesheet" href="/assets/ai.css?v=20260903" />
+  <link rel="stylesheet" href="/assets/ai.css?v=20260903-2" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 </head>
 <body>
@@ -40,7 +40,10 @@
     <section class="panel aiComposer">
       <div class="aiComposerHeader">
         <h2 id="aiComposerTitle">Formuler dit spørgsmål</h2>
-        <button id="aiNewConversation" class="aiSecondary" type="button" hidden>Ny samtale</button>
+        <div class="aiHeaderActions">
+          <button id="aiSavePdf" class="aiSecondary" type="button" hidden>Gem som PDF</button>
+          <button id="aiNewConversation" class="aiSecondary" type="button" hidden>Ny samtale</button>
+        </div>
       </div>
 
       <div id="aiTaskWrap">
@@ -53,6 +56,13 @@
           <option value="explain">Forklar indholdet enkelt</option>
           <option value="free">Frit spørgsmål</option>
         </select>
+      </div>
+
+      <div id="aiOriginalPrompt" class="aiOriginalPrompt" hidden>
+        <div class="aiOriginalPromptTitle">Oprindeligt spørgsmål</div>
+        <div class="aiOriginalChoice"><span>Valg:</span> <strong id="aiOriginalTask"></strong></div>
+        <div id="aiOriginalText" class="aiOriginalText"></div>
+        <div id="aiOriginalImages" class="aiOriginalImages"></div>
       </div>
 
       <div id="aiConversation" class="aiConversation" hidden aria-live="polite"></div>
@@ -80,6 +90,7 @@
     </section>
   </main>
 
-  <script src="/assets/ai.js?v=20260903"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="/assets/ai.js?v=20260903-2"></script>
 </body>
 </html>
