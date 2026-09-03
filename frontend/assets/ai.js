@@ -79,9 +79,17 @@
     });
   }
 
-  function updateConditionalOptions() {
+  function getOptionValues() {
     const values = {};
-    taskOptionsEl.querySelectorAll("select[data-option-key]").forEach(el => values[el.dataset.optionKey] = el.value);
+    taskOptionsEl.querySelectorAll(".aiOptionButtons[data-option-key]").forEach(group => {
+      const selected = group.querySelector(".aiOptionButton.is-selected");
+      if (selected) values[group.dataset.optionKey] = selected.dataset.value;
+    });
+    return values;
+  }
+
+  function updateConditionalOptions() {
+    const values = getOptionValues();
     taskOptionsEl.querySelectorAll(".aiOptionGroup[data-show-key]").forEach(group => {
       group.hidden = values[group.dataset.showKey] !== group.dataset.showValue;
     });
@@ -90,6 +98,7 @@
   function renderTaskOptions() {
     taskOptionsEl.innerHTML = "";
     const defs = TASK_OPTIONS[task.value] || [];
+
     defs.forEach(def => {
       const group = document.createElement("div");
       group.className = "aiOptionGroup";
@@ -98,38 +107,64 @@
         group.dataset.showValue = def.showWhen.value;
       }
 
-      const label = document.createElement("label");
+      const label = document.createElement("div");
       label.className = "aiLabel";
       label.textContent = def.label;
 
-      const select = document.createElement("select");
-      select.className = "aiField";
-      select.dataset.optionKey = def.key;
-      select.dataset.optionLabel = def.label;
+      const buttons = document.createElement("div");
+      buttons.className = "aiOptionButtons";
+      buttons.dataset.optionKey = def.key;
+      buttons.dataset.optionLabel = def.label;
+      buttons.setAttribute("role", "group");
+      buttons.setAttribute("aria-label", def.label);
+
       def.values.forEach(([value, text]) => {
-        const option = document.createElement("option");
-        option.value = value;
-        option.textContent = text;
-        if (value === def.default) option.selected = true;
-        select.appendChild(option);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "aiOptionButton";
+        button.dataset.value = value;
+        button.textContent = text;
+
+        const selected = value === def.default;
+        button.classList.toggle("is-selected", selected);
+        button.setAttribute("aria-pressed", selected ? "true" : "false");
+
+        button.addEventListener("click", () => {
+          buttons.querySelectorAll(".aiOptionButton").forEach(other => {
+            const isSelected = other === button;
+            other.classList.toggle("is-selected", isSelected);
+            other.setAttribute("aria-pressed", isSelected ? "true" : "false");
+          });
+          updateConditionalOptions();
+        });
+
+        buttons.appendChild(button);
       });
-      select.addEventListener("change", updateConditionalOptions);
-      group.append(label, select);
+
+      group.append(label, buttons);
       taskOptionsEl.appendChild(group);
     });
+
     updateConditionalOptions();
   }
 
   function getSelectedTaskOptions() {
     const values = {};
     const labels = [];
+
     taskOptionsEl.querySelectorAll(".aiOptionGroup").forEach(group => {
       if (group.hidden) return;
-      const select = group.querySelector("select[data-option-key]");
-      if (!select) return;
-      values[select.dataset.optionKey] = select.value;
-      labels.push({ label: select.dataset.optionLabel, value: select.options[select.selectedIndex]?.text || select.value });
+      const buttons = group.querySelector(".aiOptionButtons[data-option-key]");
+      const selected = buttons?.querySelector(".aiOptionButton.is-selected");
+      if (!buttons || !selected) return;
+
+      values[buttons.dataset.optionKey] = selected.dataset.value;
+      labels.push({
+        label: buttons.dataset.optionLabel,
+        value: selected.textContent || selected.dataset.value
+      });
     });
+
     return { values, labels };
   }
 

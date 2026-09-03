@@ -63,3 +63,35 @@
 .aiOriginalOptions { margin:.45rem 0 .8rem; display:flex; flex-wrap:wrap; gap:.4rem; }
 .aiOriginalOption { display:inline-block; padding:.28rem .55rem; border-radius:999px; background:#eef2f4; color:#374151; font-size:.86rem; }
 @media (max-width:650px) { .aiTaskOptions { grid-template-columns:1fr; } }
+
+
+/* Undervalg vises som knapper i stedet for dropdowns */
+.aiTaskOptions { grid-template-columns:1fr; gap:.9rem; }
+.aiOptionGroup { padding:.15rem 0; }
+.aiOptionButtons { display:flex; flex-wrap:wrap; gap:.5rem; }
+.aiOptionButton {
+  appearance:none;
+  border:1px solid #cfd6dd;
+  background:#fff;
+  color:#374151;
+  border-radius:999px;
+  padding:.58rem .9rem;
+  font:inherit;
+  font-weight:700;
+  line-height:1.1;
+  cursor:pointer;
+  transition:background .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease;
+}
+.aiOptionButton:hover { background:#f7f7f7; border-color:#aeb8c2; }
+.aiOptionButton:focus-visible { outline:2px solid var(--nav-accent); outline-offset:2px; }
+.aiOptionButton.is-selected {
+  background:var(--nav-bg);
+  border-color:var(--nav-bg);
+  color:#fff;
+  box-shadow:0 1px 2px rgba(0,0,0,.12);
+}
+.aiOptionGroup[hidden] { display:none !important; }
+@media (max-width:650px) {
+  .aiOptionButtons { gap:.45rem; }
+  .aiOptionButton { padding:.55rem .78rem; font-size:.92rem; }
+}
