@@ -8,7 +8,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
 
-  <link rel="stylesheet" href="/assets/app.css?v=20260814-2" />
+  <link rel="stylesheet" href="/assets/app.css?v=20260903-news" />
   <style>
     .tableToolbar {
       display: flex;
@@ -159,8 +159,13 @@
 
       <form id="tipForm">
         <div class="formRow formRow--full">
+          <label for="tipOverskrift">Overskrift</label>
+          <input id="tipOverskrift" class="field" maxlength="120" placeholder="Fx Ny version af Herrup AI" />
+        </div>
+
+        <div class="formRow formRow--full">
           <label for="tipIndhold">Indhold</label>
-          <textarea id="tipIndhold" class="field" rows="3" placeholder="Teksten der vises i banneret på forsiden"></textarea>
+          <textarea id="tipIndhold" class="field" rows="3" placeholder="Teksten der vises under overskriften på forsiden"></textarea>
         </div>
 
         <div class="formRow">
@@ -341,6 +346,9 @@
 
   </div>
 
-  <script src="/assets/admin.js?v=20260814-2"></script>
+  <script src="/assets/admin.js?v=20260903-news"></script>
 </body>
 </html>
+
+
+

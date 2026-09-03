@@ -25,23 +25,93 @@ async function loadFavorites() {
   }
 }
 
-// ── Nyhed/tip i "Velkommen"-banneret ─────────────────────────────────────────
-// Rent dekorativ — går ALDRIG i stykker for resten af siden. Findes ingen
-// aktiv nyhed/tip (eller kaldet fejler), bliver den statiske standardtekst
-// i markup'et bare stående uændret.
+// ── Nyheder/tips i hero-feltet ───────────────────────────────────────────────
+// Henter alle aktive poster, blander rækkefølgen én gang pr. side-load og
+// roterer derefter gennem dem hvert 10. sekund. En post får kun
+// opmærksomheds-animation første gang den vises i den aktuelle browser.
+let newsTipTimer = null;
+let newsTipItems = [];
+let newsTipIndex = 0;
+const NEWS_TIP_INTERVAL_MS = 10_000;
+
+function shuffleNewsTips(items) {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function newsTipSeenKey(id) {
+  return `herrup-news-seen-${id}`;
+}
+
+function hasSeenNewsTip(id) {
+  try { return localStorage.getItem(newsTipSeenKey(id)) === "1"; }
+  catch { return false; }
+}
+
+function markNewsTipSeen(id) {
+  try { localStorage.setItem(newsTipSeenKey(id), "1"); } catch {}
+}
+
+function renderNewsTip(item) {
+  const box = document.getElementById("newsTipBox");
+  const title = document.getElementById("newsTipTitle");
+  const text = document.getElementById("newsTip");
+  if (!box || !title || !text || !item) return;
+
+  title.textContent = item.overskrift || (item.type === "nyhed" ? "Nyhed" : "Tip");
+  text.textContent = `${item.type === "nyhed" ? "📢" : "💡"} ${item.indhold || ""}`.trim();
+
+  box.classList.remove("is-unseen");
+  if (item.id && !hasSeenNewsTip(item.id)) {
+    // Tving reflow, så animationen også starter korrekt efter et tidligere item.
+    void box.offsetWidth;
+    box.classList.add("is-unseen");
+    markNewsTipSeen(item.id);
+    setTimeout(() => box.classList.remove("is-unseen"), 2600);
+  }
+}
+
+function stopNewsTipRotation() {
+  if (newsTipTimer) clearTimeout(newsTipTimer);
+  newsTipTimer = null;
+}
+
+function scheduleNextNewsTip() {
+  stopNewsTipRotation();
+  if (newsTipItems.length <= 1) return;
+  newsTipTimer = setTimeout(() => {
+    newsTipIndex = (newsTipIndex + 1) % newsTipItems.length;
+    renderNewsTip(newsTipItems[newsTipIndex]);
+    scheduleNextNewsTip();
+  }, NEWS_TIP_INTERVAL_MS);
+}
+
 async function loadNewsOrTip() {
-  const el = document.getElementById("newsTip");
-  if (!el) return;
   try {
     const r = await fetch("/api/tips", { cache: "no-store" });
     if (!r.ok) return;
     const data = await r.json();
-    if (data && data.indhold) {
-      const prefix = data.type === "nyhed" ? "📢 " : "💡 ";
-      el.textContent = prefix + data.indhold;
+    const items = Array.isArray(data?.items) ? data.items.filter(x => x && x.indhold) : [];
+    if (!items.length) return;
+
+    newsTipItems = shuffleNewsTips(items);
+    newsTipIndex = 0;
+    renderNewsTip(newsTipItems[0]);
+    scheduleNextNewsTip();
+
+    // Pause rotation mens musen holdes over hero-beskeden.
+    const box = document.getElementById("newsTipBox");
+    if (box && !box.dataset.rotationWired) {
+      box.dataset.rotationWired = "1";
+      box.addEventListener("mouseenter", stopNewsTipRotation);
+      box.addEventListener("mouseleave", scheduleNextNewsTip);
     }
   } catch {
-    // Ignoreres — standardteksten forbliver synlig.
+    // Ignoreres - standardteksten forbliver synlig.
   }
 }
 
@@ -538,3 +608,6 @@ function renderSections(items, myFavItems) {
   syncClearBtn();
   render();
 })();
+
+
+

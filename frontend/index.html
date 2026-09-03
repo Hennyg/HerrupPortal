@@ -8,7 +8,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c30a14">
 
-<link rel="stylesheet" href="/assets/app.css?v=20260814-2" />
+<link rel="stylesheet" href="/assets/app.css?v=20260903-news" />
 
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-32x32.png">
@@ -100,10 +100,10 @@
 </div>
 
 <div class="container">
-<div class="hero">
+<div class="hero" id="heroNewsArea">
 <div id="primaryBoxLeft" class="primaryBox"></div>
-<div>
-<h1>Velkommen</h1>
+<div id="newsTipBox" class="newsTipBox" aria-live="polite">
+<h1 id="newsTipTitle">Velkommen</h1>
 <div class="muted" id="newsTip" style="text-align:center">Din hub til Web Apps, favoritter og værktøjer</div>
 </div>
 <div id="primaryBoxRight" class="primaryBox"></div>
@@ -126,7 +126,7 @@
 </div>
 </div>
 
-<script src="/assets/app.js?v=20260814-2"></script>
+<script src="/assets/app.js?v=20260903-news"></script>
 <script src="/assets/entraCache.js?v=20260814-2"></script>
 
 <script>
@@ -240,3 +240,6 @@ console.warn("SW register failed", e);
 </script>
 </body>
 </html>
+
+
+

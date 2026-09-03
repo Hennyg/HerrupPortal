@@ -426,7 +426,7 @@ function initTipPopup() {
   function openTipPopup() {
     resetTipForm();
     overlay.style.display = "flex";
-    setTimeout(() => $("tipIndhold")?.focus(), 100);
+    setTimeout(() => $("tipOverskrift")?.focus(), 100);
   }
 
   function closeTipPopup() {
@@ -449,9 +449,16 @@ function initTipPopup() {
 
   $("tipForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
+    const overskrift = $("tipOverskrift").value.trim();
     const indhold = $("tipIndhold").value.trim();
+    if (!overskrift) {
+      $("tipMsg").textContent = "Overskrift er påkrævet.";
+      $("tipOverskrift").focus();
+      return;
+    }
     if (!indhold) {
       $("tipMsg").textContent = "Indhold er påkrævet.";
+      $("tipIndhold").focus();
       return;
     }
 
@@ -460,7 +467,7 @@ function initTipPopup() {
 
     $("tipMsg").textContent = "Gemmer...";
     try {
-      await api("POST", "/api/tips-admin", { indhold, valg, udlobsdato, aktiv: true });
+      await api("POST", "/api/tips-admin", { overskrift, indhold, valg, udlobsdato, aktiv: true });
       $("tipMsg").textContent = "Gemt ✅";
       setTimeout(closeTipPopup, 500);
     } catch (err) {
@@ -470,3 +477,6 @@ function initTipPopup() {
     }
   });
 }
+
+
+
