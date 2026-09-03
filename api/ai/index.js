@@ -29,6 +29,11 @@ function extractOutputText(data) {
   return parts.join("\n").trim();
 }
 
+function validResponseId(value) {
+  const id = String(value || "").trim();
+  return /^resp_[A-Za-z0-9_-]+$/.test(id) ? id : null;
+}
+
 module.exports = async function (context, req) {
   if (!req.headers["x-ms-client-principal"]) {
     return json(context, 401, { error: "Ikke logget ind" });
@@ -43,6 +48,7 @@ module.exports = async function (context, req) {
   const task = TASKS[body.task] ? body.task : "free";
   const prompt = String(body.prompt || "").trim();
   const images = Array.isArray(body.images) ? body.images.slice(0, 3) : [];
+  const previousResponseId = validResponseId(body.previousResponseId);
 
   if (!prompt && images.length === 0) {
     return json(context, 400, { error: "empty_input", message: "Skriv et spørgsmål eller tilføj et billede." });
@@ -53,6 +59,7 @@ module.exports = async function (context, req) {
 
   const content = [];
   if (prompt) content.push({ type: "input_text", text: prompt });
+
   for (const image of images) {
     if (typeof image !== "string" || !image.startsWith("data:image/")) {
       return json(context, 400, { error: "invalid_image", message: "Et af billederne har et ugyldigt format." });
@@ -67,22 +74,29 @@ module.exports = async function (context, req) {
     "Du er den interne AI-hjælper i Herrup Portalen.",
     "Svar som udgangspunkt på samme sprog som brugeren.",
     "Vær konkret og brugbar. Opfind ikke fakta, hvis information mangler.",
+    "Når dette er en opfølgning, skal du bruge den tidligere samtale som kontekst og forstå henvisninger som 'den', 'det', 'ovenstående' og lignende ud fra samtalen.",
     TASKS[task]
   ].join(" ");
 
   try {
+    const requestBody = {
+      model: process.env.CHATGTP_AI_MODEL || "gpt-5.6",
+      instructions,
+      input: [{ role: "user", content }],
+      max_output_tokens: 2500
+    };
+
+    if (previousResponseId) {
+      requestBody.previous_response_id = previousResponseId;
+    }
+
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model: process.env.CHATGTP_AI_MODEL || "gpt-5.6",
-        instructions,
-        input: [{ role: "user", content }],
-        max_output_tokens: 2500
-      })
+      body: JSON.stringify(requestBody)
     });
 
     const text = await r.text();
@@ -98,9 +112,14 @@ module.exports = async function (context, req) {
     }
 
     const answer = extractOutputText(data);
-    if (!answer) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget tekstsvar." });
+    if (!answer) {
+      return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget tekstsvar." });
+    }
 
-    return json(context, 200, { answer });
+    return json(context, 200, {
+      answer,
+      responseId: data.id || null
+    });
   } catch (e) {
     context.log("AI endpoint fejl:", e.message);
     return json(context, 500, { error: "ai_failed", message: e.message });
