@@ -82,7 +82,7 @@ module.exports = async function (context, req) {
     const body = req.body || {};
     const indhold = String(body.indhold || "").trim();
     const valg = String(body.valg || "").trim();
-    const aktiv = body.aktiv !== false;
+    const aktiv = body.aktiv !== false ? "Ja" : "Nej";
 
     if (!indhold) {
       return json(context, 400, {

@@ -12,7 +12,7 @@
 //   cr175_lch_valg        (tekst — "Nyhed" eller "Tip")
 //   cr175_lch_udlobsdato  (dato — kun relevant for Nyhed; er datoen passeret,
 //                          regnes nyheden som udløbet, og der vises et tip i stedet)
-//   cr175_lch_aktiv       (Ja/Nej — slå fra uden at slette)
+//   cr175_lch_aktiv       (tekst — "Ja" eller "Nej")
 //
 // GET /api/tips → { type: "nyhed" | "tip" | null, indhold: string }
 //
@@ -67,7 +67,7 @@ module.exports = async function (context, req) {
     const dvUrl = process.env.DV_HerrupPortal_URL;
 
     const select = [IDCOL, "cr175_lch_indhold", "cr175_lch_valg", "cr175_lch_udlobsdato", "cr175_lch_aktiv", "createdon"].join(",");
-    const filter = encodeURIComponent("cr175_lch_aktiv eq true");
+    const filter = encodeURIComponent("cr175_lch_aktiv eq 'Ja'");
     const url = `${dvUrl}/api/data/v9.2/${TABLE}?$select=${select}&$filter=${filter}&$orderby=createdon desc`;
 
     const r = await fetch(url, {
