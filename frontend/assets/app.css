@@ -39,31 +39,6 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 .hero h1{text-align:center;color:var(--heading);font-size:1.6rem;margin:0}
 .hero .muted{margin-top:.3rem}
 
-/* Nyhed/tip-rotation i hero-feltet */
-.newsTipBox{
-  min-width:min(560px, 100%);
-  max-width:720px;
-  padding:.7rem 1.1rem;
-  border-radius:12px;
-  background:#fff;
-  transition:background-color .35s ease, box-shadow .35s ease, transform .35s ease;
-}
-.newsTipBox .muted{
-  line-height:1.45;
-  white-space:pre-wrap;
-}
-.newsTipBox.is-unseen{
-  animation:newsTipAttention 2.4s ease-in-out 1;
-}
-@keyframes newsTipAttention{
-  0%,100%{ background:#fff; box-shadow:none; transform:scale(1); }
-  18%,52%{ background:#fff3bf; box-shadow:0 0 0 4px rgba(195,10,20,.12), 0 8px 22px rgba(0,0,0,.08); transform:scale(1.015); }
-  35%,70%{ background:#fff; box-shadow:none; transform:scale(1); }
-}
-@media (prefers-reduced-motion: reduce){
-  .newsTipBox.is-unseen{ animation:none; background:#fff3bf; }
-}
-
 /* De 2 primær-app-bokse i toppen (styret fra Admin: "Primær-boks 1/2") */
 .primaryBox{ display:flex; justify-content:center; min-height:1px; }
 .primaryTile{
@@ -325,3 +300,14 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 
 
 
+
+
+/* Nyhed/tip i hero: blød markering første gang en post ses i browseren. */
+.hero.newsFirstSeen {
+  animation: newsFirstSeenPulse .8s ease-in-out 3;
+  border-radius: 14px;
+}
+@keyframes newsFirstSeenPulse {
+  0%, 100% { background: transparent; box-shadow: none; }
+  50% { background: #fff4cc; box-shadow: 0 0 0 4px rgba(195,10,20,.08); }
+}

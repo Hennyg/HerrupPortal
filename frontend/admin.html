@@ -8,7 +8,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
 
-  <link rel="stylesheet" href="/assets/app.css?v=20260903-news" />
+  <link rel="stylesheet" href="/assets/app.css?v=20260903-news-admin-2" />
   <style>
     .tableToolbar {
       display: flex;
@@ -111,7 +111,7 @@
 .tipModal{
   background: #fff;
   border-radius: 12px;
-  width: min(520px, 100%);
+  width: min(980px, 96vw);
   max-height: 90vh;
   overflow-y: auto;
   padding: 1.25rem 1.5rem 1.5rem;
@@ -127,8 +127,22 @@
   font-size: 1.1rem; color: #6b7280; padding: 2px 6px; border-radius: 6px;
 }
 .tipCloseBtn:hover{ background: rgba(0,0,0,.05); color:#111; }
-#tipForm{ display:flex; flex-direction:column; gap: 14px; }
+#tipForm{ display:grid; grid-template-columns:1fr 1fr; gap:14px 18px; }
 #tipForm .formRow{ display:grid; grid-template-columns:1fr; gap:6px; }
+#tipForm .formRow--full, #tipForm .formActions{ grid-column:1 / -1; }
+.tipListSection{ margin-top:1.25rem; padding-top:1rem; border-top:1px solid #e5e7eb; }
+.tipListHeader{ display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:.65rem; }
+.tipListWrap{ max-height:300px; overflow:auto; border:1px solid #e5e7eb; border-radius:10px; }
+.tipList{ width:100%; border-collapse:collapse; font-size:.88rem; }
+.tipList th,.tipList td{ padding:.55rem .65rem; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:top; }
+.tipList th{ position:sticky; top:0; background:#fff; z-index:1; white-space:nowrap; }
+.tipList tbody tr{ cursor:pointer; }
+.tipList tbody tr:hover{ background:#f8fafc; }
+.tipList tbody tr.tipRowSelected{ background:#fff7ed; }
+.tipStatus{ display:inline-block; border-radius:999px; padding:.15rem .5rem; font-size:.78rem; font-weight:700; }
+.tipStatus.on{ background:#dcfce7; color:#166534; }
+.tipStatus.off{ background:#f3f4f6; color:#6b7280; }
+@media (max-width:700px){ #tipForm{ grid-template-columns:1fr; } #tipForm .formRow--full,#tipForm .formActions{ grid-column:auto; } .tipModal{ width:100%; } }
   </style>
 </head>
 
@@ -149,23 +163,20 @@
     <div class="nav-accent"></div>
   </div>
 
-  <!-- Popup: opret ny nyhed/tip til forsidebanneret -->
+  <!-- Popup: opret/rediger nyhed/tip til forsidebanneret -->
   <div id="tipOverlay" class="tipOverlay" style="display:none">
     <div class="tipModal">
       <div class="tipModalHeader">
-        <div class="tipModalTitle">Ny nyhed/tip</div>
+        <div class="tipModalTitle" id="tipModalTitle">Ny nyhed/tip</div>
         <button type="button" id="tipCloseBtn" class="tipCloseBtn" aria-label="Luk">✕</button>
       </div>
 
       <form id="tipForm">
-        <div class="formRow formRow--full">
-          <label for="tipOverskrift">Overskrift</label>
-          <input id="tipOverskrift" class="field" maxlength="120" placeholder="Fx Ny version af Herrup AI" />
-        </div>
+        <input id="tipId" type="hidden" />
 
-        <div class="formRow formRow--full">
-          <label for="tipIndhold">Indhold</label>
-          <textarea id="tipIndhold" class="field" rows="3" placeholder="Teksten der vises under overskriften på forsiden"></textarea>
+        <div class="formRow">
+          <label for="tipOverskrift">Overskrift</label>
+          <input id="tipOverskrift" class="field" maxlength="150" placeholder="Fx Ny version af Herrup AI" />
         </div>
 
         <div class="formRow">
@@ -180,17 +191,43 @@
           </div>
         </div>
 
+        <div class="formRow formRow--full">
+          <label for="tipIndhold">Indhold</label>
+          <textarea id="tipIndhold" class="field" rows="4" placeholder="Teksten der vises under overskriften på forsiden"></textarea>
+        </div>
+
         <div class="formRow" id="tipUdlobRow">
           <label for="tipUdlobsdato">Udløbsdato</label>
           <input id="tipUdlobsdato" class="field" type="date" />
         </div>
 
+        <div class="formRow">
+          <label>Aktiv</label>
+          <label class="formInline" style="gap:8px; font-weight:600">
+            <input id="tipAktiv" type="checkbox" checked /> Vis på forsiden
+          </label>
+        </div>
+
         <div class="formActions">
-          <button class="btn primary" type="submit">Gem</button>
-          <button class="btn" type="button" id="tipCancelBtn">Annullér</button>
+          <button class="btn primary" type="submit" id="tipSaveBtn">Gem</button>
+          <button class="btn" type="button" id="tipNewBtn">Ny</button>
+          <button class="btn" type="button" id="tipCancelBtn">Luk</button>
           <span id="tipMsg" class="muted"></span>
         </div>
       </form>
+
+      <div class="tipListSection">
+        <div class="tipListHeader">
+          <strong>Alle nyheder og tips</strong>
+          <span id="tipListCount" class="muted"></span>
+        </div>
+        <div class="tipListWrap">
+          <table class="tipList">
+            <thead><tr><th>Type</th><th>Overskrift</th><th>Indhold</th><th>Udløber</th><th>Status</th></tr></thead>
+            <tbody id="tipListBody"><tr><td colspan="5" class="muted">Henter...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -346,7 +383,7 @@
 
   </div>
 
-  <script src="/assets/admin.js?v=20260903-news"></script>
+  <script src="/assets/admin.js?v=20260903-news-admin-2"></script>
 </body>
 </html>
 

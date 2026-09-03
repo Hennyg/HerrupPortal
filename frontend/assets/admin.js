@@ -12,6 +12,7 @@ async function api(method, url, body) {
 }
 
 function $(id){ return document.getElementById(id); }
+function escapeHtml(value){ return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","\'":"&#39;"}[c])); }
 
 let lastRows = [];
 let sortCol = "sort";
@@ -406,27 +407,102 @@ async function refresh() {
   initTipPopup();
 })();
 
-// ── "Ny nyhed/tip"-popup ──────────────────────────────────────────────────
+// ── Nyhed/tip administration ────────────────────────────────────────────────
 function initTipPopup() {
   const overlay = $("tipOverlay");
   if (!overlay) return;
 
-  function resetTipForm() {
-    $("tipForm").reset();
-    $("tipValgNyhed").checked = true;
-    updateTipUdlobVisibility();
-    $("tipMsg").textContent = "";
-  }
+  let tipRows = [];
 
   function updateTipUdlobVisibility() {
     const isNyhed = $("tipValgNyhed").checked;
     $("tipUdlobRow").style.display = isNyhed ? "" : "none";
+    if (!isNyhed) $("tipUdlobsdato").value = "";
   }
 
-  function openTipPopup() {
+  function resetTipForm() {
+    $("tipForm").reset();
+    $("tipId").value = "";
+    $("tipValgNyhed").checked = true;
+    $("tipAktiv").checked = true;
+    $("tipModalTitle").textContent = "Ny nyhed/tip";
+    $("tipSaveBtn").textContent = "Gem";
+    $("tipMsg").textContent = "";
+    updateTipUdlobVisibility();
+    document.querySelectorAll("#tipListBody tr").forEach(tr => tr.classList.remove("tipRowSelected"));
+  }
+
+  function fillTipForm(row) {
+    if (!row) return;
+    $("tipId").value = row.id || "";
+    $("tipOverskrift").value = row.overskrift || "";
+    $("tipIndhold").value = row.indhold || "";
+    $("tipValgNyhed").checked = row.valg === "Nyhed";
+    $("tipValgTip").checked = row.valg === "Tip";
+    $("tipUdlobsdato").value = row.udlobsdato || "";
+    $("tipAktiv").checked = row.aktiv !== false;
+    $("tipModalTitle").textContent = "Rediger nyhed/tip";
+    $("tipSaveBtn").textContent = "Gem ændringer";
+    $("tipMsg").textContent = "";
+    updateTipUdlobVisibility();
+  }
+
+  function shortText(value, max = 100) {
+    const t = String(value || "").replace(/\s+/g, " ").trim();
+    return t.length > max ? t.slice(0, max - 1) + "…" : t;
+  }
+
+  function renderTipList() {
+    const body = $("tipListBody");
+    if (!body) return;
+    body.innerHTML = "";
+    $("tipListCount").textContent = `${tipRows.length} stk.`;
+
+    if (!tipRows.length) {
+      body.innerHTML = '<tr><td colspan="5" class="muted">Ingen nyheder eller tips fundet.</td></tr>';
+      return;
+    }
+
+    tipRows.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.dataset.id = row.id;
+      tr.innerHTML = `
+        <td>${row.valg === "Nyhed" ? "📢 Nyhed" : "💡 Tip"}</td>
+        <td><strong>${escapeHtml(row.overskrift || "(ingen overskrift)")}</strong></td>
+        <td title="${escapeHtml(row.indhold || "")}">${escapeHtml(shortText(row.indhold))}</td>
+        <td>${escapeHtml(row.udlobsdato || "-")}</td>
+        <td><span class="tipStatus ${row.aktiv ? "on" : "off"}">${row.aktiv ? "Aktiv" : "Inaktiv"}</span></td>`;
+      tr.addEventListener("click", () => {
+        document.querySelectorAll("#tipListBody tr").forEach(x => x.classList.remove("tipRowSelected"));
+        tr.classList.add("tipRowSelected");
+        fillTipForm(row);
+        $("tipOverskrift")?.focus();
+      });
+      body.appendChild(tr);
+    });
+  }
+
+  async function loadTipList() {
+    const body = $("tipListBody");
+    if (body) body.innerHTML = '<tr><td colspan="5" class="muted">Henter...</td></tr>';
+    try {
+      const data = await api("GET", "/api/tips-admin");
+      tipRows = Array.isArray(data?.items) ? data.items : [];
+      renderTipList();
+      if (data?.headingSupported === false) {
+        $("tipMsg").textContent = "Bemærk: Dataverse-feltet cr175_lch_overskrift findes ikke endnu.";
+      }
+    } catch (err) {
+      tipRows = [];
+      if (body) body.innerHTML = `<tr><td colspan="5">Fejl: ${escapeHtml(err?.data?.message || JSON.stringify(err?.data || err))}</td></tr>`;
+    }
+  }
+
+  async function openTipPopup() {
     resetTipForm();
     overlay.style.display = "flex";
-    setTimeout(() => $("tipOverskrift")?.focus(), 100);
+    await loadTipList();
+    setTimeout(() => $("tipOverskrift")?.focus(), 50);
   }
 
   function closeTipPopup() {
@@ -437,46 +513,45 @@ function initTipPopup() {
     e.preventDefault();
     openTipPopup();
   });
-
   $("tipCloseBtn")?.addEventListener("click", closeTipPopup);
   $("tipCancelBtn")?.addEventListener("click", closeTipPopup);
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeTipPopup();
-  });
-
+  $("tipNewBtn")?.addEventListener("click", resetTipForm);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeTipPopup(); });
   $("tipValgNyhed")?.addEventListener("change", updateTipUdlobVisibility);
   $("tipValgTip")?.addEventListener("change", updateTipUdlobVisibility);
 
   $("tipForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const overskrift = $("tipOverskrift").value.trim();
     const indhold = $("tipIndhold").value.trim();
-    if (!overskrift) {
-      $("tipMsg").textContent = "Overskrift er påkrævet.";
-      $("tipOverskrift").focus();
-      return;
-    }
     if (!indhold) {
       $("tipMsg").textContent = "Indhold er påkrævet.";
-      $("tipIndhold").focus();
       return;
     }
 
-    const valg = $("tipValgNyhed").checked ? "Nyhed" : "Tip";
-    const udlobsdato = valg === "Nyhed" ? ($("tipUdlobsdato").value || null) : null;
+    const payload = {
+      id: $("tipId").value || undefined,
+      overskrift: $("tipOverskrift").value.trim(),
+      indhold,
+      valg: $("tipValgNyhed").checked ? "Nyhed" : "Tip",
+      udlobsdato: $("tipValgNyhed").checked ? ($("tipUdlobsdato").value || null) : null,
+      aktiv: $("tipAktiv").checked
+    };
 
     $("tipMsg").textContent = "Gemmer...";
     try {
-      await api("POST", "/api/tips-admin", { overskrift, indhold, valg, udlobsdato, aktiv: true });
-      $("tipMsg").textContent = "Gemt ✅";
-      setTimeout(closeTipPopup, 500);
+      const data = await api(payload.id ? "PUT" : "POST", "/api/tips-admin", payload);
+      $("tipMsg").textContent = data?.headingSupported === false
+        ? "Gemt, men overskrift-feltet mangler i Dataverse."
+        : "Gemt ✅";
+      await loadTipList();
+      if (!payload.id) resetTipForm();
+      else {
+        const updated = tipRows.find(x => x.id === payload.id);
+        if (updated) fillTipForm(updated);
+      }
     } catch (err) {
-      $("tipMsg").textContent =
-        `Fejl (${err?.status || "?"}): ` + (err?.data?.message || JSON.stringify(err?.data || err));
+      $("tipMsg").textContent = `Fejl (${err?.status || "?"}): ` + (err?.data?.message || JSON.stringify(err?.data || err));
       console.warn("tip save fejl:", err);
     }
   });
 }
-
-
-
