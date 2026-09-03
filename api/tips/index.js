@@ -26,6 +26,8 @@ const fetch = globalThis.fetch;
 
 const TABLE = "cr175_lch_tips";
 const IDCOL = "cr175_lch_tipid";
+const VALG_NYHED = 245500000;
+const VALG_TIP = 245500001;
 
 function json(context, status, body) {
   context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
@@ -85,7 +87,7 @@ module.exports = async function (context, req) {
 
     // Nyeste, ikke-udløbne "Nyhed" vinder altid.
     const nyhed = rows.find(row => {
-      if ((row.cr175_lch_valg || "").toLowerCase() !== "nyhed") return false;
+      if (row.cr175_lch_valg !== VALG_NYHED) return false;
       const udlob = row.cr175_lch_udlobsdato ? new Date(row.cr175_lch_udlobsdato) : null;
       return !udlob || udlob >= today;
     });
@@ -95,7 +97,7 @@ module.exports = async function (context, req) {
     }
 
     // Ingen aktiv nyhed — vælg et tilfældigt tip blandt de aktive.
-    const tips = rows.filter(row => (row.cr175_lch_valg || "").toLowerCase() === "tip");
+    const tips = rows.filter(row => row.cr175_lch_valg === VALG_TIP);
     if (tips.length) {
       const pick = tips[Math.floor(Math.random() * tips.length)];
       return json(context, 200, { type: "tip", indhold: pick.cr175_lch_indhold || "" });

@@ -2,6 +2,11 @@ const fetch = globalThis.fetch;
 
 const TABLE = "cr175_lch_tips";
 
+const VALG_VALUES = {
+  Nyhed: 245500000,
+  Tip: 245500001
+};
+
 function json(context, status, body) {
   context.res = {
     status,
@@ -108,7 +113,7 @@ module.exports = async function (context, req) {
 
     const payload = {
       cr175_lch_indhold: indhold,
-      cr175_lch_valg: valg,
+      cr175_lch_valg: VALG_VALUES[valg],
       cr175_lch_aktiv: aktiv
     };
 
