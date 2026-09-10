@@ -538,12 +538,6 @@ function renderSections(items, myFavItems) {
     .filter(x => x.enabled)
     .filter(x => x.platformHint === "all" || x.platformHint === platform)
     .filter(x => matchesRoles(x.allowedRoles, roles))
-    .map(x => ({
-      ...x,
-      adminOnly: x.allowedRoles.length > 0
-        && x.allowedRoles.includes("portal_admin")
-        && !x.allowedRoles.includes("portal_user")
-    }))
     .sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 
   const categories = uniq(itemsAll.map(x => x.category));
