@@ -280,11 +280,10 @@ function normSubgroup(it) { return normKey(it.subgroup || it.subGroup || ""); }
 
 function renderTileHTML(it) {
   const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
-  const adminClass = it.adminOnly ? " tile--admin-only" : "";
   const isFavStarred = favoriteIds.has(it.id);
   const wrapper = document.createElement("div");
   wrapper.innerHTML = `
-    <div class="tile${adminClass}">
+    <div class="tile">
       <button
         class="favStar${isFavStarred ? " is-active" : ""}"
         type="button"
