@@ -162,10 +162,12 @@
     try {
       const r = await api("/api/sms-balance");
       if (r.price) PRICE = r.price;
+      if (r.isAdmin) $("migrateSection").hidden = false;
       $("balance").textContent = r.count !== null && r.count !== undefined
         ? `${Number(r.count).toLocaleString("da-DK")} SMS'er`
         : (r.raw || "ukendt");
     } catch (e) {
+      if (e.data?.isAdmin) $("migrateSection").hidden = false;
       $("balance").textContent = "kunne ikke hentes";
       console.warn("sms-balance:", e);
     }

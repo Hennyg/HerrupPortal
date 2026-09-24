@@ -9,7 +9,7 @@ const { dvFetch } = require("./_dv");
 const TABLE = process.env.SMS_DV_ENTITYSET || "cr175_lch_sms_services";
 const IDCOL = "cr175_lch_sms_serviceid";
 const COL = {
-  titel:          "cr175_lch_titel",          // Tekst (primær kolonne)
+  titel:          "cr175_lch_key",            // Tekst (primær kolonne "lch_key")
   modtagere:      "cr175_lch_modtagere",      // Tekst, flere linjer
   besked:         "cr175_lch_besked",         // Tekst, flere linjer
   afsender:       "cr175_lch_afsender",       // Tekst – navn på medarbejder
@@ -224,32 +224,42 @@ function sveveCredentials() {
   return { user, passwd };
 }
 
+// Sender via GET (som den gamle PowerApps-app – Sveve svarer 404 på POST).
+// URLSearchParams koder % og linjeskift korrekt. Modtagere sendes i bidder
+// af 100, så URL'en ikke bliver for lang.
 async function sveveSend({ to, from, msg, test }) {
   const { user, passwd } = sveveCredentials();
-  const body = new URLSearchParams({
-    f: "json", user, passwd,
-    to: to.join(","), from, msg,
-    test: test ? "true" : "false"
-  });
-  // POST i stedet for URL-parametre: ingen grænse på URL-længde, og % og
-  // linjeskift i beskeden kodes korrekt.
-  const r = await fetch(`${SVEVE_BASE}/SMS/SendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
-    body
-  });
-  const txt = await r.text();
-  let data = null;
-  try { data = JSON.parse(txt); } catch { data = null; }
-  const resp = data?.response || data || {};
-  return {
-    httpStatus: r.status,
-    raw: txt.slice(0, 4000),
-    okCount: Number(resp.msgOkCount ?? 0),
-    smsCount: Number(resp.stdSMSCount ?? resp.stdSmsCount ?? 0),
-    fatalError: resp.fatalError || (r.ok ? "" : `HTTP ${r.status}`),
-    errors: Array.isArray(resp.errors) ? resp.errors.map(e => ({ number: e.number, message: e.message })) : []
-  };
+  const CHUNK = 100;
+  const out = { httpStatus: 200, raw: "", okCount: 0, smsCount: 0, fatalError: "", errors: [] };
+  const raws = [];
+
+  for (let i = 0; i < to.length; i += CHUNK) {
+    const qs = new URLSearchParams({
+      f: "json", user, passwd,
+      to: to.slice(i, i + CHUNK).join(","),
+      from, msg,
+      test: test ? "true" : "false"
+    });
+    const r = await fetch(`${SVEVE_BASE}/SMS/SendMessage?${qs}`);
+    const txt = await r.text();
+    raws.push(txt);
+    let data = null;
+    try { data = JSON.parse(txt); } catch { data = null; }
+    const resp = data?.response || data || {};
+
+    out.httpStatus = r.status;
+    out.okCount += Number(resp.msgOkCount ?? 0);
+    out.smsCount += Number(resp.stdSMSCount ?? resp.stdSmsCount ?? 0);
+    if (Array.isArray(resp.errors)) out.errors.push(...resp.errors.map(e => ({ number: e.number, message: e.message })));
+    const fatal = resp.fatalError || (r.ok ? "" : `Sveve svarede HTTP ${r.status}`);
+    if (fatal) {
+      // Stop ved fatal fejl – de resterende bidder sendes ikke.
+      out.fatalError = out.okCount ? `${fatal} (efter ${out.okCount} sendte)` : fatal;
+      break;
+    }
+  }
+  out.raw = raws.join("\n").slice(0, 4000);
+  return out;
 }
 
 async function sveveBalance() {
