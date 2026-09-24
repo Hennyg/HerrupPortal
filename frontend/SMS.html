@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SMS service – Herrup Portalen</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260924-empsearch-2" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  /* Layout: tre kolonner som i den gamle app (Modtagere · Besked · Afsendelse) */
+  .smsGrid{ display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; }
+  @media (max-width: 980px){ .smsGrid{ grid-template-columns: 1fr; } }
+  .smsCol{ display:flex; flex-direction:column; gap:10px; }
+  .smsColHead{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .smsColHead h2{ margin:0; font-size:1.05rem; color:var(--heading); }
+  .smsCount{ font-size:.85rem; color:#6b7280; white-space:nowrap; }
+  .smsCount strong{ color:#111; }
+  .smsText{ width:100%; box-sizing:border-box; min-height:320px; resize:vertical;
+    border:1px solid #d1d5db; border-radius:8px; padding:.65rem .75rem; font:inherit; font-size:.95rem; }
+  .smsText:focus, .smsCol .field:focus{ outline:none; border-color:var(--nav-accent); box-shadow:0 0 0 3px rgba(31,108,122,.12); }
+  .smsWarn{ font-size:.82rem; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:.45rem .6rem; }
+  .smsWarn:empty{ display:none; }
+  .smsSummary{ background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:.75rem .85rem; font-size:.9rem; line-height:1.6; }
+  .smsSummary .big{ font-size:1.15rem; font-weight:700; color:#111; }
+  .smsToggle{ display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer; }
+  .smsToggle input{ width:18px; height:18px; accent-color: var(--nav-bg); }
+  .smsSend{ font-size:1.15rem; font-weight:700; padding:.8rem 1rem; border-radius:10px; width:100%; }
+  .smsSend.isTest{ background:var(--nav-accent); }
+  .smsRow{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .smsResult{ border-radius:10px; padding:.7rem .85rem; font-size:.9rem; }
+  .smsResult:empty{ display:none; }
+  .smsResult.ok{ background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; }
+  .smsResult.err{ background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+  .smsResult ul{ margin:.4rem 0 0 1.1rem; padding:0; }
+  .smsHelp{ font-size:.85rem; color:#4b5563; background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:.75rem .9rem; }
+  .smsHelp ul{ margin:.3rem 0 0 1.1rem; padding:0; }
+  .smsHelp li{ margin:.15rem 0; }
+
+  /* Historik */
+  .smsToolbar{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:10px; }
+  .smsToolbar .clearable{ flex:1; min-width:220px; max-width:420px; }
+  .smsListWrap{ max-height:520px; overflow:auto; border:1px solid #e5e7eb; border-radius:10px; }
+  .smsList{ width:100%; border-collapse:collapse; font-size:.88rem; }
+  .smsList th,.smsList td{ padding:.55rem .65rem; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:top; }
+  .smsList th{ position:sticky; top:0; background:#fff; z-index:1; white-space:nowrap; }
+  .smsList .num{ text-align:right; white-space:nowrap; }
+  .smsList tbody tr{ cursor:pointer; }
+  .smsList tbody tr:hover{ background:#f8fafc; }
+  .smsMsgCell{ max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#374151; }
+  .badge{ display:inline-block; font-size:.75rem; font-weight:600; padding:2px 8px; border-radius:999px; background:#e5e7eb; color:#374151; white-space:nowrap; }
+  .badge.sent{ background:#dcfce7; color:#166534; }
+  .badge.test{ background:#e0f2fe; color:#075985; }
+  .badge.err{ background:#fee2e2; color:#991b1b; }
+  .badge.part{ background:#fef3c7; color:#92400e; }
+
+  /* Detalje-popup (samme stil som Admin) */
+  .smsOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:200; padding:1rem; }
+  .smsOverlay[hidden]{ display:none; }
+  .smsModal{ background:#fff; border-radius:12px; width:min(860px,96vw); max-height:90vh; overflow-y:auto; padding:1.25rem 1.5rem 1.5rem; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .smsModalHeader{ display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+  .smsModalTitle{ font-weight:700; font-size:1.1rem; }
+  .smsCloseBtn{ background:transparent; border:0; cursor:pointer; font-size:1.1rem; color:#6b7280; padding:2px 6px; border-radius:6px; }
+  .smsCloseBtn:hover{ background:rgba(0,0,0,.05); color:#111; }
+  .smsDetailGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  @media (max-width: 720px){ .smsDetailGrid{ grid-template-columns:1fr; } }
+  .smsDetailBox{ border:1px solid #e5e7eb; border-radius:10px; padding:.7rem .85rem; white-space:pre-wrap; word-break:break-word; font-size:.9rem; max-height:360px; overflow:auto; }
+  .smsDetailMeta{ display:grid; grid-template-columns: max-content 1fr; gap:4px 14px; font-size:.9rem; margin-bottom:14px; }
+  .smsDetailMeta dt{ font-weight:600; color:#374151; }
+  .smsDetailMeta dd{ margin:0; }
+
+  /* Migrering (kun admin) */
+  .smsMigrateLog{ font-family: ui-monospace, Consolas, monospace; font-size:.82rem; background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:.6rem .75rem; max-height:220px; overflow:auto; white-space:pre-wrap; }
+  .smsMigrateLog:empty{ display:none; }
+
+  .noAccess{ text-align:center; padding:2.5rem 1rem; }
+  .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
+</style>
+</head>
+
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>SMS service</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+      <span class="sep">|</span>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.5rem">
+  <h1 class="adminTitle">SMS service</h1>
+  <div class="muted adminSub">Send SMS til mange modtagere på én gang</div>
+
+  <div id="noAccess" class="panel noAccess" hidden>
+    <h2>Ingen adgang</h2>
+    <div class="muted">Du har ikke rollen til SMS service. Kontakt IT, hvis du skal have adgang.</div>
+  </div>
+
+  <div id="app" hidden>
+    <!-- ── Send SMS ─────────────────────────────────────────────── -->
+    <section class="section">
+      <div class="accent-bar" style="margin-bottom:10px;">Send SMS</div>
+      <div class="panel">
+        <div class="smsGrid">
+
+          <div class="smsCol">
+            <div class="smsColHead">
+              <h2>Modtagere</h2>
+              <span class="smsCount"><strong id="recCount">0</strong> modtagere</span>
+            </div>
+            <textarea id="recipients" class="smsText" spellcheck="false"
+              placeholder="Ét telefonnummer pr. linje.&#10;&#10;Du kan indsætte en kolonne direkte fra Excel.&#10;&#10;8-cifrede danske numre får automatisk 45 foran."></textarea>
+            <div id="recWarn" class="smsWarn"></div>
+          </div>
+
+          <div class="smsCol">
+            <div class="smsColHead">
+              <h2>Besked</h2>
+              <span class="smsCount"><strong id="msgLen">0</strong> tegn · <strong id="msgParts">0</strong> SMS pr. modtager</span>
+            </div>
+            <textarea id="message" class="smsText" placeholder="Skriv din besked her."></textarea>
+            <div id="msgWarn" class="smsWarn"></div>
+          </div>
+
+          <div class="smsCol">
+            <div class="smsColHead"><h2>Afsendelse</h2></div>
+
+            <div class="formRow">
+              <label for="from">Afsender (vises på modtagerens telefon)</label>
+              <input id="from" class="field" maxlength="11" value="Lely Center" autocomplete="off" />
+            </div>
+
+            <label class="smsToggle"><input type="checkbox" id="testMode" checked /> Test (sender ikke rigtigt)</label>
+
+            <div class="smsSummary" id="summary">
+              <div>Pris i alt: <span class="big" id="sumPrice">kr. 0,00</span></div>
+              <div><span id="sumSms">0</span> SMS'er (<span id="sumRec">0</span> modtagere × <span id="sumParts">0</span>)</div>
+              <div class="muted">Saldo: <span id="balance">–</span> <a href="#" id="balanceBtn">opdatér</a></div>
+            </div>
+
+            <button type="button" id="sendBtn" class="btn primary smsSend isTest" disabled>Send test</button>
+            <div class="smsRow">
+              <button type="button" id="resetBtn" class="btn">Nulstil</button>
+              <span class="muted" id="sendMsg"></span>
+            </div>
+
+            <div id="result" class="smsResult"></div>
+
+            <div class="smsHelp">
+              <strong>Gode råd</strong>
+              <ul>
+                <li>Send altid en test først – den viser fejl i numre og tekst uden at sende.</li>
+                <li>En SMS er 160 tegn. Længere beskeder deles op (153 tegn pr. del).</li>
+                <li>Emojis og specialtegn gør, at en SMS kun kan være 70 tegn.</li>
+                <li>Tjek saldoen, før du sender til mange.</li>
+              </ul>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Historik ─────────────────────────────────────────────── -->
+    <section class="section">
+      <div class="accent-bar" style="margin-bottom:10px;">Historik</div>
+      <div class="panel">
+        <div class="smsToolbar">
+          <div class="clearable">
+            <input id="histSearch" type="search" placeholder="Søg i afsender, besked eller nummer…" autocomplete="off">
+            <button class="x" id="histSearchX" type="button">×</button>
+          </div>
+          <div class="smsRow">
+            <label class="smsToggle" style="font-weight:500"><input type="checkbox" id="histHideTest" /> Skjul test</label>
+            <span class="muted" id="histCount"></span>
+            <button type="button" class="btn" id="histReload">Opdatér</button>
+          </div>
+        </div>
+        <div class="smsListWrap">
+          <table class="smsList">
+            <thead>
+              <tr><th>Dato</th><th>Afsender</th><th>Besked</th><th class="num">Modtagere</th><th class="num">SMS</th><th>Status</th></tr>
+            </thead>
+            <tbody id="histBody"><tr><td colspan="6" class="muted">Henter...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Flyt data fra SharePoint (kun admin) ─────────────────── -->
+    <section class="section" id="migrateSection" hidden>
+      <div class="accent-bar" style="margin-bottom:10px;">Flyt historik fra SharePoint</div>
+      <div class="panel">
+        <p class="muted" style="margin-top:0">
+          Flytter alle rækker fra SharePoint-listen “SMS service log” over i Dataverse-tabellen
+          <code>lch_sms_service</code>. Kan køres flere gange – rækker der allerede er flyttet, springes over.
+        </p>
+        <div class="smsRow" style="margin-bottom:10px">
+          <button type="button" class="btn" id="migCheck">Tjek</button>
+          <button type="button" class="btn primary" id="migRun" disabled>Start flytning</button>
+          <span class="muted" id="migStatus"></span>
+        </div>
+        <div id="migLog" class="smsMigrateLog"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Detalje-popup -->
+<div id="detailOverlay" class="smsOverlay" hidden>
+  <div class="smsModal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="smsModalHeader">
+      <div class="smsModalTitle" id="detailTitle">SMS</div>
+      <button type="button" class="smsCloseBtn" id="detailClose" aria-label="Luk">✕</button>
+    </div>
+    <dl class="smsDetailMeta" id="detailMeta"></dl>
+    <div class="smsDetailGrid">
+      <div>
+        <div style="font-weight:600;margin-bottom:6px">Modtagere</div>
+        <div class="smsDetailBox" id="detailRec"></div>
+      </div>
+      <div>
+        <div style="font-weight:600;margin-bottom:6px">Besked</div>
+        <div class="smsDetailBox" id="detailMsg"></div>
+      </div>
+    </div>
+    <div class="formActions" style="margin-top:14px">
+      <button type="button" class="btn" id="detailReuse">Brug igen</button>
+      <button type="button" class="btn" id="detailClose2">Luk</button>
+    </div>
+  </div>
+</div>
+
+<script src="/assets/sms.js?v=20260924-1"></script>
+</body>
+</html>
