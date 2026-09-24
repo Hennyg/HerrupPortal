@@ -4,7 +4,7 @@ const S = require("../_sms");
 const C = S.COL;
 
 module.exports = async function (context, req) {
-  const user = S.requireAccess(context, req);
+  const user = await S.requireAccess(context, req);
   if (!user) return;
   try {
     const top = Math.min(Math.max(parseInt(req.query.top, 10) || 200, 1), 1000);

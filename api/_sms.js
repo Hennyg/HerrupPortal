@@ -38,7 +38,11 @@ function json(context, status, body) {
   context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
 }
 
-// ── Bruger og roller fra SWA-login ─────────────────────────────────────────
+// ── Bruger og roller ────────────────────────────────────────────────────────
+// principal.claims er altid tom i Azure Functions-backend'en (kun /.auth/me i
+// browseren har dem). Rollerne slås derfor op i Graph mod login-app'en
+// (AZURE_CLIENT_ID) – både direkte bruger-tildelinger og tildelinger via
+// grupper (fx gruppen portal_sms lagt på appen).
 function getPrincipal(req) {
   const b64 = req.headers["x-ms-client-principal"];
   if (!b64) return null;
@@ -56,9 +60,12 @@ function getPrincipal(req) {
         return t === "roles" || t === "role" || t.endsWith("/identity/claims/role");
       })
       .forEach(c => roles.add(String(c.val || "").toLowerCase()));
+    roles.delete("anonymous");
+    roles.delete("authenticated");
     return {
+      userId: cp.userId || "",
       email: cp.userDetails || claim("preferred_username", "email"),
-      name: claim("name") || cp.userDetails || "",
+      name: claim("name") || "",
       roles: [...roles]
     };
   } catch {
@@ -66,15 +73,109 @@ function getPrincipal(req) {
   }
 }
 
+async function graphToken() {
+  const r = await fetch(`https://login.microsoftonline.com/${process.env.DV_TENANT_ID}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: process.env.DV_CLIENT_ID,
+      client_secret: process.env.DV_CLIENT_SECRET,
+      scope: "https://graph.microsoft.com/.default"
+    })
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error(`Graph token-fejl ${r.status}: ${j.error_description || JSON.stringify(j)}`);
+  return j.access_token;
+}
+
+async function graphJson(token, url, opts = {}) {
+  const r = await fetch(url.startsWith("http") ? url : `https://graph.microsoft.com/v1.0/${url}`, {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts.headers || {}) }
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Graph ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
+  return j;
+}
+
+// Rolletildelinger på login-app'en caches 5 min pr. instans.
+let assignCache = { at: 0, data: null };
+async function getAppAssignments(token) {
+  if (assignCache.data && Date.now() - assignCache.at < 5 * 60 * 1000) return assignCache.data;
+  const appId = process.env.AZURE_CLIENT_ID;
+  if (!appId) throw new Error("Miljøvariablen AZURE_CLIENT_ID mangler");
+  const spRes = await graphJson(token, `servicePrincipals?$filter=appId eq '${appId}'&$select=id,appRoles`);
+  const sp = (spRes.value || [])[0];
+  if (!sp) throw new Error("Service principal ikke fundet for AZURE_CLIENT_ID");
+  const roleName = new Map((sp.appRoles || []).map(r => [r.id, String(r.value || "").toLowerCase()]));
+
+  const byUser = new Map();  // userId  -> Set(roller)
+  const byGroup = new Map(); // groupId -> Set(roller)
+  let url = `servicePrincipals/${sp.id}/appRoleAssignedTo?$top=999`;
+  while (url) {
+    const j = await graphJson(token, url);
+    for (const a of j.value || []) {
+      const role = roleName.get(a.appRoleId);
+      if (!role) continue;
+      const map = a.principalType === "Group" ? byGroup : (a.principalType === "User" ? byUser : null);
+      if (!map) continue;
+      if (!map.has(a.principalId)) map.set(a.principalId, new Set());
+      map.get(a.principalId).add(role);
+    }
+    url = j["@odata.nextLink"] || null;
+  }
+  assignCache = { at: Date.now(), data: { byUser, byGroup } };
+  return assignCache.data;
+}
+
+async function getGraphRoles(userId, token) {
+  if (!userId) return [];
+  const { byUser, byGroup } = await getAppAssignments(token);
+  const roles = new Set(byUser.get(userId) || []);
+
+  // Hvilke af de tildelte grupper er brugeren medlem af (også indirekte)?
+  const groupIds = [...byGroup.keys()];
+  for (let i = 0; i < groupIds.length; i += 20) {
+    const chunk = groupIds.slice(i, i + 20);
+    const j = await graphJson(token, `users/${userId}/checkMemberGroups`, {
+      method: "POST",
+      body: JSON.stringify({ groupIds: chunk })
+    });
+    for (const gid of j.value || []) (byGroup.get(gid) || []).forEach(r => roles.add(r));
+  }
+  return [...roles];
+}
+
 // Returnerer brugeren, eller sætter 401/403-svar og returnerer null.
-function requireAccess(context, req, { admin = false } = {}) {
+async function requireAccess(context, req, { admin = false } = {}) {
   const user = getPrincipal(req);
   if (!user) { json(context, 401, { error: "Ikke logget ind" }); return null; }
-  const allowed = admin ? ADMIN_ROLES : smsRoles();
-  if (!user.roles.some(r => allowed.includes(r))) {
-    json(context, 403, { error: admin ? "Kræver admin-rolle" : "Du har ikke adgang til SMS service" });
+
+  let token = null;
+  try {
+    token = await graphToken();
+    const graphRoles = await getGraphRoles(user.userId, token);
+    user.roles = [...new Set([...user.roles, ...graphRoles])];
+  } catch (e) {
+    context.log.warn("Rolleopslag i Graph fejlede:", e.message);
+    json(context, 500, { error: `Kunne ikke slå roller op: ${e.message}` });
     return null;
   }
+
+  const allowed = admin ? ADMIN_ROLES : [...smsRoles(), ...ADMIN_ROLES];
+  if (!user.roles.some(r => allowed.includes(r))) {
+    json(context, 403, { error: admin ? "Kræver admin-rolle" : "Du har ikke adgang til SMS service", roles: user.roles });
+    return null;
+  }
+  // Fulde navn til loggen (claims er tomme i backend'en).
+  if (!user.name && user.userId) {
+    try {
+      const u = await graphJson(token, `users/${user.userId}?$select=displayName`);
+      user.name = u.displayName || "";
+    } catch { /* ikke kritisk */ }
+  }
+  if (!user.name) user.name = user.email;
   return user;
 }
 
@@ -188,7 +289,7 @@ function formatTitle(date) {
 
 module.exports = {
   TABLE, IDCOL, COL, SMS_PRICE, ADMIN_ROLES,
-  json, getPrincipal, requireAccess,
+  json, getPrincipal, requireAccess, graphToken, graphJson,
   parseNumbers, smsInfo,
   sveveSend, sveveBalance,
   dvFetch, dvGetAll, formatTitle

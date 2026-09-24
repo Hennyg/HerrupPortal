@@ -3,7 +3,7 @@
 const S = require("../_sms");
 
 module.exports = async function (context, req) {
-  const user = S.requireAccess(context, req);
+  const user = await S.requireAccess(context, req);
   if (!user) return;
   try {
     const b = await S.sveveBalance();

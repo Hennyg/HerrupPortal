@@ -6,7 +6,7 @@ const MAX_RECIPIENTS = 2000;
 const MAX_PARTS = 6;
 
 module.exports = async function (context, req) {
-  const user = S.requireAccess(context, req);
+  const user = await S.requireAccess(context, req);
   if (!user) return;
 
   try {

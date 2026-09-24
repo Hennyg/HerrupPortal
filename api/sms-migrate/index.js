@@ -8,7 +8,6 @@
 // Kan køres igen og igen: rækker der allerede er flyttet (samme SharePoint-ID
 // i kolonnen cr175_lch_spid) springes over. Siden kalder POST gentagne gange,
 // indtil "remaining" er 0.
-const fetch = globalThis.fetch;
 const S = require("../_sms");
 const C = S.COL;
 
@@ -17,37 +16,18 @@ const SP_SITE = process.env.SMS_SP_SITE || "lcherrup-my.sharepoint.com:/personal
 const SP_LIST = process.env.SMS_SP_LIST_ID || "007abf46-6d42-4317-94af-d021e42d6d3e";
 const TIME_BUDGET_MS = 30000; // stop i god tid før Azure Functions' timeout
 
-async function graphToken() {
-  const r = await fetch(`https://login.microsoftonline.com/${process.env.DV_TENANT_ID}/oauth2/v2.0/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: process.env.DV_CLIENT_ID,
-      client_secret: process.env.DV_CLIENT_SECRET,
-      scope: "https://graph.microsoft.com/.default"
-    })
-  });
-  const j = await r.json();
-  if (!r.ok) throw new Error(`Graph token-fejl ${r.status}: ${j.error_description || JSON.stringify(j)}`);
-  return j.access_token;
-}
-
 async function graphGet(token, url) {
-  const r = await fetch(url.startsWith("http") ? url : `https://graph.microsoft.com/v1.0/${url}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    const e = new Error(`Graph ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
-    e.status = r.status;
+  try {
+    return await S.graphJson(token, url);
+  } catch (e) {
+    const m = /Graph (\d{3})/.exec(e.message);
+    e.status = m ? Number(m[1]) : 0;
     throw e;
   }
-  return j;
 }
 
 async function readSharePointItems() {
-  const token = await graphToken();
+  const token = await S.graphToken();
   let site;
   try {
     site = await graphGet(token, `sites/${SP_SITE}`);
@@ -95,7 +75,7 @@ function mapItem(it) {
 }
 
 module.exports = async function (context, req) {
-  const user = S.requireAccess(context, req, { admin: true });
+  const user = await S.requireAccess(context, req, { admin: true });
   if (!user) return;
 
   const started = Date.now();
