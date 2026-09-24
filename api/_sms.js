@@ -21,7 +21,7 @@ const COL = {
   sendt:          "cr175_lch_sendt",          // Dato og klokkeslæt
   status:         "cr175_lch_status",         // Tekst
   svar:           "cr175_lch_svar",           // Tekst, flere linjer
-  spId:           "cr175_lch_spid"            // Heltal – ID fra SharePoint-listen
+  spId:           "cr175_lch_spid"            // Heltal – ID fra den gamle SharePoint-liste
 };
 
 // ── Konfiguration ───────────────────────────────────────────────────────────
@@ -272,20 +272,6 @@ async function sveveBalance() {
   return { count: Number.isFinite(n) && txt.match(/\d/) ? n : null, raw: txt.slice(0, 500) };
 }
 
-// ── Dataverse: følg @odata.nextLink ────────────────────────────────────────
-async function dvGetAll(path, maxPageSize = 5000) {
-  const base = `${process.env.DV_URL}/api/data/v9.2/`;
-  const rows = [];
-  let next = path;
-  while (next) {
-    const rel = next.startsWith("http") ? next.replace(base, "") : next;
-    const data = await dvFetch(rel, { headers: { Prefer: `odata.maxpagesize=${maxPageSize}` } });
-    rows.push(...(data?.value || []));
-    next = data?.["@odata.nextLink"] || null;
-  }
-  return rows;
-}
-
 function formatTitle(date) {
   // Dansk tid i titlen, fx "SMS 24-09-2026 14:30" (selve tidspunktet gemmes i "sendt").
   const parts = Object.fromEntries(
@@ -302,5 +288,5 @@ module.exports = {
   json, getPrincipal, requireAccess, graphToken, graphJson,
   parseNumbers, smsInfo,
   sveveSend, sveveBalance,
-  dvFetch, dvGetAll, formatTitle
+  dvFetch, formatTitle
 };

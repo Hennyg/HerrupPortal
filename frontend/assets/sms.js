@@ -162,12 +162,10 @@
     try {
       const r = await api("/api/sms-balance");
       if (r.price) PRICE = r.price;
-      if (r.isAdmin) $("migrateSection").hidden = false;
       $("balance").textContent = r.count !== null && r.count !== undefined
         ? `${Number(r.count).toLocaleString("da-DK")} SMS'er`
         : (r.raw || "ukendt");
     } catch (e) {
-      if (e.data?.isAdmin) $("migrateSection").hidden = false;
       $("balance").textContent = "kunne ikke hentes";
       console.warn("sms-balance:", e);
     }
@@ -216,7 +214,8 @@
   async function loadHistory() {
     try {
       const r = await api("/api/sms-log?top=500");
-      history = r.items || [];
+      // Nyeste først
+      history = (r.items || []).slice().sort((a, b) => (Date.parse(b.sendt) || 0) - (Date.parse(a.sendt) || 0));
       if (r.price) PRICE = r.price;
       renderHistory();
       return r;
@@ -258,60 +257,6 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // ── Migrering (kun admin) ─────────────────────────────────────────────────
-  function migLog(line) {
-    const el = $("migLog");
-    el.textContent += (el.textContent ? "\n" : "") + `[${new Date().toLocaleTimeString("da-DK")}] ${line}`;
-    el.scrollTop = el.scrollHeight;
-  }
-
-  async function migCheck() {
-    $("migCheck").disabled = true;
-    $("migStatus").textContent = "Tjekker…";
-    try {
-      const r = await api("/api/sms-migrate");
-      migLog(`SharePoint: ${r.total} rækker · allerede flyttet: ${r.alreadyMigrated} · mangler: ${r.remaining}`);
-      if (r.sample && r.sample.length) migLog("Eksempel på første række:\n" + JSON.stringify(r.sample[0], null, 2));
-      $("migStatus").textContent = r.remaining ? `${r.remaining} rækker klar til flytning` : "Alt er flyttet";
-      $("migRun").disabled = !r.remaining;
-    } catch (e) {
-      migLog("FEJL: " + e.message);
-      $("migStatus").textContent = "Fejl – se log";
-    } finally {
-      $("migCheck").disabled = false;
-    }
-  }
-
-  async function migRun() {
-    if (!confirm("Start flytning af historik fra SharePoint til Dataverse?")) return;
-    $("migRun").disabled = true;
-    $("migCheck").disabled = true;
-    let totalMigrated = 0, totalFailed = 0, rounds = 0, lastRemaining = Infinity;
-    try {
-      while (rounds < 100) {
-        rounds++;
-        $("migStatus").textContent = `Kører runde ${rounds}…`;
-        const r = await api("/api/sms-migrate", { method: "POST", body: { limit: 150 } });
-        totalMigrated += r.migrated;
-        totalFailed = r.failed.length;
-        migLog(`Runde ${rounds}: flyttet ${r.migrated}, fejlet ${r.failed.length}, mangler ${r.remaining}`);
-        r.failed.slice(0, 5).forEach(f => migLog(`  SharePoint-ID ${f.spId}: ${f.error}`));
-        const left = r.remaining + r.failed.length;
-        // Stop når alt er flyttet, eller hvis intet flyttes (kun fejl tilbage)
-        if (r.remaining <= 0 || r.migrated === 0 || left >= lastRemaining) break;
-        lastRemaining = left;
-      }
-      migLog(`Færdig: ${totalMigrated} rækker flyttet${totalFailed ? `, ${totalFailed} fejlede (kan køres igen)` : ""}.`);
-      $("migStatus").textContent = totalFailed ? "Færdig med fejl – se log" : "Færdig";
-      loadHistory();
-    } catch (e) {
-      migLog("FEJL: " + e.message);
-      $("migStatus").textContent = "Stoppet – se log";
-    } finally {
-      $("migCheck").disabled = false;
-    }
-  }
-
   // ── Opstart ───────────────────────────────────────────────────────────────
   async function init() {
     try {
@@ -322,15 +267,12 @@
     }
 
     // Adgang afgøres af serveren (samme roller som API'et bruger).
-    let first;
     try {
-      first = await loadHistory();
+      await loadHistory();
     } catch (e) {
       if (e.status === 401 || e.status === 403) { $("noAccess").hidden = false; return; }
-      first = null;
     }
     $("app").hidden = false;
-    if (first?.isAdmin) $("migrateSection").hidden = false;
 
     ["recipients", "message", "from"].forEach(id => $(id).addEventListener("input", recalc));
     $("testMode").addEventListener("change", recalc);
@@ -349,8 +291,6 @@
     $("detailOverlay").addEventListener("click", e => { if (e.target === $("detailOverlay")) closeDetail(); });
     document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("detailOverlay").hidden) closeDetail(); });
 
-    $("migCheck").addEventListener("click", migCheck);
-    $("migRun").addEventListener("click", migRun);
 
     recalc();
     loadBalance();

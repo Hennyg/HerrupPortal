@@ -7,8 +7,8 @@ module.exports = async function (context, req) {
   if (!user) return;
   try {
     const b = await S.sveveBalance();
-    return S.json(context, 200, { count: b.count, raw: b.count === null ? b.raw : undefined, price: S.SMS_PRICE, isAdmin: user.roles.some(r => S.ADMIN_ROLES.includes(r)) });
+    return S.json(context, 200, { count: b.count, raw: b.count === null ? b.raw : undefined, price: S.SMS_PRICE });
   } catch (e) {
-    return S.json(context, 502, { error: e.message, isAdmin: user.roles.some(r => S.ADMIN_ROLES.includes(r)) });
+    return S.json(context, 502, { error: e.message });
   }
 };

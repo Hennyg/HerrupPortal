@@ -25,7 +25,7 @@ module.exports = async function (context, req) {
       sendt: r[C.sendt] || r.createdon || null,
       status: r[C.status] || ""
     }));
-    return S.json(context, 200, { items, price: S.SMS_PRICE, isAdmin: user.roles.some(r => S.ADMIN_ROLES.includes(r)) });
+    return S.json(context, 200, { items, price: S.SMS_PRICE });
   } catch (e) {
     context.log.error("sms-log:", e);
     return S.json(context, 500, { error: e.message });
