@@ -314,26 +314,25 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 /* ── Medarbejdersøgning på tile (link til /herrup.html) ──────────────────── */
 .tile.empTile:hover{filter:none}
 .tile.empTile.empOpen{z-index:40}
-.empSearch{position:relative;margin-top:.5rem}
+.empSearch{position:relative;margin-top:.75rem}
 .empSearchInput{
   width:100%;box-sizing:border-box;
-  padding:.4rem .55rem;border:1px solid #d1d5db;border-radius:6px;
-  font:inherit;font-size:.86rem;background:#fff;
+  min-height:44px;padding:.65rem 1rem;
+  border:1px solid #d1d5db;border-radius:22px;
+  font:inherit;font-size:.92rem;background:#fff;
 }
-.empSearchInput:focus{outline:none;border-color:var(--nav-accent);box-shadow:0 0 0 2px rgba(31,108,122,.15)}
+.empSearchInput:focus{outline:none;border-color:var(--nav-accent);box-shadow:0 0 0 3px rgba(31,108,122,.15)}
 .empSearchResults{
-  position:absolute;top:calc(100% + 4px);left:0;right:0;
-  background:#fff;border:1px solid #e5e7eb;border-radius:8px;
+  position:absolute;top:calc(100% + 6px);left:0;right:0;
+  background:#fff;border:1px solid #e5e7eb;border-radius:16px;
   box-shadow:0 8px 24px rgba(0,0,0,.16);
-  max-height:280px;overflow-y:auto;z-index:50;padding:4px;
+  max-height:300px;overflow-y:auto;z-index:50;padding:6px;
 }
 .empSearchResult{
-  display:flex;flex-direction:column;align-items:flex-start;gap:1px;
-  width:100%;text-align:left;
+  display:block;width:100%;text-align:left;
   appearance:none;border:0;background:transparent;cursor:pointer;
-  padding:7px 8px;border-radius:6px;font:inherit;color:#111;
+  padding:9px 12px;border-radius:10px;
+  font:inherit;font-size:.9rem;font-weight:600;color:#111;
 }
 .empSearchResult:hover,.empSearchResult:focus{background:#f0f0f0;outline:none}
-.empSearchResultName{font-weight:600;font-size:.86rem}
-.empSearchResultSub{color:#6b7280;font-size:.78rem}
-.empSearchInfo{color:#6b7280;font-size:.82rem;padding:6px 8px}
+.empSearchInfo{color:#6b7280;font-size:.85rem;padding:8px 12px}
