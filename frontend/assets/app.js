@@ -388,10 +388,7 @@ function wireEmployeeSearch(root) {
         return;
       }
       show(list.map(u => `
-        <button type="button" class="empSearchResult" data-id="${esc(u.id)}">
-          <span class="empSearchResultName">${esc(u.displayName || "–")}</span>
-          <span class="empSearchResultSub">${esc([u.jobTitle, u.department].filter(Boolean).join(" · ") || u.mail || "")}</span>
-        </button>
+        <button type="button" class="empSearchResult" data-id="${esc(u.id)}">${esc(u.displayName || "–")}</button>
       `).join(""));
       results.querySelectorAll(".empSearchResult").forEach(el => {
         el.addEventListener("click", (e) => {
