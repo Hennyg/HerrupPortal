@@ -1,3 +1,4 @@
+
 // assets/herrup-vagtferie.js
 // Rettet version: Dagens status opdateres i modal-headeren når ny person åbnes.
 // Statuskortet vises ikke længere inde i selve Vagt/Ferie-fanens indhold.
@@ -511,14 +512,21 @@ function updateProgress() {
 
             const roles = Array.from(new Set([...fromUserRoles, ...fromClaims]));
             const email = (principal?.userDetails || "").toLowerCase().trim();
-            __meInfoCache = { roles, email };
+            const nameClaim = (principal?.claims || []).find(c => String(c.typ || "").toLowerCase() === "name");
+            const name = String(nameClaim?.val || "").toLowerCase().trim();
+            __meInfoCache = { roles, email, name };
         } catch {
-            __meInfoCache = { roles: [], email: "" };
+            __meInfoCache = { roles: [], email: "", name: "" };
         }
 
         return __meInfoCache;
     }
 
+    // Eget visningsnavn (bruges til at matche rækken i vagt/ferie-arket).
+    // 1) "name"-claim fra /.auth/me – intet ekstra kald.
+    // 2) Den delte medarbejder-cache (også selvom den er forældet – navnet
+    //    ændrer sig sjældent).
+    // 3) Den hurtige liste (?fast=1) – uden foto/manager, så den er let.
     let __myDisplayNameCache = null;
     async function getMyDisplayName() {
         if (__myDisplayNameCache !== null) {
@@ -528,18 +536,30 @@ function updateProgress() {
         const me = await getMyInfo();
         __myDisplayNameCache = "";
 
+        if (me.name) {
+            __myDisplayNameCache = me.name;
+            return __myDisplayNameCache;
+        }
+
         if (!me.email) {
             return __myDisplayNameCache;
         }
 
-        try {
-            const r = await fetch("/api/entra-users", { cache: "no-store" });
-            const users = r.ok ? await r.json() : [];
+        const findName = (users) => {
             const match = (users || []).find(u => {
                 const mail = (u.mail || u.userPrincipalName || "").toLowerCase().trim();
                 return mail === me.email;
             });
-            __myDisplayNameCache = (match?.displayName || "").toLowerCase().trim();
+            return (match?.displayName || "").toLowerCase().trim();
+        };
+
+        try {
+            const entry = typeof entraCacheRead === "function" ? await entraCacheRead() : null;
+            __myDisplayNameCache = findName(entry?.data);
+
+            if (!__myDisplayNameCache && typeof entraCacheFetchFast === "function") {
+                __myDisplayNameCache = findName(await entraCacheFetchFast());
+            }
         } catch {
             __myDisplayNameCache = "";
         }
@@ -945,3 +965,6 @@ function updateProgress() {
     window.updateHeaderStatus = updateHeaderStatus;
     window.preloadVagtFerie   = preloadVagtFerie;
 })();
+
+
+

@@ -64,13 +64,14 @@
 </div>
 </div>
 
-<script src="/assets/entraCache.js?v=20260814-2"></script>
+<script src="/assets/entraCache.js?v=20260925-warm"></script>
 <script src="/assets/app.js?v=20260924-empsearch-2"></script>
 
 <script>
-// Varm browser-cachen op så snart portalen åbnes, så søgefeltet på
-// Personaleliste-tile'n og herrup.html kan bruge lokale data uden netværkskald.
-entraCacheWarm();
+// Hent medarbejderliste og vagt/ferieplan i baggrunden, når forsiden er
+// tegnet, så søgefeltet på Personaleliste-tile'n og herrup.html kan bruge
+// lokale data uden at vente.
+herrupBackgroundWarm();
 
 if ("serviceWorker" in navigator) {
 window.addEventListener("load", async () => {

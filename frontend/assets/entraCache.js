@@ -1,3 +1,4 @@
+
 // assets/entraCache.js
 // Delt browser-cache (IndexedDB) for den berigede medarbejderliste fra
 // /api/entra-users. Bruges af index.html (opvarmning + lokal søgning) og
@@ -114,16 +115,42 @@ async function entraCacheFetchEnrichedInChunks(ids, onChunk, chunkSize = 12) {
   return all;
 }
 
-// Kaldes fra index.html ved load: varmer cachen op i baggrunden hvis den er
-// tom/forældet. Kaster aldrig en fejl videre — det er "best effort".
+// Varmer medarbejder-cachen op i baggrunden, hvis den er tom/forældet.
+// Samme to-fasede hentning som herrup.html: først den hurtige liste
+// (?fast=1), derefter foto + manager i små bidder. Det er lettere for
+// serveren end ét samlet kald og rammer ikke Functions' timeout, når der
+// kommer flere medarbejdere. Først når ALT er beriget, skrives listen til
+// den delte cache — så herrup.html aldrig får en liste uden billeder.
+// Kaster aldrig en fejl videre — det er "best effort".
+let __entraWarmPromise = null;
 async function entraCacheWarm() {
-  try {
-    const entry = await entraCacheRead();
-    if (entraCacheIsFresh(entry)) return;
-    await entraCacheFetchFresh();
-  } catch {
-    // Ignoreres — den side der reelt har brug for data, henter selv.
-  }
+  if (__entraWarmPromise) return __entraWarmPromise; // kører allerede på denne side
+  __entraWarmPromise = (async () => {
+    try {
+      const entry = await entraCacheRead();
+      if (entraCacheIsFresh(entry)) return;
+
+      const baseData = await entraCacheFetchFast();
+      const byId = new Map(baseData.map(u => [u.id, u]));
+      await entraCacheFetchEnrichedInChunks([...byId.keys()], (chunk) => {
+        for (const e of chunk) {
+          const u = byId.get(e.id);
+          if (!u) continue;
+          u.photo          = e.photo;
+          u.managerId      = e.managerId;
+          u.managerName    = e.managerName;
+          u.entraPhoto     = e.entraPhoto;
+          u.hasCustomPhoto = e.hasCustomPhoto;
+        }
+      });
+      await entraCacheWrite(baseData);
+    } catch {
+      // Ignoreres — den side der reelt har brug for data, henter selv.
+    } finally {
+      __entraWarmPromise = null;
+    }
+  })();
+  return __entraWarmPromise;
 }
 
 // Hovedfunktion: returner friske data fra cache hvis muligt, ellers hent fra
@@ -209,3 +236,50 @@ async function entraCacheInvalidate() {
   await herrupCacheDeleteKey(ENTRA_CACHE_KEY);
 }
 window.entraCacheInvalidate = entraCacheInvalidate;
+
+// ── Vagt/ferie-planen i baggrunden ───────────────────────────────────────────
+// Samme cache-nøgle og format som herrup-vagtferie.js (vagtferie:<år>), så
+// "Dagens status" på personalelisten er klar med det samme.
+let __vagtFerieWarmPromise = null;
+async function vagtFerieCacheWarm() {
+  if (__vagtFerieWarmPromise) return __vagtFerieWarmPromise;
+  __vagtFerieWarmPromise = (async () => {
+    try {
+      const year = new Date().getFullYear();
+      const key = `vagtferie:${year}`;
+      const entry = await herrupCacheReadKey(key);
+      if (herrupCacheEntryIsFresh(entry, HERRUP_CACHE_DEFAULT_TTL_MS)) return;
+
+      const r = await fetch(`/api/vagtferieplan?year=${year}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const text = await r.text();
+      const data = text ? JSON.parse(text) : null;
+      if (data) await herrupCacheWriteKey(key, data);
+    } catch {
+      // Ignoreres — personalelisten henter selv, hvis cachen er tom.
+    } finally {
+      __vagtFerieWarmPromise = null;
+    }
+  })();
+  return __vagtFerieWarmPromise;
+}
+window.vagtFerieCacheWarm = vagtFerieCacheWarm;
+
+// ── Opvarmning fra forsiden ──────────────────────────────────────────────────
+// Venter til forsiden er tegnet og browseren er ledig, så links og nyheder
+// ikke skal konkurrere med medarbejderdata. Derefter hentes vagt/ferie og
+// medarbejderlisten parallelt i baggrunden.
+function herrupBackgroundWarm(delayMs = 2000) {
+  const start = () => {
+    vagtFerieCacheWarm();
+    entraCacheWarm();
+  };
+  const whenIdle = () => {
+    if ("requestIdleCallback" in window) requestIdleCallback(start, { timeout: 5000 });
+    else start();
+  };
+  const schedule = () => setTimeout(whenIdle, delayMs);
+  if (document.readyState === "complete") schedule();
+  else window.addEventListener("load", schedule, { once: true });
+}
+window.herrupBackgroundWarm = herrupBackgroundWarm;
