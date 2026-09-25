@@ -7,7 +7,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c30a14">
 <link rel="stylesheet" href="/assets/vendor/quill.snow.css" />
-<link rel="stylesheet" href="/assets/app.css?v=20260925-news4" />
+<link rel="stylesheet" href="/assets/app.css?v=20260925-news5" />
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
 </head>
@@ -101,9 +101,18 @@
         </div>
 
         <div class="naSection">
-          <h3>Forsiden</h3>
+          <h3>Synlighed</h3>
           <div class="naChecks" style="margin-bottom:10px" id="aktivRow">
             <label><input type="checkbox" id="aktiv" checked> Aktiv (vises)</label>
+          </div>
+          <div class="formRow" style="margin-bottom:10px">
+            <label>Hvem må se nyheden</label>
+            <div class="naRadios">
+              <label><input type="radio" name="visning" value="mig"> Kun mig</label>
+              <label><input type="radio" name="visning" value="test"> Testgruppe</label>
+              <label><input type="radio" name="visning" value="alle" checked> Alle</label>
+            </div>
+            <div class="muted" style="font-size:.8rem">Gælder nyheden overalt – forsiden, Nyheder og bjælken. Testgruppe = portal_admin og portal_hp_nyheder.</div>
           </div>
           <div class="formRow" id="udlobRow">
             <label for="udlobsdato">Vis på forsiden til og med</label>
@@ -135,18 +144,15 @@
               <input type="color" id="bannercolor" class="naColor" value="#FFD400" title="Vælg selv" />
             </div>
           </div>
-          <div class="naChecks" style="margin-top:10px">
-            <label><input type="checkbox" id="bannerTile"> I tip-tile'n</label>
-            <label><input type="checkbox" id="bannerNavbar"> Under navbaren</label>
+          <div class="formRow" style="margin-top:10px">
+            <label>Placering</label>
+            <div class="naRadios">
+              <label><input type="radio" name="bannerPlace" id="bannerTile" value="tile" checked> I tip-tile'n</label>
+              <label><input type="radio" name="bannerPlace" id="bannerNavbar" value="navbar"> Under navbaren</label>
+            </div>
           </div>
           <div class="formRow" style="margin-top:10px">
-            <label>Vis for</label>
-            <div class="naRadios">
-              <label><input type="radio" name="bannerVisning" value="mig"> Kun mig</label>
-              <label><input type="radio" name="bannerVisning" value="test"> Testgruppe</label>
-              <label><input type="radio" name="bannerVisning" value="alle" checked> Alle</label>
-            </div>
-            <div class="muted" style="font-size:.8rem">Testgruppe = portal_admin og portal_hp_nyheder. Når en bruger har åbnet nyheden, stopper bjælken for den bruger.</div>
+            <div class="muted" style="font-size:.8rem">Når en bruger har åbnet nyheden, stopper bjælken for den bruger.</div>
             <div><button type="button" class="btn" id="resetSeenBtn" style="margin-top:6px">Vis bjælken igen for mig</button></div>
           </div>
           <div class="formRow" style="margin-top:10px">
@@ -173,6 +179,6 @@
 <script src="/assets/newsEditor.js?v=20260925-1"></script>
 <script src="/assets/newsCommon.js?v=20260925-3"></script>
 <script src="/assets/newsTicker.js?v=20260925-2"></script>
-<script src="/assets/nyheder-admin.js?v=20260925-5"></script>
+<script src="/assets/nyheder-admin.js?v=20260925-7"></script>
 </body>
 </html>

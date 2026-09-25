@@ -8,7 +8,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c30a14">
 
-<link rel="stylesheet" href="/assets/app.css?v=20260925-news4" />
+<link rel="stylesheet" href="/assets/app.css?v=20260925-news6" />
 
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-32x32.png">
@@ -38,9 +38,13 @@
 <div class="container">
 <div class="hero">
 <div id="primaryBoxLeft" class="primaryBox"></div>
-<div>
+<div class="newsTile" id="newsTile">
+<button type="button" class="newsArrow off" id="newsPrev" aria-label="Forrige nyhed" title="Forrige">&#8249;</button>
+<div class="newsTileBody">
 <h1 id="newsTitle">Velkommen</h1>
 <div class="muted" id="newsTip" style="text-align:center">Din hub til Web Apps, favoritter og værktøjer</div>
+</div>
+<button type="button" class="newsArrow off" id="newsNext" aria-label="Næste nyhed" title="Næste">&#8250;</button>
 </div>
 <div id="primaryBoxRight" class="primaryBox"></div>
 </div>
@@ -64,7 +68,7 @@
 
 <script src="/assets/entraCache.js?v=20260925-warm"></script>
 <script src="/assets/newsTicker.js?v=20260925-2"></script>
-<script src="/assets/app.js?v=20260925-news3"></script>
+<script src="/assets/app.js?v=20260925-news4"></script>
 
 <script>
 // Hent medarbejderliste og vagt/ferieplan i baggrunden, når forsiden er

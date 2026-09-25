@@ -52,6 +52,16 @@ function showNewsItem(item) {
   title.textContent = item.overskrift || (item.type === "tip" ? "Tip" : "Nyhed");
   text.textContent = `${icon} ${item.indhold || ""}`.trim();
 
+  // Hele tile'n er klikbar til nyheden (se wireNewsTile)
+  const tile = document.getElementById("newsTile");
+  if (tile && item.id) {
+    tile.dataset.href = `/nyhed.html?id=${encodeURIComponent(item.id)}`;
+    tile.classList.add("clickable");
+    tile.setAttribute("role", "link");
+    tile.tabIndex = 0;
+    tile.title = "Åbn nyheden";
+  }
+
   // "Læs mere" når nyheden har en længere tekst eller en video
   if (item.hasBody || item.videourl) {
     const a = document.createElement("a");
@@ -75,6 +85,37 @@ function showNewsItem(item) {
       setTimeout(() => hero.classList.remove("newsFirstSeen"), 2400);
     }
   }
+}
+
+// Pile i begge sider + klik på hele tile'n
+function stepNews(dir) {
+  if (newsRotationItems.length <= 1) return;
+  newsRotationIndex = (newsRotationIndex + dir + newsRotationItems.length) % newsRotationItems.length;
+  showNewsItem(newsRotationItems[newsRotationIndex]);
+}
+
+function wireNewsTile() {
+  const tile = document.getElementById("newsTile");
+  if (!tile || tile.dataset.wired) return;
+  tile.dataset.wired = "1";
+  const multi = newsRotationItems.length > 1;
+  document.getElementById("newsPrev")?.classList.toggle("off", !multi);
+  document.getElementById("newsNext")?.classList.toggle("off", !multi);
+  document.getElementById("newsPrev")?.addEventListener("click", e => { e.stopPropagation(); stepNews(-1); });
+  document.getElementById("newsNext")?.addEventListener("click", e => { e.stopPropagation(); stepNews(1); });
+
+  const open = () => { if (tile.dataset.href) location.href = tile.dataset.href; };
+  tile.addEventListener("click", e => {
+    // Links og knapper inde i tile'n (bjælke, "Læs mere", pile) klarer sig selv
+    if (e.target.closest("a, button")) return;
+    open();
+  });
+  tile.addEventListener("keydown", e => {
+    if (e.target !== tile) return;
+    if (e.key === "Enter") open();
+    if (e.key === "ArrowLeft") stepNews(-1);
+    if (e.key === "ArrowRight") stepNews(1);
+  });
 }
 
 function scheduleNewsRotation() {
@@ -107,6 +148,7 @@ async function loadNewsOrTip() {
     newsRotationIndex = 0;
     showNewsItem(newsRotationItems[0]);
     scheduleNewsRotation();
+    wireNewsTile();
 
     if (hero && !hero.dataset.newsRotationWired) {
       hero.dataset.newsRotationWired = "1";

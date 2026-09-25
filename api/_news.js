@@ -18,7 +18,9 @@ const T = {
   bannerTile:   "cr175_lch_banner_tile",
   bannerNavbar: "cr175_lch_banner_navbar",
   bannerSlut:   "cr175_lch_banner_slut",
-  bannerVisning:"cr175_lch_banner_visning", // "alle", "test" eller "mig:<mail>"
+  // Hvem må se NYHEDEN (og dermed også dens bjælke): "alle", "test" eller "mig:<mail>".
+  // Kolonnen hedder "banner_visning" af historiske grunde.
+  bannerVisning:"cr175_lch_banner_visning",
   indsender:    "cr175_lch_indsender"       // "Navn <mail>" når en medarbejder har indsendt
 };
 const VALG = { nyhed: 245500000, tip: 245500001, olkassemode: 245500002 };
@@ -328,6 +330,34 @@ async function syncImages(tipId, html) {
   } catch { /* ignoreres */ }
 }
 
+// ── Synlighed pr. bruger ────────────────────────────────────────────────────
+// Returnerer canSee(item) for den aktuelle bruger. Roller slås kun op i
+// Graph, hvis der faktisk er en nyhed med visning "test".
+function viewerFilter(req) {
+  const user = getPrincipal(req || { headers: {} });
+  const email = String(user?.email || "").toLowerCase();
+  let isTester = null;
+  return async function canSee(item) {
+    const v = item?.visning || "alle";
+    if (v === "alle") return true;
+    if (v === "mig") return !!email && item.ejer === email;
+    if (v === "test") {
+      if (isTester === null) {
+        try { isTester = user ? hasEditorRole(await lookupRoles(user)) : false; }
+        catch { isTester = false; }
+      }
+      return isTester;
+    }
+    return false;
+  };
+}
+
+// Fjerner felter der ikke skal ud til almindelige brugere
+function publicItem(m) {
+  const { ejer, indsender, ...rest } = m;
+  return rest;
+}
+
 // ── Mapping ─────────────────────────────────────────────────────────────────
 const yes = v => ["ja", "true", "1", "aktiv", "yes"].includes(String(v ?? "").trim().toLowerCase());
 
@@ -374,6 +404,7 @@ function mapRow(row, { withBody = false } = {}) {
     videourl: row[T.videourl] || "",
     aktiv: yes(row[T.aktiv]),
     status: statusOf(row[T.aktiv]),
+    ...parseVisning(row[T.bannerVisning]),
     indsender: row[T.indsender] || "",
     udlobsdato: row[T.udlobsdato] ? String(row[T.udlobsdato]).slice(0, 10) : null,
     banner: {
@@ -382,7 +413,6 @@ function mapRow(row, { withBody = false } = {}) {
       tile: row[T.bannerTile] === true,
       navbar: row[T.bannerNavbar] === true,
       slut: row[T.bannerSlut] || null,
-      ...parseVisning(row[T.bannerVisning]),
       active: bannerActive(row)
     },
     createdon: row.createdon || null,
@@ -399,5 +429,5 @@ module.exports = {
   TIP_SET, TIP_ID, T, VALG, VALG_NAME, IMG_ID, I, EDITOR_ROLES, LIST_COLS,
   json, dv, imageMeta, getPrincipal, requireEditor, lookupRoles, hasEditorRole,
   yes, bannerActive, frontpageActive, parseVisning, statusOf, STATUS_TEXT, mapRow,
-  cleanHtml, syncImages, resolveVideoLink
+  cleanHtml, syncImages, resolveVideoLink, viewerFilter, publicItem
 };

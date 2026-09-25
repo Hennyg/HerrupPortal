@@ -54,8 +54,7 @@
       farve: $("bannercolor").value.toUpperCase(),
       tile: $("bannerTile").checked,
       navbar: $("bannerNavbar").checked,
-      slut: $("bannerSlut").value ? new Date($("bannerSlut").value).toISOString() : null,
-      visning: document.querySelector('input[name="bannerVisning"]:checked')?.value || "alle"
+      slut: $("bannerSlut").value ? new Date($("bannerSlut").value).toISOString() : null
     };
   }
 
@@ -65,7 +64,6 @@
     const off = !b.tekst;
     $("bannerTile").disabled = off;
     $("bannerNavbar").disabled = off;
-    document.querySelectorAll('input[name="bannerVisning"]').forEach(r => { r.disabled = off; });
     window.HerrupTicker?.preview($("bannerPreview"), b.tekst ? {
       ...b,
       overskrift: $("overskrift").value.trim() || "Overskrift",
@@ -108,11 +106,13 @@
     $("udlobsdato").value = it?.udlobsdato || "";
     $("bannertekst").value = it?.banner?.tekst || "";
     $("bannercolor").value = /^#[0-9a-f]{6}$/i.test(it?.banner?.farve || "") ? it.banner.farve : DEFAULT_COLOR;
-    $("bannerTile").checked = !!it?.banner?.tile;
-    $("bannerNavbar").checked = !!it?.banner?.navbar;
+    // Kun ét sted ad gangen – ældre nyheder med begge sat vises som tip-tile
+    const onNavbar = !!it?.banner?.navbar && !it?.banner?.tile;
+    $("bannerTile").checked = !onNavbar;
+    $("bannerNavbar").checked = onNavbar;
     $("bannerSlut").value = toLocalInput(it?.banner?.slut);
-    const vis = it?.banner?.visning || "alle";
-    document.querySelectorAll('input[name="bannerVisning"]').forEach(r => { r.checked = r.value === vis; });
+    const vis = it?.visning || "alle";
+    document.querySelectorAll('input[name="visning"]').forEach(r => { r.checked = r.value === vis; });
     $("resetSeenBtn").hidden = !currentId;
 
     $("deleteBtn").hidden = !currentId;
@@ -158,7 +158,8 @@
           ${it.status === "afvist" ? "<span>· Afvist</span>" : ""}
           ${it.status === "inaktiv" ? "<span>· Inaktiv</span>" : ""}
           ${it.indsender ? `<span>· ${esc(it.indsender.replace(/\s*<[^>]*>/, ""))}</span>` : ""}
-          ${it.banner?.active ? `<span class="naBannerDot">${esc(it.banner.tekst)}${it.banner.visning === "test" ? " · TEST" : (it.banner.visning === "mig" ? " · KUN MIG" : "")}</span>` : ""}
+          ${it.banner?.active ? `<span class="naBannerDot">${esc(it.banner.tekst)}</span>` : ""}
+          ${it.visning === "test" ? '<span class="naVisDot">TEST</span>' : (it.visning === "mig" ? '<span class="naVisDot">KUN MIG</span>' : "")}
           ${it.videourl ? "<span>🎬</span>" : ""}
         </span>
       </button>`).join("");
@@ -205,6 +206,7 @@
         aktiv: $("aktiv").checked,
         status: statusOverride || ((currentStatus === "afventer" || currentStatus === "afvist") ? currentStatus : ($("aktiv").checked ? "aktiv" : "inaktiv")),
         udlobsdato: selectedType() === "tip" ? null : ($("udlobsdato").value || null),
+        visning: document.querySelector('input[name="visning"]:checked')?.value || "alle",
         banner: currentBanner()
       };
 
@@ -268,7 +270,7 @@
       $(id).addEventListener("input", () => { dirty = true; }));
     ["aktiv", "bannerTile", "bannerNavbar", "bannercolor"].forEach(id =>
       $(id).addEventListener("change", () => { dirty = true; }));
-    document.querySelectorAll('input[name="bannerVisning"]').forEach(r => r.addEventListener("change", () => { dirty = true; }));
+    document.querySelectorAll('input[name="visning"]').forEach(r => r.addEventListener("change", () => { dirty = true; }));
 
     $("resetSeenBtn").addEventListener("click", () => {
       if (!currentId) return;

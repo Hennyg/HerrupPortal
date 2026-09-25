@@ -11,36 +11,24 @@ module.exports = async function (context, req) {
     const data = await N.dv(`${N.TIP_SET}?$select=${select}&$orderby=createdon desc`);
     const rows = (data?.value || []).filter(r => N.yes(r[T.aktiv]));
 
-    const items = rows
-      .filter(r => r[T.valg] === N.VALG.tip || N.frontpageActive(r, now))
-      .map(r => N.mapRow(r));
-
-    // Bannere kan være begrænset til "mig" (den der gemte) eller "test"
-    // (portal_admin + portal_hp_nyheder). Roller slås kun op i Graph, hvis
-    // der faktisk findes et aktivt test-banner.
-    const user = N.getPrincipal(req || { headers: {} });
-    const email = String(user?.email || "").toLowerCase();
-    let isTester = null;
-    const canSee = async (b) => {
-      if (b.visning === "alle") return true;
-      if (b.visning === "mig") return !!email && b.ejer === email;
-      if (b.visning === "test") {
-        if (isTester === null) {
-          try { isTester = user ? N.hasEditorRole(await N.lookupRoles(user)) : false; }
-          catch { isTester = false; }
-        }
-        return isTester;
-      }
-      return false;
-    };
-
-    const banners = [];
-    for (const r of rows.filter(r => N.bannerActive(r, now))) {
+    // Nyheder kan være begrænset til "mig" eller "test" – gælder også bjælken
+    const canSee = N.viewerFilter(req);
+    const visible = [];
+    for (const r of rows) {
       const m = N.mapRow(r);
-      if (!(await canSee(m.banner))) continue;
-      const { ejer, ...banner } = m.banner;
-      banners.push({ id: m.id, overskrift: m.overskrift, indhold: m.indhold, hasBody: m.hasBody || !!m.videourl, modifiedon: m.modifiedon, ...banner });
+      if (await canSee(m)) visible.push({ r, m });
     }
+
+    const items = visible
+      .filter(({ r }) => r[T.valg] === N.VALG.tip || N.frontpageActive(r, now))
+      .map(({ m }) => N.publicItem(m));
+
+    const banners = visible
+      .filter(({ r }) => N.bannerActive(r, now))
+      .map(({ m }) => ({
+        id: m.id, overskrift: m.overskrift, indhold: m.indhold,
+        hasBody: m.hasBody || !!m.videourl, modifiedon: m.modifiedon, ...m.banner
+      }));
 
     return N.json(context, 200, { items, banners });
   } catch (e) {

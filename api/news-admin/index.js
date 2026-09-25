@@ -41,8 +41,8 @@ function buildPayload(b, user) {
 
   const banner = b.banner || {};
   const bannertekst = String(banner.tekst || "").trim().slice(0, 30);
-  const vis = String(banner.visning || "alle").toLowerCase();
-  if (!["mig", "test", "alle"].includes(vis)) throw bad("Ukendt visning for bjælken");
+  const vis = String(b.visning || banner.visning || "alle").toLowerCase();
+  if (!["mig", "test", "alle"].includes(vis)) throw bad("Ukendt valg for hvem der må se nyheden");
   const visning = vis === "mig" ? `mig:${String(user?.email || "").toLowerCase()}` : vis;
 
   return {
@@ -55,8 +55,9 @@ function buildPayload(b, user) {
     [T.udlobsdato]: normDate(b.udlobsdato),
     [T.bannertekst]: bannertekst || null,
     [T.bannercolor]: normColor(banner.farve),
+    // Kun ét sted ad gangen: tip-tile'n vinder, hvis begge er sat
     [T.bannerTile]: !!(bannertekst && banner.tile),
-    [T.bannerNavbar]: !!(bannertekst && banner.navbar),
+    [T.bannerNavbar]: !!(bannertekst && banner.navbar && !banner.tile),
     [T.bannerSlut]: normDateTime(banner.slut),
     [T.bannerVisning]: visning
   };
