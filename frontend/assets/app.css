@@ -1,3 +1,4 @@
+
 :root{
   --nav-bg:#850c18; --nav-accent:#1f6c7a; --text-on-dark:#fff;
   --page-bg:#fff; --heading:#2c3e50; --accent-bar:#c30a14;
@@ -336,3 +337,152 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 }
 .empSearchResult:hover,.empSearchResult:focus{background:#f0f0f0;outline:none}
 .empSearchInfo{color:#6b7280;font-size:.85rem;padding:8px 12px}
+
+/* ══ Nyheder ═══════════════════════════════════════════════════════════════ */
+
+/* ── Nyhedsbjælke (ticker) ─────────────────────────────────────────────── */
+.nav-accent.hasTicker{height:auto;background:var(--nav-accent)}
+.newsTicker{
+  display:flex;width:100%;max-width:100%;box-sizing:border-box;align-items:stretch;overflow:hidden;text-decoration:none;
+  background:var(--ticker-bg,#FFD400);color:var(--ticker-fg,#111);
+  font-weight:600;font-size:.92rem;line-height:1;min-height:34px;
+}
+.newsTicker:hover .tickerMove{animation-play-state:paused}
+.tickerLabel{
+  flex:0 0 auto;display:flex;align-items:center;gap:7px;
+  background:#c30a14;color:#fff;padding:0 14px;
+  font-weight:800;letter-spacing:.06em;text-transform:uppercase;font-size:.82rem;
+}
+.tickerLive{width:8px;height:8px;border-radius:50%;background:#fff;animation:tickerPulse 1.2s ease-in-out infinite}
+@keyframes tickerPulse{0%,100%{opacity:1}50%{opacity:.25}}
+.tickerTrack{flex:1;min-width:0;overflow:hidden;position:relative;display:flex;align-items:center;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+          mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);}
+.tickerMove{display:inline-flex;white-space:nowrap;animation:tickerScroll 30s linear infinite;will-change:transform}
+.tickerCopy{display:inline-flex;align-items:center;padding-left:24px}
+.tickerSeg{display:inline-flex;align-items:center;gap:8px}
+.tickerInlineLabel{background:#c30a14;color:#fff;border-radius:3px;padding:3px 6px;font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.tickerDot{opacity:.45;font-size:.6rem;padding:0 16px}
+@keyframes tickerScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion: reduce){
+  .tickerMove{animation:none}
+  .tickerCopy[aria-hidden="true"]{display:none}
+  .tickerTrack{overflow:hidden;text-overflow:ellipsis}
+}
+
+/* Bjælken øverst i "Velkommen"-tile'n */
+.hero > *{min-width:0}
+.tileTicker{width:100%;max-width:680px;margin:-.25rem auto .7rem;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.tileTicker .newsTicker{min-height:30px;font-size:.86rem}
+.newsReadMore{font-weight:600;color:var(--nav-accent);text-decoration:none;white-space:nowrap}
+.newsReadMore:hover{text-decoration:underline}
+
+/* ── Fælles for nyhedssiderne ──────────────────────────────────────────── */
+.newsTypeBadge{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:#e5e7eb;color:#374151}
+.newsTypeBadge.nyhed{background:#fee2e2;color:#991b1b}
+.newsTypeBadge.olkassemode{background:#fef3c7;color:#92400e}
+.newsTypeBadge.tip{background:#e0f2fe;color:#075985}
+.newsMeta{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;color:#6b7280;font-size:.85rem}
+
+/* ── Nyhedsoversigt (nyheder.html) ─────────────────────────────────────── */
+.newsToolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+.newsChips{display:flex;flex-wrap:wrap;gap:6px}
+.newsChip{appearance:none;border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:.4rem .85rem;font:inherit;font-size:.88rem;cursor:pointer;color:#374151}
+.newsChip:hover{background:#f3f4f6}
+.newsChip.active{background:var(--nav-bg);border-color:var(--nav-bg);color:#fff}
+.newsToolbar .clearable{min-width:220px;max-width:360px;flex:1}
+.newsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.newsCard{display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1rem 1.1rem;text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(0,0,0,.04);transition:box-shadow .15s,transform .15s}
+.newsCard:hover{box-shadow:0 6px 18px rgba(0,0,0,.1);transform:translateY(-1px)}
+.newsCard.featured{grid-column:1/-1;padding:1.25rem 1.4rem;border-left:5px solid var(--nav-bg)}
+.newsCard h3{margin:0;font-size:1.08rem;color:var(--heading);line-height:1.3}
+.newsCard.featured h3{font-size:1.35rem}
+.newsCardText{color:#374151;font-size:.92rem;line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.newsCard.featured .newsCardText{-webkit-line-clamp:4}
+.newsCardFoot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.85rem;color:#6b7280;padding-top:4px}
+.newsCardFoot .more{color:var(--nav-accent);font-weight:600}
+.newsEmpty{text-align:center;color:#6b7280;padding:2rem 1rem}
+
+/* ── Artikel (nyhed.html) ──────────────────────────────────────────────── */
+.newsArticleLayout{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}
+.newsArticleLayout.hasVideo{grid-template-columns:minmax(0,1fr) minmax(320px,440px)}
+@media (max-width: 980px){
+  .newsArticleLayout.hasVideo{grid-template-columns:minmax(0,1fr)}
+  .newsArticleLayout.hasVideo .newsVideoTile{order:-1;position:static}
+}
+.newsArticle{padding:1.4rem 1.6rem}
+.newsArticle h1{margin:.4rem 0 .5rem;color:var(--heading);font-size:1.8rem;line-height:1.25}
+.newsLead{font-size:1.05rem;color:#374151;line-height:1.55;margin:.75rem 0 1.25rem;padding-bottom:1rem;border-bottom:1px solid #e5e7eb}
+.newsBody{font-size:1rem;line-height:1.65;color:#1f2937;overflow-wrap:anywhere}
+.newsBody h2{font-size:1.3rem;color:var(--heading);margin:1.4rem 0 .5rem}
+.newsBody h3{font-size:1.1rem;color:var(--heading);margin:1.2rem 0 .4rem}
+.newsBody p{margin:.6rem 0}
+.newsBody ul,.newsBody ol{padding-left:1.5rem;margin:.5rem 0}
+.newsBody li{margin:.25rem 0}
+.newsBody li>ul,.newsBody li>ol{margin:.25rem 0}
+.newsBody img{max-width:100%;height:auto;border-radius:8px;margin:.5rem 0;display:block}
+.newsBody blockquote{margin:.8rem 0;padding:.5rem 1rem;border-left:4px solid var(--nav-accent);background:#f8fafc;color:#374151}
+.newsBody a{color:var(--nav-accent)}
+.newsBody .ql-align-center{text-align:center}.newsBody .ql-align-right{text-align:right}
+.newsBody img.ql-align-center,.newsBody .ql-align-center img{margin-left:auto;margin-right:auto}
+.newsVideoTile{position:sticky;top:12px;padding:1rem}
+.newsVideoTile h2{margin:0 0 .6rem;font-size:1rem;color:var(--heading)}
+.newsVideoFrame{position:relative;width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#000}
+.newsVideoFrame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.newsVideoHint{font-size:.8rem;color:#6b7280;margin-top:.5rem}
+.newsBack{display:inline-flex;align-items:center;gap:6px;color:var(--nav-accent);text-decoration:none;font-weight:600;margin-bottom:10px}
+.newsBack:hover{text-decoration:underline}
+
+/* ── Redigering (nyheder-admin.html) ───────────────────────────────────── */
+.naLayout{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width: 1100px){ .naLayout{grid-template-columns:minmax(0,1fr)} }
+.naList{padding:.9rem}
+.naListTools{display:flex;gap:8px;margin-bottom:10px}
+.naListTools .clearable{flex:1}
+.naItems{max-height:calc(100vh - 260px);min-height:200px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.naItem{appearance:none;text-align:left;border:1px solid #e5e7eb;background:#fff;border-radius:10px;padding:.6rem .7rem;cursor:pointer;font:inherit;display:flex;flex-direction:column;gap:4px}
+.naItem:hover{background:#f8fafc}
+.naItem.selected{border-color:var(--nav-accent);background:#f0f9fa}
+.naItem.inactive{opacity:.6}
+.naItemTitle{font-weight:600;font-size:.92rem;color:#111}
+.naItemMeta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:.76rem;color:#6b7280}
+.naBannerDot{display:inline-block;font-size:.68rem;font-weight:800;padding:2px 6px;border-radius:4px;background:#FFD400;color:#111;text-transform:uppercase}
+.naForm{padding:1.1rem 1.25rem}
+.naGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 18px}
+.naGrid > *,.naSection{min-width:0}
+.naForm .formRow{grid-template-columns:minmax(0,1fr)}
+.naGrid .full{grid-column:1/-1}
+@media (max-width: 700px){ .naGrid{grid-template-columns:minmax(0,1fr)} }
+.naRadios{display:flex;gap:16px;flex-wrap:wrap;padding-top:4px}
+.naRadios label{display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer}
+.naCounter{font-size:.78rem;color:#6b7280;text-align:right}
+.naCounter.over{color:#b91c1c;font-weight:600}
+.naEditorWrap{border:1px solid #d1d5db;border-radius:8px;overflow:hidden;background:#fff}
+.naEditorWrap .ql-toolbar.ql-snow{border:0;border-bottom:1px solid #e5e7eb;background:#f8fafc}
+.naEditorWrap .ql-container.ql-snow{border:0;font:inherit;font-size:1rem}
+.naEditorWrap .ql-editor{min-height:340px;max-height:60vh;overflow-y:auto;line-height:1.6}
+.naEditorWrap .ql-editor img{max-width:100%;border-radius:6px}
+.naEditorWrap .ql-editor img.uploading{opacity:.4;outline:2px dashed var(--nav-accent)}
+.naSection{border:1px solid #e5e7eb;border-radius:10px;padding:.9rem 1rem;background:#fcfcfd}
+.naSection h3{margin:0 0 .7rem;font-size:.98rem;color:var(--heading)}
+.naChecks{display:flex;gap:18px;flex-wrap:wrap}
+.naChecks label{display:flex;align-items:center;gap:7px;font-weight:500;cursor:pointer}
+.naChecks input{width:17px;height:17px;accent-color:var(--nav-bg)}
+.naSwatches{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.naSwatch{width:26px;height:26px;border-radius:6px;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.naSwatch.active{border-color:#111}
+.naColor{width:44px;height:30px;padding:0;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer}
+.naPresets{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.naPreset{appearance:none;border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:.2rem .6rem;font-size:.78rem;font-weight:700;cursor:pointer}
+.naPreset:hover{background:#f3f4f6}
+.naPreview{margin-top:10px;border-radius:8px;overflow:hidden}
+.naVideoPreview{margin-top:8px;max-width:420px}
+.naActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid #e5e7eb}
+.naActions .spacer{flex:1}
+a.btn{color:#111;text-decoration:none;display:inline-block}
+a.btn.primary{color:#fff}
+.btn.danger{color:#b91c1c;border-color:#fecaca}
+.btn.danger:hover{background:#fef2f2}
+.naForm textarea.field,.naForm .btn,.naList .btn,.newsToolbar .btn{font:inherit;font-size:.95rem}
+.naMsg{font-size:.88rem}
+.naMsg.ok{color:#047857}.naMsg.err{color:#b91c1c}

@@ -1,4 +1,3 @@
-
 {
   "bindings": [
     {
@@ -6,8 +5,8 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["get"],
-      "route": "tips"
+      "methods": [ "get", "post", "delete" ],
+      "route": "news-image/{id?}"
     },
     {
       "type": "http",
@@ -16,6 +15,3 @@
     }
   ]
 }
-
-
-

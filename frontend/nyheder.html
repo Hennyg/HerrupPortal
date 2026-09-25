@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nyheder – Herrup Portalen</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260925-news" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+</head>
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Nyheder</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.5rem">
+  <h1 class="adminTitle">Nyheder</h1>
+  <div class="muted adminSub">Nyheder, referater fra Ølkassemøder og tips</div>
+
+  <div class="panel">
+    <div class="newsToolbar">
+      <div class="newsChips" id="chips">
+        <button type="button" class="newsChip active" data-type="">Alle</button>
+        <button type="button" class="newsChip" data-type="nyhed">Nyheder</button>
+        <button type="button" class="newsChip" data-type="olkassemode">Ølkassemøder</button>
+        <button type="button" class="newsChip" data-type="tip">Tips</button>
+      </div>
+      <div class="smsRow" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div class="clearable">
+          <input id="q" type="search" placeholder="Søg i nyheder…" autocomplete="off">
+          <button class="x" id="qx" type="button">×</button>
+        </div>
+        <a href="/nyheder-admin.html" class="btn primary" id="newBtn" hidden style="text-decoration:none">+ Opret nyhed</a>
+      </div>
+    </div>
+    <div id="grid" class="newsGrid"><div class="newsEmpty">Henter…</div></div>
+  </div>
+</div>
+
+<script src="/assets/newsCommon.js?v=20260925-1"></script>
+<script src="/assets/newsTicker.js?v=20260925-1"></script>
+<script src="/assets/nyheder.js?v=20260925-1"></script>
+</body>
+</html>

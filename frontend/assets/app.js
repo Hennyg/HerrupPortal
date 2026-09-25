@@ -1,3 +1,4 @@
+
 // assets/app.js
 
 // Slå tracking til/fra (du har pt. ikke /api/track => hold den false)
@@ -47,9 +48,19 @@ function showNewsItem(item) {
   const hero = title?.closest(".hero");
   if (!title || !text || !item) return;
 
-  const icon = item.type === "nyhed" ? "📢" : "💡";
-  title.textContent = item.overskrift || (item.type === "nyhed" ? "Nyhed" : "Tip");
+  const icon = item.type === "tip" ? "💡" : (item.type === "olkassemode" ? "🍺" : "📢");
+  title.textContent = item.overskrift || (item.type === "tip" ? "Tip" : "Nyhed");
   text.textContent = `${icon} ${item.indhold || ""}`.trim();
+
+  // "Læs mere" når nyheden har en længere tekst eller en video
+  if (item.hasBody || item.videourl) {
+    const a = document.createElement("a");
+    a.className = "newsReadMore";
+    a.href = `/nyhed.html?id=${encodeURIComponent(item.id)}`;
+    a.textContent = "Læs mere →";
+    text.appendChild(document.createTextNode(" "));
+    text.appendChild(a);
+  }
 
   if (hero && item.id) {
     const key = `herrup-news-seen-${item.id}`;
@@ -85,6 +96,7 @@ async function loadNewsOrTip() {
     const r = await fetch("/api/tips", { cache: "no-store" });
     if (!r.ok) return;
     const data = await r.json();
+    if (window.HerrupTicker) window.HerrupTicker.render(data?.banners || []);
     const items = Array.isArray(data?.items) ? data.items : [];
     if (!items.length) {
       if (data?.error) console.warn("/api/tips:", data.error);
@@ -744,3 +756,9 @@ function renderSections(items, myFavItems) {
   syncClearBtn();
   render();
 })();
+
+
+
+
+
+

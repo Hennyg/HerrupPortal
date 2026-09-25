@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nyhed – Herrup Portalen</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260925-news" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+</head>
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Nyheder</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/nyheder.html">Alle nyheder</a>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.25rem">
+  <a class="newsBack" href="/nyheder.html">← Alle nyheder</a>
+
+  <div id="notFound" class="panel newsEmpty" hidden></div>
+
+  <div id="layout" class="newsArticleLayout" hidden>
+    <article class="panel newsArticle">
+      <div class="newsMeta" id="meta"></div>
+      <h1 id="title"></h1>
+      <div class="newsLead" id="lead"></div>
+      <div class="newsBody" id="body"></div>
+      <div class="naActions" id="editBar" hidden>
+        <a class="btn" id="editBtn" href="#" style="text-decoration:none">Ret nyhed</a>
+      </div>
+    </article>
+
+    <aside class="panel newsVideoTile" id="videoTile" hidden>
+      <h2>🎬 Video</h2>
+      <div id="videoBox"></div>
+    </aside>
+  </div>
+</div>
+
+<script src="/assets/vendor/purify.min.js"></script>
+<script src="/assets/newsCommon.js?v=20260925-1"></script>
+<script src="/assets/newsTicker.js?v=20260925-1"></script>
+<script src="/assets/nyhed.js?v=20260925-1"></script>
+</body>
+</html>

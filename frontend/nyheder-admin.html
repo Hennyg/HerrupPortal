@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Opret og ret nyheder – Herrup Portalen</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/vendor/quill.snow.css" />
+<link rel="stylesheet" href="/assets/app.css?v=20260925-news" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+</head>
+<body class="adminPage">
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Nyheder – redigering</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/nyheder.html">Se nyheder</a>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.25rem">
+  <h1 class="adminTitle">Nyheder og tips</h1>
+  <div class="muted adminSub">Opret nyheder, referater fra Ølkassemøder og tips til forsiden</div>
+
+  <div id="noAccess" class="panel newsEmpty" hidden>
+    <h2 style="color:var(--heading);margin-top:0">Ingen adgang</h2>
+    <div>Du skal have rollen portal_hp_nyheder for at oprette og rette nyheder.</div>
+  </div>
+
+  <div id="app" class="naLayout" hidden>
+    <!-- Liste -->
+    <section class="panel naList">
+      <div class="naListTools">
+        <div class="clearable">
+          <input id="listQ" type="search" placeholder="Søg…" autocomplete="off">
+          <button class="x" id="listQx" type="button">×</button>
+        </div>
+        <button type="button" class="btn primary" id="newBtn">+ Ny</button>
+      </div>
+      <div id="items" class="naItems"><div class="muted">Henter…</div></div>
+    </section>
+
+    <!-- Formular -->
+    <section class="panel naForm">
+      <div class="naGrid">
+        <div class="formRow full">
+          <label>Type</label>
+          <div class="naRadios">
+            <label><input type="radio" name="type" value="nyhed" checked> 📢 Nyhed</label>
+            <label><input type="radio" name="type" value="olkassemode"> 🍺 Ølkassemøde</label>
+            <label><input type="radio" name="type" value="tip"> 💡 Tip</label>
+          </div>
+        </div>
+
+        <div class="formRow full">
+          <label for="overskrift">Overskrift</label>
+          <input id="overskrift" class="field" maxlength="200" placeholder="Fx Ølkassemøde 19. september 2026" />
+        </div>
+
+        <div class="formRow full">
+          <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– vises på forsiden og i nyhedsoversigten</span></label>
+          <textarea id="indhold" class="field" rows="3" placeholder="Et par linjer om hvad nyheden handler om"></textarea>
+          <div class="naCounter" id="indholdCount">0 / 300</div>
+        </div>
+
+        <div class="formRow full">
+          <label>Hele teksten <span class="muted" style="font-weight:400">– kopiér gerne Teams-opsummeringen ind. Billeder kan indsættes, trækkes ind eller vælges med 🖼</span></label>
+          <div class="naEditorWrap"><div id="editor"></div></div>
+        </div>
+
+        <div class="formRow full">
+          <label for="videourl">Video <span class="muted" style="font-weight:400">– Stream: Del → Integrer → kopiér koden ind her</span></label>
+          <textarea id="videourl" class="field" rows="2" placeholder='<iframe src="https://lcherrup-my.sharepoint.com/.../_layouts/15/embed.aspx?UniqueId=..."></iframe>'></textarea>
+          <div id="videoPreview" class="naVideoPreview"></div>
+        </div>
+
+        <div class="naSection">
+          <h3>Forsiden</h3>
+          <div class="naChecks" style="margin-bottom:10px">
+            <label><input type="checkbox" id="aktiv" checked> Aktiv (vises)</label>
+          </div>
+          <div class="formRow" id="udlobRow">
+            <label for="udlobsdato">Vis på forsiden til og med</label>
+            <input id="udlobsdato" class="field" type="date" />
+            <div class="muted" style="font-size:.8rem">Tom = altid. Nyheden bliver liggende under Nyheder bagefter.</div>
+          </div>
+        </div>
+
+        <div class="naSection">
+          <h3>Nyhedsbjælke</h3>
+          <div class="formRow">
+            <label for="bannertekst">Label</label>
+            <input id="bannertekst" class="field" maxlength="30" placeholder="Tom = ingen bjælke" />
+            <div class="naPresets">
+              <button type="button" class="naPreset" data-text="LIVE">LIVE</button>
+              <button type="button" class="naPreset" data-text="BREAKING">BREAKING</button>
+              <button type="button" class="naPreset" data-text="NYT">NYT</button>
+              <button type="button" class="naPreset" data-text="VIGTIGT">VIGTIGT</button>
+            </div>
+          </div>
+          <div class="formRow" style="margin-top:10px">
+            <label>Farve</label>
+            <div class="naSwatches" id="swatches">
+              <span class="naSwatch" data-color="#FFD400" style="background:#FFD400" title="Gul"></span>
+              <span class="naSwatch" data-color="#FF8A00" style="background:#FF8A00" title="Orange"></span>
+              <span class="naSwatch" data-color="#C30A14" style="background:#C30A14" title="Rød"></span>
+              <span class="naSwatch" data-color="#1F6C7A" style="background:#1F6C7A" title="Petrol"></span>
+              <span class="naSwatch" data-color="#111827" style="background:#111827" title="Sort"></span>
+              <input type="color" id="bannercolor" class="naColor" value="#FFD400" title="Vælg selv" />
+            </div>
+          </div>
+          <div class="naChecks" style="margin-top:10px">
+            <label><input type="checkbox" id="bannerTile"> I tip-tile'n</label>
+            <label><input type="checkbox" id="bannerNavbar"> Under navbaren</label>
+          </div>
+          <div class="formRow" style="margin-top:10px">
+            <label for="bannerSlut">Bjælken slutter</label>
+            <input id="bannerSlut" class="field" type="datetime-local" />
+            <div class="muted" style="font-size:.8rem">Tom = indtil den slås fra</div>
+          </div>
+          <div class="naPreview" id="bannerPreview"></div>
+        </div>
+      </div>
+
+      <div class="naActions">
+        <button type="button" class="btn primary" id="saveBtn">Gem</button>
+        <a class="btn" id="viewBtn" href="#" target="_blank" rel="noopener" hidden style="text-decoration:none">Vis nyhed</a>
+        <span class="naMsg" id="msg"></span>
+        <span class="spacer"></span>
+        <button type="button" class="btn danger" id="deleteBtn" hidden>Slet</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="/assets/vendor/quill.js"></script>
+<script src="/assets/newsCommon.js?v=20260925-1"></script>
+<script src="/assets/newsTicker.js?v=20260925-1"></script>
+<script src="/assets/nyheder-admin.js?v=20260925-1"></script>
+</body>
+</html>
