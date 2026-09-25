@@ -18,7 +18,8 @@ const T = {
   bannerTile:   "cr175_lch_banner_tile",
   bannerNavbar: "cr175_lch_banner_navbar",
   bannerSlut:   "cr175_lch_banner_slut",
-  bannerVisning:"cr175_lch_banner_visning"  // "alle", "test" eller "mig:<mail>"
+  bannerVisning:"cr175_lch_banner_visning", // "alle", "test" eller "mig:<mail>"
+  indsender:    "cr175_lch_indsender"       // "Navn <mail>" når en medarbejder har indsendt
 };
 const VALG = { nyhed: 245500000, tip: 245500001, olkassemode: 245500002 };
 const VALG_NAME = { 245500000: "nyhed", 245500001: "tip", 245500002: "olkassemode" };
@@ -234,6 +235,49 @@ async function requireEditor(context, req) {
   return user;
 }
 
+// ── Tekst og billeder ───────────────────────────────────────────────────────
+const IMG_REF = /\/api\/news-image\/([0-9a-f-]{36})/gi;
+
+// Fjerner scripts, event-attributter og javascript:-links. Visningen renser
+// også med DOMPurify, så dette er et ekstra lag.
+function cleanHtml(html) {
+  return String(html || "")
+    .replace(/<\s*(script|style|iframe|object|embed|form)[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+    .replace(/<\s*(script|style|iframe|object|embed|form|meta|link)[^>]*>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
+}
+
+// Knyt billeder i teksten til nyheden, og slet dem der ikke længere bruges.
+async function syncImages(tipId, html) {
+  const { entitySet, navProp } = await imageMeta();
+  const used = new Set([...String(html || "").matchAll(IMG_REF)].map(m => m[1].toLowerCase()));
+
+  const linked = await dv(`${entitySet}?$select=${IMG_ID}&$filter=${I.tipValue} eq ${tipId}`);
+  const linkedIds = new Set((linked?.value || []).map(r => String(r[IMG_ID]).toLowerCase()));
+
+  for (const id of used) {
+    if (linkedIds.has(id)) continue;
+    try {
+      await dv(`${entitySet}(${id})`, { method: "PATCH", body: { [`${navProp}@odata.bind`]: `/${TIP_SET}(${tipId})` } });
+    } catch { /* billedet findes ikke længere */ }
+  }
+  for (const id of linkedIds) {
+    if (!used.has(id)) {
+      try { await dv(`${entitySet}(${id})`, { method: "DELETE" }); } catch { /* ignoreres */ }
+    }
+  }
+
+  // Oprydning: billeder uploadet men aldrig gemt i en nyhed (ældre end 2 dage)
+  try {
+    const cutoff = new Date(Date.now() - 2 * 86400000).toISOString();
+    const orphans = await dv(`${entitySet}?$select=${IMG_ID}&$filter=${I.tipValue} eq null and createdon lt ${cutoff}&$top=50`);
+    for (const r of orphans?.value || []) {
+      try { await dv(`${entitySet}(${r[IMG_ID]})`, { method: "DELETE" }); } catch { /* ignoreres */ }
+    }
+  } catch { /* ignoreres */ }
+}
+
 // ── Mapping ─────────────────────────────────────────────────────────────────
 const yes = v => ["ja", "true", "1", "aktiv", "yes"].includes(String(v ?? "").trim().toLowerCase());
 
@@ -259,6 +303,16 @@ function parseVisning(v) {
   return { visning: "alle", ejer: "" };
 }
 
+// Status gemmes i lch_aktiv: "Ja", "Nej", "Afventer" (indsendt, ikke godkendt), "Afvist"
+function statusOf(v) {
+  const s = String(v ?? "").trim().toLowerCase();
+  if (yes(s)) return "aktiv";
+  if (s === "afventer") return "afventer";
+  if (s === "afvist") return "afvist";
+  return "inaktiv";
+}
+const STATUS_TEXT = { aktiv: "Ja", inaktiv: "Nej", afventer: "Afventer", afvist: "Afvist" };
+
 function mapRow(row, { withBody = false } = {}) {
   const body = row[T.brodtekst] || "";
   const out = {
@@ -269,6 +323,8 @@ function mapRow(row, { withBody = false } = {}) {
     hasBody: !!String(body).replace(/<[^>]*>/g, "").trim() || /<img/i.test(body),
     videourl: row[T.videourl] || "",
     aktiv: yes(row[T.aktiv]),
+    status: statusOf(row[T.aktiv]),
+    indsender: row[T.indsender] || "",
     udlobsdato: row[T.udlobsdato] ? String(row[T.udlobsdato]).slice(0, 10) : null,
     banner: {
       tekst: row[T.bannertekst] || "",
@@ -287,10 +343,11 @@ function mapRow(row, { withBody = false } = {}) {
 }
 
 const LIST_COLS = [TIP_ID, T.overskrift, T.indhold, T.valg, T.udlobsdato, T.aktiv, T.videourl,
-  T.bannertekst, T.bannercolor, T.bannerTile, T.bannerNavbar, T.bannerSlut, T.bannerVisning, "createdon", "modifiedon"];
+  T.bannertekst, T.bannercolor, T.bannerTile, T.bannerNavbar, T.bannerSlut, T.bannerVisning, T.indsender, "createdon", "modifiedon"];
 
 module.exports = {
   TIP_SET, TIP_ID, T, VALG, VALG_NAME, IMG_ID, I, EDITOR_ROLES, LIST_COLS,
   json, dv, imageMeta, getPrincipal, requireEditor, lookupRoles, hasEditorRole,
-  yes, bannerActive, frontpageActive, parseVisning, mapRow
+  yes, bannerActive, frontpageActive, parseVisning, statusOf, STATUS_TEXT, mapRow,
+  cleanHtml, syncImages
 };

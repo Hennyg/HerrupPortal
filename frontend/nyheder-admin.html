@@ -7,7 +7,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c30a14">
 <link rel="stylesheet" href="/assets/vendor/quill.snow.css" />
-<link rel="stylesheet" href="/assets/app.css?v=20260925-news2" />
+<link rel="stylesheet" href="/assets/app.css?v=20260925-news3" />
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
 </head>
@@ -48,11 +48,20 @@
         </div>
         <button type="button" class="btn primary" id="newBtn">+ Ny</button>
       </div>
+      <button type="button" class="naPendingChip" id="pendingChip" hidden>Afventer godkendelse (0)</button>
       <div id="items" class="naItems"><div class="muted">Henter…</div></div>
     </section>
 
     <!-- Formular -->
     <section class="panel naForm">
+      <div class="naApproveBar" id="approveBar" hidden>
+        <div id="approveText"></div>
+        <div class="naApproveActions">
+          <button type="button" class="btn primary" id="approveBtn">✔ Godkend og udgiv</button>
+          <button type="button" class="btn danger" id="rejectBtn">Afvis</button>
+        </div>
+        <div class="muted" style="font-size:.8rem;margin-top:6px">Du kan rette alle felter, før du godkender. “Gem” gemmer uden at udgive.</div>
+      </div>
       <div class="naGrid">
         <div class="formRow full">
           <label>Type</label>
@@ -90,7 +99,7 @@
 
         <div class="naSection">
           <h3>Forsiden</h3>
-          <div class="naChecks" style="margin-bottom:10px">
+          <div class="naChecks" style="margin-bottom:10px" id="aktivRow">
             <label><input type="checkbox" id="aktiv" checked> Aktiv (vises)</label>
           </div>
           <div class="formRow" id="udlobRow">
@@ -203,8 +212,9 @@
 </div>
 
 <script src="/assets/vendor/quill.js"></script>
+<script src="/assets/newsEditor.js?v=20260925-1"></script>
 <script src="/assets/newsCommon.js?v=20260925-1"></script>
 <script src="/assets/newsTicker.js?v=20260925-2"></script>
-<script src="/assets/nyheder-admin.js?v=20260925-2"></script>
+<script src="/assets/nyheder-admin.js?v=20260925-3"></script>
 </body>
 </html>

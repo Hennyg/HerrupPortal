@@ -37,7 +37,19 @@
   async function init() {
     userLine();
     window.HerrupTicker?.load();
-    if (await isEditor()) $("newBtn").hidden = false;
+    if (await isEditor()) {
+      $("newBtn").hidden = false;
+      // Vis om der er indsendte nyheder, der venter på godkendelse
+      fetch("/api/news-admin?count=pending", { cache: "no-store" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (!d?.pending) return;
+          const el = $("pendingBar");
+          el.innerHTML = `⏳ ${d.pending} nyhed${d.pending === 1 ? "" : "er"} venter på godkendelse – <a href="/nyheder-admin.html?filter=afventer">gå til godkendelse</a>`;
+          el.hidden = false;
+        })
+        .catch(() => {});
+    }
 
     document.querySelectorAll(".newsChip").forEach(b => b.addEventListener("click", () => {
       type = b.dataset.type;

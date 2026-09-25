@@ -6,9 +6,9 @@
 //   PUT    /api/news-admin/{id}    → ret
 //   DELETE /api/news-admin/{id}    → slet (inkl. billeder)
 const N = require("../_news");
-const { T, I } = N;
+const { T } = N;
+const { cleanHtml, syncImages } = N;
 
-const IMG_REF = /\/api\/news-image\/([0-9a-f-]{36})/gi;
 const bad = msg => Object.assign(new Error(msg), { userError: true });
 
 function normDate(v) {
@@ -31,16 +31,6 @@ function normColor(v) {
   return s.toUpperCase();
 }
 
-// Fjerner scripts, event-attributter og javascript:-links. Visningen renser
-// også med DOMPurify, så dette er et ekstra lag.
-function cleanHtml(html) {
-  return String(html || "")
-    .replace(/<\s*(script|style|iframe|object|embed|form)[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
-    .replace(/<\s*(script|style|iframe|object|embed|form|meta|link)[^>]*>/gi, "")
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
-}
-
 function buildPayload(b, user) {
   const type = String(b.type || "").toLowerCase();
   if (!(type in N.VALG)) throw bad("Ukendt type");
@@ -61,7 +51,7 @@ function buildPayload(b, user) {
     [T.indhold]: indhold,
     [T.brodtekst]: cleanHtml(b.brodtekst),
     [T.videourl]: String(b.videourl || "").trim() || null,
-    [T.aktiv]: b.aktiv === false ? "Nej" : "Ja",
+    [T.aktiv]: (b.status && N.STATUS_TEXT[b.status]) ? N.STATUS_TEXT[b.status] : (b.aktiv === false ? "Nej" : "Ja"),
     [T.udlobsdato]: normDate(b.udlobsdato),
     [T.bannertekst]: bannertekst || null,
     [T.bannercolor]: normColor(banner.farve),
@@ -70,36 +60,6 @@ function buildPayload(b, user) {
     [T.bannerSlut]: normDateTime(banner.slut),
     [T.bannerVisning]: visning
   };
-}
-
-// Knyt billeder i teksten til nyheden, og slet dem der ikke længere bruges.
-async function syncImages(tipId, html) {
-  const { entitySet, navProp } = await N.imageMeta();
-  const used = new Set([...String(html || "").matchAll(IMG_REF)].map(m => m[1].toLowerCase()));
-
-  const linked = await N.dv(`${entitySet}?$select=${N.IMG_ID}&$filter=${I.tipValue} eq ${tipId}`);
-  const linkedIds = new Set((linked?.value || []).map(r => String(r[N.IMG_ID]).toLowerCase()));
-
-  for (const id of used) {
-    if (linkedIds.has(id)) continue;
-    try {
-      await N.dv(`${entitySet}(${id})`, { method: "PATCH", body: { [`${navProp}@odata.bind`]: `/${N.TIP_SET}(${tipId})` } });
-    } catch { /* billedet findes ikke længere */ }
-  }
-  for (const id of linkedIds) {
-    if (!used.has(id)) {
-      try { await N.dv(`${entitySet}(${id})`, { method: "DELETE" }); } catch { /* ignoreres */ }
-    }
-  }
-
-  // Oprydning: billeder uploadet men aldrig gemt i en nyhed (ældre end 2 dage)
-  try {
-    const cutoff = new Date(Date.now() - 2 * 86400000).toISOString();
-    const orphans = await N.dv(`${entitySet}?$select=${N.IMG_ID}&$filter=${I.tipValue} eq null and createdon lt ${cutoff}&$top=50`);
-    for (const r of orphans?.value || []) {
-      try { await N.dv(`${entitySet}(${r[N.IMG_ID]})`, { method: "DELETE" }); } catch { /* ignoreres */ }
-    }
-  } catch { /* ignoreres */ }
 }
 
 module.exports = async function (context, req) {
@@ -112,6 +72,11 @@ module.exports = async function (context, req) {
 
   try {
     if (method === "GET") {
+      // Let kald til forsiden: antal nyheder der venter på godkendelse
+      if (String(req.query?.count || "") === "pending") {
+        const data = await N.dv(`${N.TIP_SET}?$select=${N.TIP_ID}&$filter=${T.aktiv} eq 'Afventer'`);
+        return N.json(context, 200, { pending: (data?.value || []).length });
+      }
       const select = [...N.LIST_COLS, T.brodtekst].join(",");
       if (id) {
         const row = await N.dv(`${N.TIP_SET}(${id})?$select=${select}`);

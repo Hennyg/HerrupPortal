@@ -4,13 +4,13 @@
   const { esc, fmtDate, TYPE_LABEL, parseVideo, userLine } = window.NewsCommon;
   const $ = id => document.getElementById(id);
 
-  const MAX_IMG_SIDE = 1600;
   const DEFAULT_COLOR = "#FFD400";
 
   let items = [];
   let currentId = null;
   let dirty = false;
-  let quill = null;
+  let currentStatus = "aktiv";
+  let listFilter = "";
 
   // ── API ───────────────────────────────────────────────────────────────────
   async function api(method, path, body) {
@@ -31,112 +31,10 @@
     $("msg").className = "naMsg " + kind;
   }
 
-  // ── Billeder: formindsk i browseren og upload ─────────────────────────────
-  function loadImage(src) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("Billedet kunne ikke læses"));
-      img.src = src;
-    });
-  }
-
-  function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result).split(",")[1]);
-      r.onerror = () => reject(r.error);
-      r.readAsDataURL(blob);
-    });
-  }
-
-  // Returnerer { mime, data(base64) }. GIF bevares (animation).
-  async function prepareImage(blob) {
-    if (blob.type === "image/gif" && blob.size < 5 * 1024 * 1024) {
-      return { mime: "image/gif", data: await blobToBase64(blob) };
-    }
-    const url = URL.createObjectURL(blob);
-    try {
-      const img = await loadImage(url);
-      const scale = Math.min(1, MAX_IMG_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#fff";          // gennemsigtige PNG'er får hvid baggrund
-      ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
-      const out = await new Promise(res => canvas.toBlob(res, "image/jpeg", 0.85));
-      return { mime: "image/jpeg", data: await blobToBase64(out) };
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  async function uploadImage(blob, name) {
-    const p = await prepareImage(blob);
-    const r = await api("POST", "/api/news-image", { name: name || "billede", mime: p.mime, data: p.data });
-    return r.url;
-  }
-
-  async function dataUrlToBlob(dataUrl) {
-    const r = await fetch(dataUrl);
-    return r.blob();
-  }
-
-  // Indsæt billeder fra filvælger, træk-og-slip eller indsæt
-  async function insertFiles(range, files) {
-    let index = range ? range.index : quill.getLength();
-    for (const file of files) {
-      if (!/^image\//.test(file.type)) continue;
-      msg(`Uploader ${file.name || "billede"}…`);
-      try {
-        const url = await uploadImage(file, file.name);
-        quill.insertEmbed(index, "image", url, "user");
-        index += 1;
-        quill.setSelection(index, 0, "silent");
-        msg("");
-      } catch (e) {
-        msg(`Billedet kunne ikke uploades: ${e.message}`, "err");
-      }
-    }
-  }
-
-  function pickImage() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.multiple = true;
-    input.onchange = () => insertFiles(quill.getSelection(true), [...input.files]);
-    input.click();
-  }
-
-  // Billeder indsat som data-URL (fx kopieret fra Teams/Word) uploades ved gem
-  async function uploadInlineImages(html) {
-    const matches = [...html.matchAll(/<img[^>]+src="(data:image\/[^"]+)"/gi)];
-    let out = html, n = 0;
-    for (const m of matches) {
-      n++;
-      msg(`Uploader billede ${n} af ${matches.length}…`);
-      const url = await uploadImage(await dataUrlToBlob(m[1]), `billede-${n}`);
-      out = out.replace(m[1], url);
-    }
-    return out;
-  }
-
-  function editorHTML() {
-    let html = quill.getSemanticHTML();
-    // Quill 2 laver mellemrum om til &nbsp; – det forhindrer linjeskift
-    html = html.replace(/&nbsp;/g, " ");
-    const text = quill.getText().trim();
-    if (!text && !/<img/i.test(html)) return "";
-    return html;
-  }
-
-  function setEditorHTML(html) {
-    quill.setContents(quill.clipboard.convert({ html: html || "" }), "silent");
-    quill.history.clear();
-  }
+  // Editor (Quill + billed-upload) kommer fra assets/newsEditor.js
+  let editor = null;
+  const editorHTML = () => editor.getHTML();
+  const setEditorHTML = html => editor.setHTML(html);
 
   // ── Formular ──────────────────────────────────────────────────────────────
   function selectedType() {
@@ -204,7 +102,15 @@
     $("indhold").value = it?.indhold || "";
     setEditorHTML(it?.brodtekst || "");
     $("videourl").value = it?.videourl || "";
-    $("aktiv").checked = it ? it.aktiv !== false : true;
+    currentStatus = it?.status || "aktiv";
+    $("aktiv").checked = it ? currentStatus === "aktiv" : true;
+    const pending = currentStatus === "afventer" || currentStatus === "afvist";
+    $("approveBar").hidden = !pending;
+    $("aktivRow").hidden = pending;
+    $("approveText").innerHTML = currentStatus === "afvist"
+      ? `❌ Afvist. Indsendt af <strong>${esc(it?.indsender || "ukendt")}</strong>.`
+      : `⏳ Venter på godkendelse. Indsendt af <strong>${esc(it?.indsender || "ukendt")}</strong> ${esc(fmtDate(it?.createdon, true))}.`;
+    $("rejectBtn").hidden = currentStatus === "afvist";
     $("udlobsdato").value = it?.udlobsdato || "";
     $("bannertekst").value = it?.banner?.tekst || "";
     $("bannercolor").value = /^#[0-9a-f]{6}$/i.test(it?.banner?.farve || "") ? it.banner.farve : DEFAULT_COLOR;
@@ -216,7 +122,7 @@
     $("resetSeenBtn").hidden = !currentId;
 
     $("deleteBtn").hidden = !currentId;
-    $("viewBtn").hidden = !currentId;
+    $("viewBtn").hidden = !currentId || currentStatus !== "aktiv";
     if (currentId) $("viewBtn").href = `/nyhed.html?id=${encodeURIComponent(currentId)}`;
 
     const u = new URL(location.href);
@@ -237,18 +143,27 @@
   function renderList() {
     const q = $("listQ").value.trim().toLowerCase();
     $("listQx").style.visibility = q ? "visible" : "hidden";
-    const list = items.filter(it => !q || (it.overskrift + " " + it.indhold).toLowerCase().includes(q));
+    const pendingCount = items.filter(it => it.status === "afventer").length;
+    $("pendingChip").textContent = `Afventer godkendelse (${pendingCount})`;
+    $("pendingChip").hidden = !pendingCount && listFilter !== "afventer";
+    $("pendingChip").classList.toggle("active", listFilter === "afventer");
+    const list = items.filter(it =>
+      (!listFilter || it.status === listFilter) &&
+      (!q || (it.overskrift + " " + it.indhold + " " + (it.indsender || "")).toLowerCase().includes(q)));
     if (!list.length) {
       $("items").innerHTML = `<div class="muted" style="padding:.5rem">${items.length ? "Ingen match" : "Ingen nyheder endnu"}</div>`;
       return;
     }
     $("items").innerHTML = list.map(it => `
-      <button type="button" class="naItem${it.id === currentId ? " selected" : ""}${it.aktiv ? "" : " inactive"}" data-id="${esc(it.id)}">
+      <button type="button" class="naItem${it.id === currentId ? " selected" : ""}${it.status === "aktiv" || it.status === "afventer" ? "" : " inactive"}" data-id="${esc(it.id)}">
         <span class="naItemTitle">${esc(it.overskrift || it.indhold || "Uden overskrift")}</span>
         <span class="naItemMeta">
           <span class="newsTypeBadge ${esc(it.type)}">${esc(TYPE_LABEL[it.type] || "Nyhed")}</span>
           <span>${esc(fmtDate(it.createdon))}</span>
-          ${it.aktiv ? "" : "<span>· Inaktiv</span>"}
+          ${it.status === "afventer" ? '<span class="naPendingDot">AFVENTER</span>' : ""}
+          ${it.status === "afvist" ? "<span>· Afvist</span>" : ""}
+          ${it.status === "inaktiv" ? "<span>· Inaktiv</span>" : ""}
+          ${it.indsender ? `<span>· ${esc(it.indsender.replace(/\s*<[^>]*>/, ""))}</span>` : ""}
           ${it.banner?.active ? `<span class="naBannerDot">${esc(it.banner.tekst)}${it.banner.visning === "test" ? " · TEST" : (it.banner.visning === "mig" ? " · KUN MIG" : "")}</span>` : ""}
           ${it.videourl ? "<span>🎬</span>" : ""}
         </span>
@@ -274,7 +189,8 @@
   }
 
   // ── Gem / slet ────────────────────────────────────────────────────────────
-  async function save() {
+  async function save(statusOverride) {
+    if (typeof statusOverride !== "string") statusOverride = "";
     const overskrift = $("overskrift").value.trim();
     const indhold = $("indhold").value.trim();
     if (!overskrift) { msg("Skriv en overskrift", "err"); $("overskrift").focus(); return; }
@@ -283,11 +199,7 @@
     const btn = $("saveBtn");
     btn.disabled = true;
     try {
-      let brodtekst = editorHTML();
-      if (/src="data:image\//i.test(brodtekst)) {
-        brodtekst = await uploadInlineImages(brodtekst);
-        setEditorHTML(brodtekst);
-      }
+      const brodtekst = await editor.getHTMLWithUploads();
 
       const v = $("videourl").value.trim();
       const parsed = parseVideo(v);
@@ -298,6 +210,7 @@
         brodtekst,
         videourl: parsed ? (parsed.embed || parsed.link) : "",
         aktiv: $("aktiv").checked,
+        status: statusOverride || ((currentStatus === "afventer" || currentStatus === "afvist") ? currentStatus : ($("aktiv").checked ? "aktiv" : "inaktiv")),
         udlobsdato: selectedType() === "tip" ? null : ($("udlobsdato").value || null),
         banner: currentBanner()
       };
@@ -315,7 +228,9 @@
       } else if (saved) {
         renderList();
       }
-      msg(r.imageWarning ? `Gemt – men: ${r.imageWarning}` : "Gemt ✓", r.imageWarning ? "err" : "ok");
+      const doneText = statusOverride === "aktiv" && !r.imageWarning ? "Godkendt og udgivet ✓"
+        : (statusOverride === "afvist" ? "Afvist" : "Gemt ✓");
+      msg(r.imageWarning ? `Gemt – men: ${r.imageWarning}` : doneText, r.imageWarning ? "err" : "ok");
     } catch (e) {
       msg(`Kunne ikke gemme: ${e.message}`, "err");
     } finally {
@@ -352,25 +267,10 @@
     }
     $("app").hidden = false;
 
-    quill = new Quill("#editor", {
-      theme: "snow",
-      placeholder: "Skriv eller indsæt teksten her…",
-      modules: {
-        toolbar: {
-          container: [
-            [{ header: [2, 3, false] }],
-            ["bold", "italic", "underline"],
-            [{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }],
-            [{ align: [] }],
-            ["blockquote", "link", "image"],
-            ["clean"]
-          ],
-          handlers: { image: pickImage }
-        },
-        uploader: { handler: (range, files) => insertFiles(range, files) }
-      }
+    editor = NewsEditor.create("#editor", {
+      onMessage: msg,
+      onChange: () => { dirty = true; }
     });
-    quill.on("text-change", (d, o, source) => { if (source === "user") dirty = true; });
 
     ["overskrift", "indhold", "videourl", "udlobsdato", "bannertekst", "bannerSlut"].forEach(id =>
       $(id).addEventListener("input", () => { dirty = true; }));
@@ -409,7 +309,16 @@
     $("listQ").addEventListener("input", renderList);
     $("listQx").addEventListener("click", () => { $("listQ").value = ""; renderList(); });
     $("newBtn").addEventListener("click", () => { if (confirmDiscard()) fillForm(null); });
-    $("saveBtn").addEventListener("click", save);
+    $("saveBtn").addEventListener("click", () => save());
+    $("approveBtn").addEventListener("click", () => save("aktiv"));
+    $("rejectBtn").addEventListener("click", () => {
+      if (confirm("Afvis nyheden? Den bliver ikke vist, men kan godkendes senere.")) save("afvist");
+    });
+    $("pendingChip").addEventListener("click", () => {
+      listFilter = listFilter === "afventer" ? "" : "afventer";
+      renderList();
+    });
+    if (new URLSearchParams(location.search).get("filter") === "afventer") listFilter = "afventer";
     $("deleteBtn").addEventListener("click", remove);
     window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
     document.addEventListener("keydown", e => {

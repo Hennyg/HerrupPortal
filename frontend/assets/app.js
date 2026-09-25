@@ -499,16 +499,53 @@ function renderPrimaryTileHTML(it) {
   return a.outerHTML;
 }
 
-function renderPrimaryBoxes(items) {
+// Nyheds-tiles under primær-boksene. Vises indtil videre kun for disse roller –
+// tilføj "portal_user" her, når alle skal kunne se dem.
+const NEWS_TILE_ROLES = ["portal_admin", "portal_hp_nyheder", "portal_herrup_portal_admin"];
+
+function renderNewsTileHTML(href, icon, title, badgeId) {
+  return `
+    <a class="primaryTile compact" href="${href}">
+      <span class="icon">${icon}</span>
+      <span class="primaryTitle">${esc(title)}</span>
+      ${badgeId ? `<span class="primaryBadge" id="${badgeId}" hidden></span>` : ""}
+    </a>`;
+}
+
+// Antal nyheder der venter på godkendelse (kun for redaktører)
+async function loadPendingNewsBadge() {
+  const badge = document.getElementById("newsPendingBadge");
+  if (!badge) return;
+  try {
+    const r = await fetch("/api/news-admin?count=pending", { cache: "no-store" });
+    if (!r.ok) return;
+    const { pending } = await r.json();
+    if (pending > 0) {
+      badge.textContent = String(pending);
+      badge.title = `${pending} nyhed${pending === 1 ? "" : "er"} venter på godkendelse`;
+      badge.hidden = false;
+    }
+  } catch { /* ikke kritisk */ }
+}
+
+function renderPrimaryBoxes(items, roles = []) {
   const left = document.getElementById("primaryBoxLeft");
   const right = document.getElementById("primaryBoxRight");
   if (!left && !right) return;
 
   const p1 = items.find(x => x.primaer === 1);
   const p2 = items.find(x => x.primaer === 2);
+  const showNews = roles.some(r => NEWS_TILE_ROLES.includes(r));
 
-  if (left)  left.innerHTML  = p1 ? renderPrimaryTileHTML(p1) : "";
-  if (right) right.innerHTML = p2 ? renderPrimaryTileHTML(p2) : "";
+  if (left) {
+    left.innerHTML = `<div class="primaryStack">${p1 ? renderPrimaryTileHTML(p1) : ""}${
+      showNews ? renderNewsTileHTML("/nyheder.html", "📰", "Nyheder", "newsPendingBadge") : ""}</div>`;
+  }
+  if (right) {
+    right.innerHTML = `<div class="primaryStack">${p2 ? renderPrimaryTileHTML(p2) : ""}${
+      showNews ? renderNewsTileHTML("/nyhed-opret.html", "✍️", "Opret nyhed") : ""}</div>`;
+  }
+  if (showNews) loadPendingNewsBadge();
 
   // Samme klik-tracking som de almindelige tiles (no-op når TRACKING_ENABLED er false).
   wireTileTracking(document.querySelector(".hero"));
@@ -709,7 +746,7 @@ function renderSections(items, myFavItems) {
 
   // De 2 "primære app"-bokse i toppen af siden — uafhængige af søgning/
   // kategori-filter, sættes én gang her.
-  renderPrimaryBoxes(itemsAll);
+  renderPrimaryBoxes(itemsAll, roles);
 
   const catSel = document.getElementById("categoryFilter");
   const grpSel = document.getElementById("groupFilter");

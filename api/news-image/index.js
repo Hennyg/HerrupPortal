@@ -1,6 +1,6 @@
 // /api/news-image
 //   GET    /api/news-image/{id}  → selve billedet (alle der er logget ind)
-//   POST   /api/news-image       → upload { name, mime, data (base64) } (redaktør)
+//   POST   /api/news-image       → upload { name, mime, data (base64) } (alle der er logget ind)
 //   DELETE /api/news-image/{id}  → slet (redaktør)
 const N = require("../_news");
 const { I } = N;
@@ -35,10 +35,10 @@ module.exports = async function (context, req) {
       return;
     }
 
-    const user = await N.requireEditor(context, req);
-    if (!user) return;
-
     if (method === "POST") {
+      // Alle der er logget ind må uploade (bruges også af "Opret nyhed").
+      // Billeder der aldrig bliver brugt i en nyhed, ryddes op efter 2 dage.
+      if (!N.getPrincipal(req)) return N.json(context, 401, { error: "Ikke logget ind" });
       const b = req.body || {};
       const mime = String(b.mime || "").toLowerCase();
       if (!ALLOWED.includes(mime)) return N.json(context, 400, { error: "Kun JPG, PNG, GIF og WEBP" });
@@ -67,6 +67,8 @@ module.exports = async function (context, req) {
     }
 
     if (method === "DELETE") {
+      const user = await N.requireEditor(context, req);
+      if (!user) return;
       if (!id) return N.json(context, 400, { error: "Mangler id" });
       await N.dv(`${entitySet}(${id})`, { method: "DELETE" });
       return N.json(context, 200, { ok: true });

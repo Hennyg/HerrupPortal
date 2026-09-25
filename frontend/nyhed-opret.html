@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Opret nyhed – Herrup Portalen</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/vendor/quill.snow.css" />
+<link rel="stylesheet" href="/assets/app.css?v=20260925-news3" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+</head>
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Opret nyhed</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/nyheder.html">Se nyheder</a>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.25rem;max-width:900px">
+  <h1 class="adminTitle">Opret nyhed</h1>
+  <div class="muted adminSub">Din nyhed bliver vist, når den er godkendt</div>
+
+  <section class="panel naForm" id="formPanel">
+    <div class="naGrid">
+      <div class="formRow full">
+        <label for="overskrift">Overskrift</label>
+        <input id="overskrift" class="field" maxlength="200" placeholder="Hvad handler nyheden om?" />
+      </div>
+      <div class="formRow full">
+        <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– et par linjer, der vises på forsiden</span></label>
+        <textarea id="indhold" class="field" rows="3"></textarea>
+        <div class="naCounter" id="indholdCount">0 / 300</div>
+      </div>
+      <div class="formRow full">
+        <label>Hele teksten <span class="muted" style="font-weight:400">– valgfri. Billeder kan indsættes, trækkes ind eller vælges med 🖼</span></label>
+        <div class="naEditorWrap"><div id="editor"></div></div>
+      </div>
+    </div>
+    <div class="naActions">
+      <button type="button" class="btn primary" id="sendBtn">Send til godkendelse</button>
+      <span class="naMsg" id="msg"></span>
+    </div>
+  </section>
+
+  <section class="panel newsEmpty" id="donePanel" hidden>
+    <div style="font-size:2.2rem">✅</div>
+    <h2 style="color:var(--heading);margin:.3rem 0">Tak! Din nyhed er sendt til godkendelse</h2>
+    <div>Du kan se den under Nyheder, når den er godkendt.</div>
+    <div class="naActions" style="justify-content:center;border-top:0">
+      <button type="button" class="btn" id="againBtn">Opret en nyhed mere</button>
+      <a class="btn primary" href="/">Til forsiden</a>
+    </div>
+  </section>
+</div>
+
+<script src="/assets/vendor/quill.js"></script>
+<script src="/assets/newsEditor.js?v=20260925-1"></script>
+<script src="/assets/newsCommon.js?v=20260925-1"></script>
+<script src="/assets/newsTicker.js?v=20260925-2"></script>
+<script src="/assets/nyhed-opret.js?v=20260925-1"></script>
+</body>
+</html>
