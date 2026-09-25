@@ -17,11 +17,16 @@
     $("indholdCount").classList.toggle("over", n > 300);
   }
 
+  let videoField = null;
+  const updateVideoPreview = () => videoField?.refresh();
+
   async function send() {
     const overskrift = $("overskrift").value.trim();
     const indhold = $("indhold").value.trim();
     if (!overskrift) { msg("Skriv en overskrift", "err"); $("overskrift").focus(); return; }
     if (!indhold) { msg("Skriv en kort besked", "err"); $("indhold").focus(); return; }
+
+    const rawVideo = $("videourl").value.trim();
 
     $("sendBtn").disabled = true;
     try {
@@ -30,7 +35,7 @@
       const r = await fetch("/api/news-submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ overskrift, indhold, brodtekst })
+        body: JSON.stringify({ overskrift, indhold, brodtekst, videourl: rawVideo })
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
@@ -47,6 +52,8 @@
   function reset() {
     $("overskrift").value = "";
     $("indhold").value = "";
+    $("videourl").value = "";
+    updateVideoPreview();
     editor.setHTML("");
     counter();
     msg("");
@@ -62,6 +69,15 @@
     editor = NewsEditor.create("#editor", { onMessage: msg, onChange: () => { dirty = true; } });
     $("overskrift").addEventListener("input", () => { dirty = true; });
     $("indhold").addEventListener("input", () => { dirty = true; counter(); });
+    videoField = NewsCommon.wireVideoField({ input: $("videourl"), preview: $("videoPreview"), onChange: () => { dirty = true; } });
+    $("videoHelpLink").addEventListener("click", NewsCommon.openVideoHelp);
+    NewsCommon.wireAiSummary({
+      button: $("aiBtn"),
+      textarea: $("indhold"),
+      getText: () => editor.quill.getText(),
+      getTitle: () => $("overskrift").value,
+      onMessage: msg
+    });
     $("sendBtn").addEventListener("click", send);
     $("againBtn").addEventListener("click", reset);
     window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });

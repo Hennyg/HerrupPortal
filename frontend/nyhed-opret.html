@@ -7,7 +7,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c30a14">
 <link rel="stylesheet" href="/assets/vendor/quill.snow.css" />
-<link rel="stylesheet" href="/assets/app.css?v=20260925-news3" />
+<link rel="stylesheet" href="/assets/app.css?v=20260925-news4" />
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
 </head>
@@ -40,13 +40,24 @@
         <input id="overskrift" class="field" maxlength="200" placeholder="Hvad handler nyheden om?" />
       </div>
       <div class="formRow full">
-        <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– et par linjer, der vises på forsiden</span></label>
+        <div class="naLabelRow">
+          <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– et par linjer, der vises på forsiden</span></label>
+          <button type="button" class="naAiBtn" id="aiBtn">✨ Send tekst til AI</button>
+        </div>
         <textarea id="indhold" class="field" rows="3"></textarea>
         <div class="naCounter" id="indholdCount">0 / 300</div>
       </div>
       <div class="formRow full">
         <label>Hele teksten <span class="muted" style="font-weight:400">– valgfri. Billeder kan indsættes, trækkes ind eller vælges med 🖼</span></label>
         <div class="naEditorWrap"><div id="editor"></div></div>
+      </div>
+      <div class="formRow full">
+        <div class="naLabelRow">
+          <label for="videourl">Video <span class="muted" style="font-weight:400">– valgfri. Indsæt linket fra OneDrive</span></label>
+          <a href="#" id="videoHelpLink" class="naHelpLink">❓ Sådan får du en video fra din pc ind her</a>
+        </div>
+        <input id="videourl" class="field" type="url" autocomplete="off" placeholder="Indsæt linket fra OneDrive (Del → Kopiér link)" />
+        <div id="videoPreview" class="naVideoPreview"></div>
       </div>
     </div>
     <div class="naActions">
@@ -68,8 +79,8 @@
 
 <script src="/assets/vendor/quill.js"></script>
 <script src="/assets/newsEditor.js?v=20260925-1"></script>
-<script src="/assets/newsCommon.js?v=20260925-1"></script>
+<script src="/assets/newsCommon.js?v=20260925-3"></script>
 <script src="/assets/newsTicker.js?v=20260925-2"></script>
-<script src="/assets/nyhed-opret.js?v=20260925-1"></script>
+<script src="/assets/nyhed-opret.js?v=20260925-3"></script>
 </body>
 </html>

@@ -235,6 +235,56 @@ async function requireEditor(context, req) {
   return user;
 }
 
+// ── Video: OneDrive/SharePoint-delingslink → Stream-integrering ────────────
+// Et delingslink (…sharepoint.com/:v:/g/personal/…) kan ikke vises i en
+// iframe. Graph finder filen bag linket, og ud fra dens SharePoint-id'er
+// bygges samme integrerings-URL, som Stream laver under "Del → Integrer".
+function isShareLink(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && u.hostname.toLowerCase().endsWith(".sharepoint.com") && /^\/:[a-z]:\//i.test(u.pathname);
+  } catch { return false; }
+}
+
+function isEmbedUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.hostname.toLowerCase().endsWith(".sharepoint.com") && /\/_layouts\/15\/embed\.aspx/i.test(u.pathname);
+  } catch { return false; }
+}
+
+async function resolveVideoLink(input) {
+  let url = String(input || "").trim();
+  const m = /<iframe[^>]*\ssrc\s*=\s*["']([^"']+)["']/i.exec(url);   // integreringskode virker stadig
+  if (m) url = m[1].replace(/&amp;/g, "&");
+  if (!url) return { embed: "", name: "" };
+  if (isEmbedUrl(url)) return { embed: url, name: "" };
+  if (!isShareLink(url)) throw Object.assign(new Error("Indsæt linket fra OneDrive (Del → Kopiér link)"), { userError: true });
+
+  const clean = new URL(url);
+  clean.searchParams.delete("nav");                        // kun visningsinfo – ikke nødvendigt
+  const encoded = "u!" + Buffer.from(clean.href, "utf8").toString("base64")
+    .replace(/=+$/, "").replace(/\//g, "_").replace(/\+/g, "-");
+
+  const token = await graphToken();
+  let item;
+  try {
+    item = await graphJson(token, `shares/${encoded}/driveItem?$select=id,name,file,sharepointIds`);
+  } catch (e) {
+    throw Object.assign(new Error(`Videoen kunne ikke findes ud fra linket. Tjek at den er delt med alle i Lely Center Herrup. (${e.message})`), { userError: true });
+  }
+  const sp = item?.sharepointIds || {};
+  if (!sp.siteUrl || !sp.listItemUniqueId) throw Object.assign(new Error("Linket peger ikke på en fil i OneDrive/SharePoint"), { userError: true });
+  if (item.file?.mimeType && !/^video\//i.test(item.file.mimeType)) {
+    throw Object.assign(new Error(`Filen “${item.name}” er ikke en video`), { userError: true });
+  }
+
+  const embed = `${sp.siteUrl.replace(/\/+$/, "")}/_layouts/15/embed.aspx?UniqueId=${sp.listItemUniqueId}` +
+    `&embed=${encodeURIComponent(JSON.stringify({ ust: true, hv: "CopyEmbedCode" }))}` +
+    `&referrer=StreamWebApp&referrerScenario=EmbedDialog.Create`;
+  return { embed, name: item.name || "" };
+}
+
 // ── Tekst og billeder ───────────────────────────────────────────────────────
 const IMG_REF = /\/api\/news-image\/([0-9a-f-]{36})/gi;
 
@@ -349,5 +399,5 @@ module.exports = {
   TIP_SET, TIP_ID, T, VALG, VALG_NAME, IMG_ID, I, EDITOR_ROLES, LIST_COLS,
   json, dv, imageMeta, getPrincipal, requireEditor, lookupRoles, hasEditorRole,
   yes, bannerActive, frontpageActive, parseVisning, statusOf, STATUS_TEXT, mapRow,
-  cleanHtml, syncImages
+  cleanHtml, syncImages, resolveVideoLink
 };

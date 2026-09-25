@@ -42,7 +42,8 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
 
 /* De 2 primær-app-bokse i toppen (styret fra Admin: "Primær-boks 1/2") */
 .primaryBox{ display:flex; justify-content:center; min-height:1px; }
-.primaryStack{ display:flex; flex-direction:column; align-items:stretch; gap:.5rem; }
+.primaryStack{ display:grid; grid-auto-rows:1fr; gap:.5rem; }
+.primaryStack > .primaryTile{ justify-content:center; }
 .primaryStack > .primaryTile{ box-sizing:border-box; width:100%; }
 .primaryTile{
   display:flex; flex-direction:column; align-items:center; text-align:center;
@@ -522,3 +523,8 @@ a.btn.primary{color:#fff}
 .naPendingBar{background:#fffbeb;border:1px solid #fde68a;color:#78350f;border-radius:10px;padding:.65rem .9rem;margin-bottom:12px;font-size:.92rem}
 .naPendingBar a{color:#92400e;font-weight:700}
 .naPendingBar[hidden]{display:none}
+
+/* "Send tekst til AI" */
+.naAiBtn{appearance:none;border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;border-radius:999px;padding:.3rem .8rem;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap}
+.naAiBtn:hover{background:#e0e7ff}
+.naAiBtn:disabled{opacity:.7;cursor:wait}

@@ -88,6 +88,7 @@ module.exports = async function (context, req) {
 
     if (method === "POST" || method === "PUT" || method === "PATCH") {
       const payload = buildPayload(req.body || {}, user);
+      if (payload[T.videourl]) payload[T.videourl] = (await N.resolveVideoLink(payload[T.videourl])).embed || null;
       let tipId = id;
       if (method === "POST") {
         const res = await N.dv(N.TIP_SET, { method: "POST", body: payload });

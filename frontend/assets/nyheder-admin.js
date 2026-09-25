@@ -84,15 +84,9 @@
     $("udlobRow").style.display = selectedType() === "tip" ? "none" : "";
   }
 
-  function updateVideoPreview() {
-    const v = parseVideo($("videourl").value);
-    const box = $("videoPreview");
-    if (!$("videourl").value.trim()) { box.innerHTML = ""; return; }
-    if (!v) { box.innerHTML = `<div class="naMsg err">Linket kan ikke bruges – indsæt integreringskoden fra Stream.</div>`; return; }
-    box.innerHTML = v.embed
-      ? `<div class="newsVideoFrame"><iframe src="${esc(v.embed)}" allow="autoplay; fullscreen" allowfullscreen title="Video"></iframe></div>`
-      : `<div class="muted" style="font-size:.85rem">Vises som en “Afspil video”-knap. Brug integreringskoden fra Stream (Del → Integrer) for at vise videoen direkte på siden.</div>`;
-  }
+  // Video-feltet: forhåndsvisning via /api/news-video (se newsCommon.js)
+  let videoField = null;
+  const updateVideoPreview = () => videoField?.refresh();
 
   function fillForm(it) {
     currentId = it?.id || null;
@@ -202,19 +196,17 @@
       const brodtekst = await editor.getHTMLWithUploads();
 
       const v = $("videourl").value.trim();
-      const parsed = parseVideo(v);
       const payload = {
         type: selectedType(),
         overskrift,
         indhold,
         brodtekst,
-        videourl: parsed ? (parsed.embed || parsed.link) : "",
+        videourl: v,  // serveren omsætter OneDrive-linket til integrering
         aktiv: $("aktiv").checked,
         status: statusOverride || ((currentStatus === "afventer" || currentStatus === "afvist") ? currentStatus : ($("aktiv").checked ? "aktiv" : "inaktiv")),
         udlobsdato: selectedType() === "tip" ? null : ($("udlobsdato").value || null),
         banner: currentBanner()
       };
-      if (v && !parsed) throw new Error("Videolinket kan ikke bruges");
 
       msg("Gemmer…");
       const r = await api(currentId ? "PUT" : "POST", currentId ? `/api/news-admin/${currentId}` : "/api/news-admin", payload);
@@ -272,7 +264,7 @@
       onChange: () => { dirty = true; }
     });
 
-    ["overskrift", "indhold", "videourl", "udlobsdato", "bannertekst", "bannerSlut"].forEach(id =>
+    ["overskrift", "indhold", "udlobsdato", "bannertekst", "bannerSlut"].forEach(id =>
       $(id).addEventListener("input", () => { dirty = true; }));
     ["aktiv", "bannerTile", "bannerNavbar", "bannercolor"].forEach(id =>
       $(id).addEventListener("change", () => { dirty = true; }));
@@ -284,20 +276,22 @@
       msg("Bjælken vises igen for dig (hvis den er aktiv)", "ok");
     });
 
-    // Vejledning til video
-    const openHelp = e => { e?.preventDefault(); $("videoHelp").hidden = false; $("videoHelpOk").focus(); };
-    const closeHelp = () => { $("videoHelp").hidden = true; };
-    $("videoHelpLink").addEventListener("click", openHelp);
-    $("videoHelpClose").addEventListener("click", closeHelp);
-    $("videoHelpOk").addEventListener("click", closeHelp);
-    $("videoHelp").addEventListener("click", e => { if (e.target === $("videoHelp")) closeHelp(); });
-    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("videoHelp").hidden) closeHelp(); });
+    // Vejledning til video + AI-oversigt til Kort besked
+    $("videoHelpLink").addEventListener("click", NewsCommon.openVideoHelp);
+    NewsCommon.wireAiSummary({
+      button: $("aiBtn"),
+      textarea: $("indhold"),
+      getText: () => editor.quill.getText(),
+      getTitle: () => $("overskrift").value,
+      onMessage: msg,
+      onDone: () => { dirty = true; }
+    });
 
     $("indhold").addEventListener("input", () => { updateCounter(); updateBannerUI(); });
     $("overskrift").addEventListener("input", updateBannerUI);
     $("bannertekst").addEventListener("input", updateBannerUI);
     $("bannercolor").addEventListener("input", updateBannerUI);
-    $("videourl").addEventListener("input", updateVideoPreview);
+    videoField = NewsCommon.wireVideoField({ input: $("videourl"), preview: $("videoPreview"), onChange: () => { dirty = true; } });
     document.querySelectorAll('input[name="type"]').forEach(r => r.addEventListener("change", () => { dirty = true; updateTypeUI(); }));
     document.querySelectorAll(".naPreset").forEach(b => b.addEventListener("click", () => {
       $("bannertekst").value = b.dataset.text; dirty = true; updateBannerUI();

@@ -40,6 +40,13 @@ module.exports = async function (context, req) {
     if (!indhold) return N.json(context, 400, { error: "Skriv en kort besked" });
 
     const brodtekst = N.cleanHtml(b.brodtekst);
+    let videourl = "";
+    try {
+      videourl = (await N.resolveVideoLink(b.videourl)).embed;
+    } catch (e) {
+      if (e.userError) return N.json(context, 400, { error: e.message });
+      throw e;
+    }
     const name = await displayName(user);
     const indsender = name ? `${name} <${user.email}>` : user.email;
 
@@ -50,6 +57,7 @@ module.exports = async function (context, req) {
         [T.overskrift]: overskrift,
         [T.indhold]: indhold,
         [T.brodtekst]: brodtekst,
+        [T.videourl]: videourl || null,
         [T.aktiv]: "Afventer",
         [T.indsender]: indsender.slice(0, 200)
       }
