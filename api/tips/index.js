@@ -4,7 +4,7 @@
 const N = require("../_news");
 const { T } = N;
 
-module.exports = async function (context) {
+module.exports = async function (context, req) {
   try {
     const now = new Date();
     const select = [...N.LIST_COLS, T.brodtekst].join(",");
@@ -15,12 +15,32 @@ module.exports = async function (context) {
       .filter(r => r[T.valg] === N.VALG.tip || N.frontpageActive(r, now))
       .map(r => N.mapRow(r));
 
-    const banners = rows
-      .filter(r => N.bannerActive(r, now))
-      .map(r => {
-        const m = N.mapRow(r);
-        return { id: m.id, overskrift: m.overskrift, indhold: m.indhold, hasBody: m.hasBody || !!m.videourl, ...m.banner };
-      });
+    // Bannere kan være begrænset til "mig" (den der gemte) eller "test"
+    // (portal_admin + portal_hp_nyheder). Roller slås kun op i Graph, hvis
+    // der faktisk findes et aktivt test-banner.
+    const user = N.getPrincipal(req || { headers: {} });
+    const email = String(user?.email || "").toLowerCase();
+    let isTester = null;
+    const canSee = async (b) => {
+      if (b.visning === "alle") return true;
+      if (b.visning === "mig") return !!email && b.ejer === email;
+      if (b.visning === "test") {
+        if (isTester === null) {
+          try { isTester = user ? N.hasEditorRole(await N.lookupRoles(user)) : false; }
+          catch { isTester = false; }
+        }
+        return isTester;
+      }
+      return false;
+    };
+
+    const banners = [];
+    for (const r of rows.filter(r => N.bannerActive(r, now))) {
+      const m = N.mapRow(r);
+      if (!(await canSee(m.banner))) continue;
+      const { ejer, ...banner } = m.banner;
+      banners.push({ id: m.id, overskrift: m.overskrift, indhold: m.indhold, hasBody: m.hasBody || !!m.videourl, modifiedon: m.modifiedon, ...banner });
+    }
 
     return N.json(context, 200, { items, banners });
   } catch (e) {

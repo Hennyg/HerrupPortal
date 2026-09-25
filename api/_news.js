@@ -17,7 +17,8 @@ const T = {
   bannercolor:  "cr175_lch_bannercolor",
   bannerTile:   "cr175_lch_banner_tile",
   bannerNavbar: "cr175_lch_banner_navbar",
-  bannerSlut:   "cr175_lch_banner_slut"
+  bannerSlut:   "cr175_lch_banner_slut",
+  bannerVisning:"cr175_lch_banner_visning"  // "alle", "test" eller "mig:<mail>"
 };
 const VALG = { nyhed: 245500000, tip: 245500001, olkassemode: 245500002 };
 const VALG_NAME = { 245500000: "nyhed", 245500001: "tip", 245500002: "olkassemode" };
@@ -199,27 +200,34 @@ async function appAssignments(token) {
   return assignCache.data;
 }
 
+// Slår brugerens app-roller op i Graph (direkte og via grupper)
+async function lookupRoles(user) {
+  const token = await graphToken();
+  const { byUser, byGroup } = await appAssignments(token);
+  const roles = new Set([...user.roles, ...(byUser.get(user.userId) || [])]);
+  const groupIds = [...byGroup.keys()];
+  for (let i = 0; i < groupIds.length; i += 20) {
+    const j = await graphJson(token, `users/${user.userId}/checkMemberGroups`, {
+      method: "POST",
+      body: JSON.stringify({ groupIds: groupIds.slice(i, i + 20) })
+    });
+    for (const gid of j.value || []) (byGroup.get(gid) || []).forEach(r => roles.add(r));
+  }
+  return [...roles];
+}
+
+const hasEditorRole = roles => roles.some(r => EDITOR_ROLES.includes(r));
+
 async function requireEditor(context, req) {
   const user = getPrincipal(req);
   if (!user) { json(context, 401, { error: "Ikke logget ind" }); return null; }
   try {
-    const token = await graphToken();
-    const { byUser, byGroup } = await appAssignments(token);
-    const roles = new Set([...user.roles, ...(byUser.get(user.userId) || [])]);
-    const groupIds = [...byGroup.keys()];
-    for (let i = 0; i < groupIds.length; i += 20) {
-      const j = await graphJson(token, `users/${user.userId}/checkMemberGroups`, {
-        method: "POST",
-        body: JSON.stringify({ groupIds: groupIds.slice(i, i + 20) })
-      });
-      for (const gid of j.value || []) (byGroup.get(gid) || []).forEach(r => roles.add(r));
-    }
-    user.roles = [...roles];
+    user.roles = await lookupRoles(user);
   } catch (e) {
     json(context, 500, { error: `Kunne ikke slå roller op: ${e.message}` });
     return null;
   }
-  if (!user.roles.some(r => EDITOR_ROLES.includes(r))) {
+  if (!hasEditorRole(user.roles)) {
     json(context, 403, { error: "Du har ikke adgang til at redigere nyheder", roles: user.roles });
     return null;
   }
@@ -243,6 +251,14 @@ function frontpageActive(row, now = new Date()) {
   return !Number.isNaN(end.getTime()) && end >= now;
 }
 
+// "alle" (standard), "test" (portal_admin + portal_hp_nyheder) eller "mig:<mail>"
+function parseVisning(v) {
+  const s = String(v || "").trim();
+  if (s.toLowerCase().startsWith("mig:")) return { visning: "mig", ejer: s.slice(4).trim().toLowerCase() };
+  if (s.toLowerCase() === "test") return { visning: "test", ejer: "" };
+  return { visning: "alle", ejer: "" };
+}
+
 function mapRow(row, { withBody = false } = {}) {
   const body = row[T.brodtekst] || "";
   const out = {
@@ -260,6 +276,7 @@ function mapRow(row, { withBody = false } = {}) {
       tile: row[T.bannerTile] === true,
       navbar: row[T.bannerNavbar] === true,
       slut: row[T.bannerSlut] || null,
+      ...parseVisning(row[T.bannerVisning]),
       active: bannerActive(row)
     },
     createdon: row.createdon || null,
@@ -270,10 +287,10 @@ function mapRow(row, { withBody = false } = {}) {
 }
 
 const LIST_COLS = [TIP_ID, T.overskrift, T.indhold, T.valg, T.udlobsdato, T.aktiv, T.videourl,
-  T.bannertekst, T.bannercolor, T.bannerTile, T.bannerNavbar, T.bannerSlut, "createdon", "modifiedon"];
+  T.bannertekst, T.bannercolor, T.bannerTile, T.bannerNavbar, T.bannerSlut, T.bannerVisning, "createdon", "modifiedon"];
 
 module.exports = {
   TIP_SET, TIP_ID, T, VALG, VALG_NAME, IMG_ID, I, EDITOR_ROLES, LIST_COLS,
-  json, dv, imageMeta, getPrincipal, requireEditor,
-  yes, bannerActive, frontpageActive, mapRow
+  json, dv, imageMeta, getPrincipal, requireEditor, lookupRoles, hasEditorRole,
+  yes, bannerActive, frontpageActive, parseVisning, mapRow
 };

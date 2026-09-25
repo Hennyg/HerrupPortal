@@ -7,7 +7,7 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c30a14">
 <link rel="stylesheet" href="/assets/vendor/quill.snow.css" />
-<link rel="stylesheet" href="/assets/app.css?v=20260925-news" />
+<link rel="stylesheet" href="/assets/app.css?v=20260925-news2" />
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
 </head>
@@ -80,7 +80,10 @@
         </div>
 
         <div class="formRow full">
-          <label for="videourl">Video <span class="muted" style="font-weight:400">– Stream: Del → Integrer → kopiér koden ind her</span></label>
+          <div class="naLabelRow">
+            <label for="videourl">Video <span class="muted" style="font-weight:400">– indsæt integreringskoden fra Stream</span></label>
+            <a href="#" id="videoHelpLink" class="naHelpLink">❓ Sådan får du en video fra din pc ind her</a>
+          </div>
           <textarea id="videourl" class="field" rows="2" placeholder='<iframe src="https://lcherrup-my.sharepoint.com/.../_layouts/15/embed.aspx?UniqueId=..."></iframe>'></textarea>
           <div id="videoPreview" class="naVideoPreview"></div>
         </div>
@@ -125,6 +128,16 @@
             <label><input type="checkbox" id="bannerNavbar"> Under navbaren</label>
           </div>
           <div class="formRow" style="margin-top:10px">
+            <label>Vis for</label>
+            <div class="naRadios">
+              <label><input type="radio" name="bannerVisning" value="mig"> Kun mig</label>
+              <label><input type="radio" name="bannerVisning" value="test"> Testgruppe</label>
+              <label><input type="radio" name="bannerVisning" value="alle" checked> Alle</label>
+            </div>
+            <div class="muted" style="font-size:.8rem">Testgruppe = portal_admin og portal_hp_nyheder. Når en bruger har åbnet nyheden, stopper bjælken for den bruger.</div>
+            <div><button type="button" class="btn" id="resetSeenBtn" style="margin-top:6px">Vis bjælken igen for mig</button></div>
+          </div>
+          <div class="formRow" style="margin-top:10px">
             <label for="bannerSlut">Bjælken slutter</label>
             <input id="bannerSlut" class="field" type="datetime-local" />
             <div class="muted" style="font-size:.8rem">Tom = indtil den slås fra</div>
@@ -144,9 +157,54 @@
   </div>
 </div>
 
+<!-- Vejledning: video fra pc til Stream -->
+<div id="videoHelp" class="naOverlay" hidden>
+  <div class="naModal" role="dialog" aria-modal="true" aria-labelledby="videoHelpTitle">
+    <div class="naModalHeader">
+      <div class="naModalTitle" id="videoHelpTitle">🎬 Sådan får du en video ind i nyheden</div>
+      <button type="button" class="naCloseBtn" id="videoHelpClose" aria-label="Luk">✕</button>
+    </div>
+    <ol class="naSteps">
+      <li>
+        <strong>Upload videoen til OneDrive</strong>
+        Åbn <a href="https://www.office.com/launch/onedrive" target="_blank" rel="noopener">OneDrive</a> i browseren, klik <em>Tilføj nyt → Upload af filer</em>, og vælg videoen på din pc.
+        <div class="naStepTip">En Teams-optagelse ligger allerede i OneDrive under mappen <em>Optagelser</em> – så kan du springe dette trin over.</div>
+      </li>
+      <li>
+        <strong>Åbn videoen</strong>
+        Klik på videoen i OneDrive. Den åbner i Stream.
+      </li>
+      <li>
+        <strong>Klip starten og slutningen (valgfrit)</strong>
+        I Stream kan du trimme videoen, så ventetiden før og efter mødet forsvinder. Du kan også klippe den i Clipchamp, før du uploader.
+      </li>
+      <li>
+        <strong>Del med alle i firmaet</strong>
+        Klik <em>Del</em>, vælg at <em>Personer i Lely Center Herrup</em> kan se videoen, og bekræft.
+        <div class="naStepTip">Uden dette trin kan kollegerne ikke afspille videoen i portalen.</div>
+      </li>
+      <li>
+        <strong>Kopiér integreringskoden</strong>
+        Klik <em>Del → Integrer</em> og derefter <em>Kopiér</em>.
+      </li>
+      <li>
+        <strong>Indsæt koden her</strong>
+        Sæt koden ind i Video-feltet. Videoen vises som forhåndsvisning under feltet, og når du gemmer, kommer den i sin egen tile ved siden af nyheden.
+      </li>
+    </ol>
+    <div class="naStepTip" style="margin-top:12px">
+      Videoen ligger i <strong>din</strong> OneDrive. Slettes din konto, forsvinder videoen også – så gem den gerne et fælles sted, hvis den skal bevares.
+    </div>
+    <div class="naActions" style="border-top:0;padding-top:0">
+      <span class="spacer"></span>
+      <button type="button" class="btn primary" id="videoHelpOk">Forstået</button>
+    </div>
+  </div>
+</div>
+
 <script src="/assets/vendor/quill.js"></script>
 <script src="/assets/newsCommon.js?v=20260925-1"></script>
-<script src="/assets/newsTicker.js?v=20260925-1"></script>
-<script src="/assets/nyheder-admin.js?v=20260925-1"></script>
+<script src="/assets/newsTicker.js?v=20260925-2"></script>
+<script src="/assets/nyheder-admin.js?v=20260925-2"></script>
 </body>
 </html>

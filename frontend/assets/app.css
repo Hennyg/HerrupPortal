@@ -486,3 +486,19 @@ a.btn.primary{color:#fff}
 .naForm textarea.field,.naForm .btn,.naList .btn,.newsToolbar .btn{font:inherit;font-size:.95rem}
 .naMsg{font-size:.88rem}
 .naMsg.ok{color:#047857}.naMsg.err{color:#b91c1c}
+
+/* Label med link til højre + vejlednings-popup */
+.naLabelRow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.naHelpLink{font-size:.85rem;font-weight:600;color:var(--nav-accent);text-decoration:none;white-space:nowrap}
+.naHelpLink:hover{text-decoration:underline}
+.naOverlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300;padding:1rem}
+.naOverlay[hidden]{display:none}
+.naModal{background:#fff;border-radius:12px;width:min(640px,96vw);max-height:90vh;overflow-y:auto;padding:1.25rem 1.5rem 1.25rem;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.naModalHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.naModalTitle{font-weight:700;font-size:1.1rem;color:var(--heading)}
+.naCloseBtn{background:transparent;border:0;cursor:pointer;font-size:1.1rem;color:#6b7280;padding:2px 6px;border-radius:6px}
+.naCloseBtn:hover{background:rgba(0,0,0,.05);color:#111}
+.naSteps{margin:0;padding-left:1.4rem;display:flex;flex-direction:column;gap:12px;line-height:1.5;font-size:.95rem}
+.naSteps li strong{display:block;color:#111;margin-bottom:2px}
+.naSteps a{color:var(--nav-accent)}
+.naStepTip{margin-top:6px;font-size:.85rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:.45rem .6rem}

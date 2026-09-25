@@ -21,6 +21,34 @@
     return lum > 0.6 ? "#111" : "#fff";
   }
 
+  // ── "Set" pr. bruger (i denne browser) ─────────────────────────────────
+  // Når brugeren har åbnet nyheden, vises dens bjælke ikke længere for
+  // brugeren. Ændres nyheden (ny modifiedon), vises bjælken igen.
+  const SEEN_KEY = "herrup-banner-seen";
+  function readSeen() {
+    try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}") || {}; } catch { return {}; }
+  }
+  function writeSeen(map) {
+    // Behold kun de 100 nyeste
+    const entries = Object.entries(map).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)).slice(0, 100);
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(Object.fromEntries(entries))); } catch { /* ignoreres */ }
+  }
+  function markSeen(id, version) {
+    if (!id) return;
+    const map = readSeen();
+    map[id] = { v: version || "", at: Date.now() };
+    writeSeen(map);
+  }
+  function resetSeen(id) {
+    const map = readSeen();
+    delete map[id];
+    writeSeen(map);
+  }
+  function isSeen(b) {
+    const e = readSeen()[b.id];
+    return !!e && e.v === (b.modifiedon || "");
+  }
+
   function segmentHTML(b, withLabel) {
     const text = [b.overskrift, b.indhold].filter(Boolean).join(" – ");
     const label = withLabel ? `<span class="tickerInlineLabel">${esc(b.tekst)}</span>` : "";
@@ -89,7 +117,7 @@
 
   // banners: array fra /api/tips → { id, tekst, farve, tile, navbar, overskrift, indhold, hasBody }
   function render(banners, { tile = true } = {}) {
-    const list = Array.isArray(banners) ? banners.filter(b => b && b.tekst) : [];
+    const list = Array.isArray(banners) ? banners.filter(b => b && b.tekst && !isSeen(b)) : [];
     renderNav(list.filter(b => b.navbar));
     if (tile) renderTile(list.filter(b => b.tile));
   }
@@ -113,5 +141,5 @@
     setSpeed(el);
   }
 
-  window.HerrupTicker = { render, load, preview };
+  window.HerrupTicker = { render, load, preview, markSeen, resetSeen };
 })();

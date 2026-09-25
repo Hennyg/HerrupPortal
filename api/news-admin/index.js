@@ -41,7 +41,7 @@ function cleanHtml(html) {
     .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1="#"');
 }
 
-function buildPayload(b) {
+function buildPayload(b, user) {
   const type = String(b.type || "").toLowerCase();
   if (!(type in N.VALG)) throw bad("Ukendt type");
   const overskrift = String(b.overskrift || "").trim();
@@ -51,6 +51,9 @@ function buildPayload(b) {
 
   const banner = b.banner || {};
   const bannertekst = String(banner.tekst || "").trim().slice(0, 30);
+  const vis = String(banner.visning || "alle").toLowerCase();
+  if (!["mig", "test", "alle"].includes(vis)) throw bad("Ukendt visning for bjælken");
+  const visning = vis === "mig" ? `mig:${String(user?.email || "").toLowerCase()}` : vis;
 
   return {
     [T.valg]: N.VALG[type],
@@ -64,7 +67,8 @@ function buildPayload(b) {
     [T.bannercolor]: normColor(banner.farve),
     [T.bannerTile]: !!(bannertekst && banner.tile),
     [T.bannerNavbar]: !!(bannertekst && banner.navbar),
-    [T.bannerSlut]: normDateTime(banner.slut)
+    [T.bannerSlut]: normDateTime(banner.slut),
+    [T.bannerVisning]: visning
   };
 }
 
@@ -118,7 +122,7 @@ module.exports = async function (context, req) {
     }
 
     if (method === "POST" || method === "PUT" || method === "PATCH") {
-      const payload = buildPayload(req.body || {});
+      const payload = buildPayload(req.body || {}, user);
       let tipId = id;
       if (method === "POST") {
         const res = await N.dv(N.TIP_SET, { method: "POST", body: payload });

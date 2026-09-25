@@ -156,7 +156,8 @@
       farve: $("bannercolor").value.toUpperCase(),
       tile: $("bannerTile").checked,
       navbar: $("bannerNavbar").checked,
-      slut: $("bannerSlut").value ? new Date($("bannerSlut").value).toISOString() : null
+      slut: $("bannerSlut").value ? new Date($("bannerSlut").value).toISOString() : null,
+      visning: document.querySelector('input[name="bannerVisning"]:checked')?.value || "alle"
     };
   }
 
@@ -166,6 +167,7 @@
     const off = !b.tekst;
     $("bannerTile").disabled = off;
     $("bannerNavbar").disabled = off;
+    document.querySelectorAll('input[name="bannerVisning"]').forEach(r => { r.disabled = off; });
     window.HerrupTicker?.preview($("bannerPreview"), b.tekst ? {
       ...b,
       overskrift: $("overskrift").value.trim() || "Overskrift",
@@ -209,6 +211,9 @@
     $("bannerTile").checked = !!it?.banner?.tile;
     $("bannerNavbar").checked = !!it?.banner?.navbar;
     $("bannerSlut").value = toLocalInput(it?.banner?.slut);
+    const vis = it?.banner?.visning || "alle";
+    document.querySelectorAll('input[name="bannerVisning"]').forEach(r => { r.checked = r.value === vis; });
+    $("resetSeenBtn").hidden = !currentId;
 
     $("deleteBtn").hidden = !currentId;
     $("viewBtn").hidden = !currentId;
@@ -244,7 +249,7 @@
           <span class="newsTypeBadge ${esc(it.type)}">${esc(TYPE_LABEL[it.type] || "Nyhed")}</span>
           <span>${esc(fmtDate(it.createdon))}</span>
           ${it.aktiv ? "" : "<span>· Inaktiv</span>"}
-          ${it.banner?.active ? `<span class="naBannerDot">${esc(it.banner.tekst)}</span>` : ""}
+          ${it.banner?.active ? `<span class="naBannerDot">${esc(it.banner.tekst)}${it.banner.visning === "test" ? " · TEST" : (it.banner.visning === "mig" ? " · KUN MIG" : "")}</span>` : ""}
           ${it.videourl ? "<span>🎬</span>" : ""}
         </span>
       </button>`).join("");
@@ -371,6 +376,22 @@
       $(id).addEventListener("input", () => { dirty = true; }));
     ["aktiv", "bannerTile", "bannerNavbar", "bannercolor"].forEach(id =>
       $(id).addEventListener("change", () => { dirty = true; }));
+    document.querySelectorAll('input[name="bannerVisning"]').forEach(r => r.addEventListener("change", () => { dirty = true; }));
+
+    $("resetSeenBtn").addEventListener("click", () => {
+      if (!currentId) return;
+      window.HerrupTicker?.resetSeen(currentId);
+      msg("Bjælken vises igen for dig (hvis den er aktiv)", "ok");
+    });
+
+    // Vejledning til video
+    const openHelp = e => { e?.preventDefault(); $("videoHelp").hidden = false; $("videoHelpOk").focus(); };
+    const closeHelp = () => { $("videoHelp").hidden = true; };
+    $("videoHelpLink").addEventListener("click", openHelp);
+    $("videoHelpClose").addEventListener("click", closeHelp);
+    $("videoHelpOk").addEventListener("click", closeHelp);
+    $("videoHelp").addEventListener("click", e => { if (e.target === $("videoHelp")) closeHelp(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("videoHelp").hidden) closeHelp(); });
 
     $("indhold").addEventListener("input", () => { updateCounter(); updateBannerUI(); });
     $("overskrift").addEventListener("input", updateBannerUI);

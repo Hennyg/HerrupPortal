@@ -26,10 +26,9 @@
 
   async function init() {
     userLine();
-    window.HerrupTicker?.load();
 
     const id = new URLSearchParams(location.search).get("id");
-    if (!id) return showError("Der er ikke valgt en nyhed.");
+    if (!id) { window.HerrupTicker?.load(); return showError("Der er ikke valgt en nyhed."); }
 
     let it;
     try {
@@ -38,8 +37,13 @@
       if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
       it = data.item;
     } catch (e) {
+      window.HerrupTicker?.load();
       return showError(`Kunne ikke hente nyheden: ${e.message}`);
     }
+
+    // Brugeren har nu set nyheden → dens bjælke stopper for brugeren
+    window.HerrupTicker?.markSeen(it.id, it.modifiedon);
+    window.HerrupTicker?.load();
 
     document.title = `${it.overskrift || "Nyhed"} – Herrup Portalen`;
     $("meta").innerHTML = `${typeBadge(it.type)}<span>${esc(fmtDate(it.createdon))}</span>` +
