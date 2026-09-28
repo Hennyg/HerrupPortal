@@ -7,20 +7,20 @@ function formUrlEncoded(obj) {
     .join("&");
 }
 
-// Kundeliste-data ligger i et andet Dataverse-miljø (cr1eb_) end portalen (cr175_),
-// derfor egne KL_DV_* settings. Tenant/klient/secret falder tilbage til portalens DV_*.
+// Kundeliste-data ligger i et andet Dataverse-miljø (cr1eb_) end portalen (cr175_).
+// Samme app registration (DV_*) bruges, kun miljø-URL'en er separat (KL_DV_URL).
 function dvUrl() {
   return String(process.env.KL_DV_URL || "").replace(/\/+$/, "");
 }
 
 async function getToken() {
-  const tenant = process.env.KL_DV_TENANT_ID || process.env.DV_TENANT_ID;
-  const clientId = process.env.KL_DV_CLIENT_ID || process.env.DV_CLIENT_ID;
-  const clientSecret = process.env.KL_DV_CLIENT_SECRET || process.env.DV_CLIENT_SECRET;
+  const tenant = process.env.DV_TENANT_ID;
+  const clientId = process.env.DV_CLIENT_ID;
+  const clientSecret = process.env.DV_CLIENT_SECRET;
   const resource = dvUrl();
 
   if (!tenant || !clientId || !clientSecret || !resource) {
-    throw new Error("Manglende KL_DV_URL, KL_DV_TENANT_ID, KL_DV_CLIENT_ID eller KL_DV_CLIENT_SECRET");
+    throw new Error("Manglende KL_DV_URL, DV_TENANT_ID, DV_CLIENT_ID eller DV_CLIENT_SECRET");
   }
 
   const r = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
@@ -85,5 +85,3 @@ async function fetchAll(path) {
 }
 
 module.exports = { dvFetch, fetchAll };
-
-
