@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Uniconta – Debitorer</title>
+
+  <link rel="stylesheet" href="/assets/kundeliste/app.css" />
+
+  <style>
+    .salesPage {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .salesToolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .salesToolbar input {
+      flex: 1 1 340px;
+      min-width: 240px;
+    }
+
+    .salesTableWrap {
+      overflow: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .salesTable {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+    }
+
+    .salesTable th,
+    .salesTable td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .salesTable th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f7f7f7;
+    }
+
+    .salesTable tbody tr:hover {
+      background: #fafafa;
+    }
+
+    .salesTable th:last-child,
+    .salesTable td:last-child {
+      width: 90px;
+      text-align: right;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .modalBackdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, .45);
+    }
+
+    .modalCard {
+      width: min(760px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      padding: 20px;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+      transition: width .15s ease;
+    }
+
+    .modalCard.modalCard--wide {
+      width: min(1100px, 100%);
+    }
+
+    .modalHead {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .modalHeadActions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .rawDataWrap {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #eee;
+    }
+
+    .rawDataWrap .detailGrid {
+      margin-top: 0;
+    }
+
+    .detailGrid {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 9px 14px;
+      margin-top: 18px;
+    }
+
+    .detailLabel {
+      color: #666;
+      font-weight: 600;
+    }
+
+    @media (max-width: 640px) {
+      .detailGrid {
+        grid-template-columns: 1fr;
+      }
+
+      .detailLabel {
+        margin-top: 8px;
+      }
+
+      .navExtra {
+        display: none !important;
+      }
+    }
+
+    html,
+body {
+  overflow: auto;
+}
+
+.pageWrap {
+  overflow: visible;
+}
+
+.salesPage {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.salesPage .panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.salesTableWrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+}
+  </style>
+</head>
+
+<body>
+  <div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Uniconta debitorer</div>
+    </div>
+    <div class="nav">
+      <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+  <main class="pageWrap">
+    <section class="salesPage">
+      <div class="panel">
+        <div class="panelTitleLine">
+          <div>
+            <h1 style="margin:0 0 4px;">Debitorer</h1>
+            <div class="muted">
+              Debitorer hentet direkte fra Uniconta.
+            </div>
+          </div>
+        </div>
+
+        <div class="salesToolbar">
+          <input
+            id="searchInput"
+            type="search"
+            placeholder="Søg på debitornr., navn, adresse, postnr. eller by…"
+            autocomplete="off"
+          />
+
+          <div class="toolbarSpacer"></div>
+
+          <div id="countText" class="muted small"></div>
+
+          <button id="reloadBtn" class="btn" type="button">
+            Opdater
+          </button>
+        </div>
+
+        <div id="status" class="status loading">
+          <div class="spinner"></div>
+          Henter debitorer…
+        </div>
+
+        <div id="tableWrap" class="salesTableWrap hidden">
+          <table class="salesTable">
+            <thead>
+              <tr>
+                <th>Debitornr.</th>
+                <th>Navn</th>
+                <th>Adresse</th>
+                <th>Postnr.</th>
+                <th>By</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody id="debtorBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div
+    id="detailModal"
+    class="modalBackdrop hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="detailTitle"
+  >
+    <section class="modalCard">
+      <div class="modalHead">
+        <div>
+          <h2 id="detailTitle" style="margin:0;">Debitor</h2>
+          <div id="detailAccount" class="muted"></div>
+        </div>
+
+        <div class="modalHeadActions">
+          <button id="showAllDataBtn" class="btn" type="button">
+            Vis alle data
+          </button>
+
+          <button id="closeModalBtn" class="btn" type="button">
+            Luk
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="detailStatus"
+        class="status loading"
+        style="margin-top:16px;"
+      >
+        <div class="spinner"></div>
+        Henter detaljer…
+      </div>
+
+      <div id="detailGrid" class="detailGrid hidden"></div>
+
+      <div id="rawDataWrap" class="rawDataWrap hidden">
+        <div id="rawDataGrid" class="detailGrid"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/assets/kundeliste/common.js"></script>
+
+  <script>
+    initUser();
+  </script>
+
+  <script src="/assets/kundeliste/unicontadebitor.js"></script>
+</body>
+</html>
+
+
+
