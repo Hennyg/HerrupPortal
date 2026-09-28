@@ -1,0 +1,9 @@
+{
+  "bindings": [
+    { "authLevel": "anonymous", "type": "httpTrigger", "direction": "in", "name": "req", "methods": ["get"], "route": "uniconta/debtors" },
+    { "type": "http", "direction": "out", "name": "res" }
+  ]
+}
+
+
+
