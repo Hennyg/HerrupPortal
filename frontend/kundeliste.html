@@ -24,7 +24,6 @@
     <div class="nav">
       <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
       <span class="sep">|</span>
-      <a href="/">← Til portal</a>
       <a href="/logout">Log ud</a>
     </div>
   </div>
@@ -48,7 +47,6 @@
           <th class="sortable" data-sort="omraade">Område</th>
           <th class="sortable" data-sort="kundestatus">Kundestatus</th>
           <th class="sortable" data-sort="sidstImporteret">Sidst opdateret</th>
-          <th class="sortable" data-sort="aktiv">Aktiv</th>
           <th></th>
         </tr></thead>
         <tbody id="tbody"></tbody>
@@ -143,9 +141,8 @@
         <td>${esc(k.omraade)}</td>
         <td>${esc(k.kundestatus)}</td>
         <td class="small muted">${fmtDateTime(k.sidstImporteret || k.modifiedon)}</td>
-        <td>${k.aktiv ? '<span class="badge ok">Aktiv</span>' : '<span class="badge err">Inaktiv</span>'}</td>
         <td style="white-space:nowrap;"><a class="btn" href="/kundeinfo.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Info</a> <a class="btn" href="/kunde.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Åbn</a></td>
-      </tr>`).join('') || '<tr><td colspan="7" class="muted">Ingen kunder</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="6" class="muted">Ingen kunder</td></tr>';
     }
     load().catch(e => setStatus('error', e.message));
   </script>
