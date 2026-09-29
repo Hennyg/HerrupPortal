@@ -21,7 +21,7 @@
   <div class="navbar-inner">
     <div class="brand">
       <div class="logo" aria-label="Herrup Portal"></div>
-      <div>Kundedetalje</div>
+      <div id="brandTitle">Kundedetalje</div>
     </div>
     <div class="nav">
       <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
@@ -77,7 +77,7 @@ function render(){
  const k=state.kunde, adresser=state.adresser, produkter=state.produkter;
  const visibleProducts = selectedProducts();
  const activeVisible = visibleProducts.filter(p=>p.aktiv).length;
- document.querySelector('.appSubTitle').textContent = `${k.kundenr} · ${k.navn}`;
+ document.getElementById('brandTitle').textContent = `${k.navn} (${k.kundenr})`; document.title = `Kunde – ${k.navn}`;
  document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresser.length}</div></div><div class="card"><div class="label">Produkter</div><div class="value">${visibleProducts.filter(p=>p.aktiv).length}</div></div><div class="card"><div class="label">Område</div><div class="value">${esc(k.omraade)}</div></div>`;
  document.getElementById('kundeInfo').innerHTML = `<p><b>${esc(k.navn)}</b></p><p>Kundestatus: ${esc(k.kundestatus)}</p><p>Aktiv: ${k.aktiv?'Ja':'Nej'}</p><p>Sidst opdateret: ${fmtDateTime(k.sidstImporteret || k.modifiedon)}</p>`;
  document.getElementById('adresseInfo').innerHTML = renderAdresser(adresser);
@@ -115,6 +115,3 @@ load();
 </script>
 </body>
 </html>
-
-
-
