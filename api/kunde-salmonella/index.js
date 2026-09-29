@@ -15,6 +15,7 @@ const FIELDS = [
   "cr406_uisygdomsniveautekst", "cr406_sdudatoveterinrstatus",
   "cr406_ejendomadresse", "cr406_ejendompostnr", "cr406_ejendomby",
   "cr406_brugeradresse", "cr406_brugerpostnummer", "cr406_brugerbynavn",
+  "cr406_kreaturerialt", "cr406_kvier", "cr406_ker",
   "modifiedon",
   "cr406_bludatoveterinrstatus", "cr406_blusygdomstekst", "cr406_bluveterinrstatustekst",
   "cr406_bstdatoveterinrstatus", "cr406_bstsygdomstekst", "cr406_bstveterinrstatustekst",
@@ -85,6 +86,9 @@ function mapRow(r) {
     by: r.cr406_ejendomby || r.cr406_brugerbynavn || "",
     salmonellaStatus: r.cr406_uisygdomsniveautekst || "",
     salmonellaDato: r.cr406_sdudatoveterinrstatus || "",
+    kreaturerIAlt: r.cr406_kreaturerialt ?? null,
+    kvier: r.cr406_kvier ?? null,
+    koeer: r.cr406_ker ?? null,
     sygdomme,
     modifiedOn: r.modifiedon || null
   };
