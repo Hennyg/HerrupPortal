@@ -144,6 +144,17 @@
     return `<div class="herdCount"><div class="muted small">${esc(label)}</div><div class="herdCountValue">${esc(v)}</div></div>`;
   }
 
+  function dyrHtml(list) {
+    const multi = list.length > 1;
+    return list.map(h => `
+      ${multi ? `<div class="muted small" style="margin:6px 0 4px;">CHR ${esc(h.chr)}</div>` : ""}
+      <div class="herdCounts">
+        ${countBox("Kreaturer i alt", h.kreaturerIAlt)}
+        ${countBox("Køer", h.koeer)}
+        ${countBox("Kvier", h.kvier)}
+      </div>`).join("");
+  }
+
   function herdHtml(h) {
     const adr = [h.adresse, [h.postnr, h.by].filter(Boolean).join(" ")].filter(Boolean).join(", ");
     const sygdomme = h.sygdomme || [];
@@ -159,11 +170,6 @@
             ${salBadge(h.salmonellaStatus)}
             ${h.salmonellaDato ? `<div class="muted small" style="margin-top:4px;">${fmtDate(h.salmonellaDato)}</div>` : ""}
           </div>
-        </div>
-        <div class="herdCounts">
-          ${countBox("Kreaturer i alt", h.kreaturerIAlt)}
-          ${countBox("Køer", h.koeer)}
-          ${countBox("Kvier", h.kvier)}
         </div>
         ${sygdomme.length ? `
           <div style="overflow-x:auto;">
@@ -185,16 +191,27 @@
 
   async function loadSalmonella(chr) {
     const value = String(chr || "").trim();
-    if (!value) { setStatus("salmonellaStatus", "Kunden har intet CHR-nummer i kundelisten."); return false; }
+    if (!value) {
+      setStatus("dyrStatus", "Kunden har intet CHR-nummer i kundelisten.");
+      setStatus("salmonellaStatus", "Kunden har intet CHR-nummer i kundelisten.");
+      return false;
+    }
+    setStatus("dyrStatus", `Henter antal dyr for CHR ${value}…`);
     setStatus("salmonellaStatus", `Henter besætningsdata for CHR ${value}…`);
 
     try {
       const data = await fetchJson(`/api/kunde-salmonella?chr=${encodeURIComponent(value)}`);
       const list = Array.isArray(data?.besaetninger) ? data.besaetninger : [];
-      if (!list.length) { setStatus("salmonellaStatus", `Ingen besætningsdata fundet for CHR ${value}.`); return false; }
+      if (!list.length) {
+        setStatus("dyrStatus", `Ingen besætningsdata fundet for CHR ${value}.`);
+        setStatus("salmonellaStatus", `Ingen besætningsdata fundet for CHR ${value}.`);
+        return false;
+      }
+      show("dyrStatus", "dyrData", dyrHtml(list));
       show("salmonellaStatus", "salmonellaData", `<div class="herdList">${list.map(herdHtml).join("")}</div>`);
       return true;
     } catch (e) {
+      setStatus("dyrStatus", `Kunne ikke hente antal dyr: ${e.message}`);
       setStatus("salmonellaStatus", `Kunne ikke hente salmonelladata: ${e.message}`);
       return false;
     }

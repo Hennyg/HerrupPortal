@@ -31,9 +31,9 @@
 .herdTitle { font-weight:700; font-size:16px; }
 .herdSal { text-align:right; }
 .herdSal .badge { font-size:13px; padding:4px 10px; }
-.herdCounts { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
-.herdCount { min-width:120px; padding:8px 12px; border:1px solid #e2e2e2; border-radius:8px; background:#fff; }
-.herdCountValue { font-size:18px; font-weight:700; }
+.herdCounts { display:flex; gap:12px; flex-wrap:wrap; }
+.herdCount { min-width:150px; padding:10px 14px; border:1px solid #e2e2e2; border-radius:10px; background:#fafafa; }
+.herdCountValue { font-size:22px; font-weight:700; }
 .herdTable { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
 .herdTable th, .herdTable td { text-align:left; padding:6px 8px; border-bottom:1px solid #eee; vertical-align:top; }
 .herdTable th { color:#666; font-weight:600; background:#f9fafb; }
