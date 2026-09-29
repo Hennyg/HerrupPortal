@@ -6,7 +6,7 @@
   <title>Kundeinfo</title>
   <link rel="icon" href="/assets/favicon-32x32.png" />
   <link rel="stylesheet" href="/assets/kundeliste/app.css" />
-  <link rel="stylesheet" href="/assets/kundeliste/kundeinfo.css?v=20260929" />
+  <link rel="stylesheet" href="/assets/kundeliste/kundeinfo.css?v=20260929b" />
 </head>
 <body>
 <div class="navbar">
@@ -45,6 +45,12 @@
     </section>
 
     <section class="card infoCard">
+      <h2>Antal dyr</h2>
+      <div id="dyrStatus" class="muted">Venter på CHR-nummer fra kundelisten…</div>
+      <div id="dyrData" class="hidden"></div>
+    </section>
+
+    <section class="card infoCard">
       <h2>Salmonella / sundhedsstatus</h2>
       <div id="salmonellaStatus" class="muted">Venter på CHR-nummer fra kundelisten…</div>
       <div id="salmonellaData" class="hidden"></div>
@@ -67,6 +73,6 @@
 </main>
 
 <script src="/assets/kundeliste/common.js"></script>
-<script src="/assets/kundeliste/kundeinfo.js?v=20260929"></script>
+<script src="/assets/kundeliste/kundeinfo.js?v=20260929b"></script>
 </body>
 </html>
