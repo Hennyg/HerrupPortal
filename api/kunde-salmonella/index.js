@@ -61,8 +61,9 @@ async function getToken(resource) {
 function parseChrList(value) {
   return [...new Set(
     String(value || "")
-      .split(/[^0-9]+/)
-      .map(s => s.trim())
+      .split(/[,;/\s]+/)                 // flere CHR-numre adskilt af , ; / eller mellemrum
+      .map(s => s.split("-")[0])          // "54028-53864" = CHR-besætningsnr. -> kun CHR
+      .map(s => s.replace(/[^0-9]/g, ""))
       .filter(Boolean)
   )].slice(0, 25);
 }
