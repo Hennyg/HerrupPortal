@@ -15,21 +15,21 @@
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-left">
-      <img src="/assets/favicon-32x32.png" class="logo" alt="" onerror="this.style.display='none'" />
-      <div class="titleBlock"><div class="appTitle">Kundeliste</div><div class="appSubTitle">Dataverse</div></div>
+  <div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Kundeliste</div>
     </div>
-<div class="topbar-right">
-    <span id="userDisplay"></span>
-
-    <a href="/">Portal</a>
-    <a class="navExtra" href="/kundeliste.html">Kunder</a>
-    <a class="navExtra" href="/unicontadebitor.html">Uniconta</a>
-
-    <a class="navExtra" href="/.auth/logout?post_logout_redirect_uri=/">Log ud</a>
+    <div class="nav">
+      <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
 </div>
-  </header>
   <main class="pageWrap">
     <section class="toolbar">
       <input id="q" type="search" placeholder="Søg kundenr, navn, område, status..." style="min-width:320px" autocomplete="off" />
@@ -144,7 +144,7 @@
         <td>${esc(k.kundestatus)}</td>
         <td class="small muted">${fmtDateTime(k.sidstImporteret || k.modifiedon)}</td>
         <td>${k.aktiv ? '<span class="badge ok">Aktiv</span>' : '<span class="badge err">Inaktiv</span>'}</td>
-        <td><a class="btn" href="/kunde.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Åbn</a></td>
+        <td style="white-space:nowrap;"><a class="btn" href="/kundeinfo.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Info</a> <a class="btn" href="/kunde.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Åbn</a></td>
       </tr>`).join('') || '<tr><td colspan="7" class="muted">Ingen kunder</td></tr>';
     }
     load().catch(e => setStatus('error', e.message));

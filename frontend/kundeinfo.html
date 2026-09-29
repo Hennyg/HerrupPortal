@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kundeinfo</title>
+  <link rel="icon" href="/assets/favicon-32x32.png" />
+  <link rel="stylesheet" href="/assets/kundeliste/app.css" />
+  <link rel="stylesheet" href="/assets/kundeliste/kundeinfo.css" />
+</head>
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Kundeinfo</div>
+    </div>
+    <div class="nav">
+      <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<main class="pageWrap">
+  <section class="infoScroll">
+    <div class="infoHead">
+      <a id="btnBack" class="btn" href="/kundeliste.html">← Tilbage til kundeliste</a>
+      <h1 id="infoTitle">Kundeinfo</h1>
+      <a id="btnOpen" class="btn" href="#">Åbn kundedetalje</a>
+    </div>
+
+    <section class="card infoCard">
+      <h2>Uniconta Debitor data</h2>
+      <div id="unicontaStatus" class="muted">Henter debitoroplysninger…</div>
+      <div id="unicontaData" class="hidden"></div>
+    </section>
+
+    <section class="card infoCard">
+      <h2>Kundeliste</h2>
+      <div id="kundelisteStatus" class="muted">Henter kundedata…</div>
+      <div id="kundelisteData" class="hidden"></div>
+    </section>
+
+    <section class="card infoCard">
+      <h2>Salmonella / sundhedsstatus</h2>
+      <div id="salmonellaStatus" class="muted">Venter på CHR-nummer fra kundelisten…</div>
+      <div id="salmonellaData" class="hidden"></div>
+    </section>
+
+    <div class="infoTwoCol">
+      <section class="card infoCard">
+        <h2>Ejere</h2>
+        <div id="entraOwnersStatus" class="muted">Henter ejere fra Entra ID…</div>
+        <div id="entraOwnersList" class="contactList hidden"></div>
+      </section>
+
+      <section class="card infoCard">
+        <h2>Medarbejdere</h2>
+        <div id="entraEmployeesStatus" class="muted">Henter medarbejdere fra Entra ID…</div>
+        <div id="entraEmployeesList" class="contactList hidden"></div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<script src="/assets/kundeliste/common.js"></script>
+<script src="/assets/kundeliste/kundeinfo.js"></script>
+</body>
+</html>

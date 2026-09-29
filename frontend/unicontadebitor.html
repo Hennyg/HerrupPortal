@@ -183,31 +183,21 @@ body {
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="topbar-left">
-      <img
-        src="/assets/favicon-32x32.png"
-        class="logo"
-        alt=""
-        onerror="this.style.display='none'"
-      />
-
-      <div class="titleBlock">
-        <div class="appTitle">Herrup apps</div>
-        <div class="appSubTitle">Uniconta debitorer</div>
-      </div>
+  <div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Uniconta debitorer</div>
     </div>
-
-    <div class="topbar-right">
-      <span id="userDisplay"></span>
-
-    <a href="/">Portal</a>
-    <a class="navExtra" href="/kundeliste.html">Kunder</a>
-    <a class="navExtra" href="/unicontadebitor.html">Uniconta</a>
-
-    <a class="navExtra" href="/.auth/logout?post_logout_redirect_uri=/">Log ud</a>
+    <div class="nav">
+      <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
 </div>
-  </header>
 
   <main class="pageWrap">
     <section class="salesPage">

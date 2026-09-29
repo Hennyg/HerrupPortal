@@ -60,3 +60,16 @@ tbody tr:hover {
 
 
 
+
+
+/* ---- Portal-navbar (samme udseende som resten af HerrupPortalen) ---- */
+.navbar{flex:0 0 auto;background:#850c18;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif;line-height:1.4}
+.navbar .navbar-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;gap:1rem}
+.navbar .brand{display:flex;align-items:center;gap:12px;font-size:1.35rem;font-weight:600;letter-spacing:.2px;white-space:nowrap}
+.navbar .brand .logo{width:52px;height:52px;border-radius:999px;background:url("/icons/icon-192.png") center/cover no-repeat;display:block;flex:0 0 auto;box-shadow:0 1px 6px rgba(0,0,0,.18)}
+.navbar .nav{display:flex;gap:1.25rem;align-items:center;font-size:1rem;flex-wrap:wrap;justify-content:flex-end}
+.navbar .nav a{color:#fff;text-decoration:none;opacity:.95}
+.navbar .nav .sep{opacity:.4;user-select:none}
+.navbar .nav a:hover{opacity:1;text-decoration:underline}
+.nav-accent{flex:0 0 auto;height:10px;background:#1f6c7a}
+@media (max-width:520px){ .navbar .brand{font-size:1.1rem} }

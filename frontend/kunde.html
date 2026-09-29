@@ -17,7 +17,21 @@
   </style>
 </head>
 <body>
-<header class="topbar"><div class="topbar-left"><img src="/assets/favicon-32x32.png" class="logo" alt="" onerror="this.style.display='none'"/><div class="titleBlock"><div class="appTitle">Kundeliste</div><div class="appSubTitle">Kundedetalje</div></div></div><div class="topbar-right"><span id="userDisplay"></span><a href="/">Portal</a><a href="/kundeliste.html">Kunder</a><a href="/unicontadebitor.html">Uniconta</a><a href="/.auth/logout?post_logout_redirect_uri=/">Log ud</a></div></header>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Kundedetalje</div>
+    </div>
+    <div class="nav">
+      <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/">← Til portal</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
 <main class="pageWrap">
   <div id="status" class="status loading"><div class="spinner"></div> Henter kunde...</div>
   <section id="content" style="display:none; overflow:auto;">
