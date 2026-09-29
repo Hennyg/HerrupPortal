@@ -1,0 +1,46 @@
+/* Kundeinfo – samme visning som Kundeinfo-appens admincreate.html */
+.hidden { display:none !important; }
+.infoScroll { flex:1; overflow:auto; }
+.infoHead { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.infoHead h1 { flex:1; margin:0; font-size:20px; }
+.infoCard { margin-bottom:12px; }
+.infoCard h2 { margin:0 0 12px 0; font-size:18px; }
+.infoTwoCol { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; }
+
+.debtorColumns { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:20px; }
+.debtorGrid { display:grid; grid-template-columns:130px minmax(0,1fr); gap:9px 12px; align-content:start; }
+.debtorLabel { color:#666; font-weight:600; }
+.debtorValue { min-width:0; overflow-wrap:anywhere; }
+
+.kundeAdresseList { display:grid; gap:8px; }
+.kundeAdresseItem { padding:8px 10px; border:1px solid #e2e2e2; border-radius:8px; background:#fafafa; }
+.kundeAdresseLine { font-weight:600; }
+.kundeAdresseProdukter { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.produktPill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef0f2; color:#333; font-size:12px; }
+
+.contactList { display:grid; gap:10px; }
+.contactItem { padding:12px 14px; border:1px solid #e2e2e2; border-radius:10px; background:#fafafa; }
+.contactName { margin-bottom:6px; font-weight:700; font-size:16px; }
+.contactDetails { display:grid; grid-template-columns:120px minmax(0,1fr); gap:5px 12px; }
+.contactLabel { color:#666; font-weight:600; }
+.contactValue { min-width:0; overflow-wrap:anywhere; }
+
+.herdList { display:grid; gap:12px; }
+.herdItem { padding:12px 14px; border:1px solid #e2e2e2; border-radius:10px; background:#fafafa; }
+.herdHead { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+.herdTitle { font-weight:700; font-size:16px; }
+.herdSal { text-align:right; }
+.herdSal .badge { font-size:13px; padding:4px 10px; }
+.herdCounts { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+.herdCount { min-width:120px; padding:8px 12px; border:1px solid #e2e2e2; border-radius:8px; background:#fff; }
+.herdCountValue { font-size:18px; font-weight:700; }
+.herdTable { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+.herdTable th, .herdTable td { text-align:left; padding:6px 8px; border-bottom:1px solid #eee; vertical-align:top; }
+.herdTable th { color:#666; font-weight:600; background:#f9fafb; }
+
+@media (max-width: 900px) {
+  .debtorColumns, .infoTwoCol { grid-template-columns:1fr; }
+}
+@media (max-width: 700px) {
+  .debtorGrid, .contactDetails { grid-template-columns:1fr; gap:2px; }
+}
