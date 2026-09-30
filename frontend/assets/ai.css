@@ -95,3 +95,28 @@
   .aiOptionButtons { gap:.45rem; }
   .aiOptionButton { padding:.55rem .78rem; font-size:.92rem; }
 }
+
+
+/* Dokumenter og lydfiler */
+.aiUploadInfo { margin-top:.45rem; font-size:.88rem; }
+.aiAttachmentList { display:grid; gap:.5rem; margin-top:.75rem; }
+.aiAttachmentList:empty { display:none; }
+.aiAttachment { border:1px solid #e5e7eb; border-radius:10px; background:#fafafa; padding:.6rem .8rem; }
+.aiAttachment.is-error { border-color:#f2b8b5; background:#fff5f5; }
+.aiAttachmentHead { display:flex; align-items:center; gap:.6rem; }
+.aiAttachmentIcon { font-size:1.15rem; flex:0 0 auto; }
+.aiAttachmentMain { flex:1; min-width:0; }
+.aiAttachmentName { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.aiAttachmentMeta { font-size:.85rem; color:#6b7280; }
+.aiAttachment.is-error .aiAttachmentMeta { color:#b42318; }
+.aiAttachmentRemove { appearance:none; border:0; width:28px; height:28px; border-radius:999px; background:#e5e7eb; color:#374151; cursor:pointer; flex:0 0 auto; font-size:1rem; }
+.aiAttachmentRemove:hover { background:#d1d5db; }
+.aiProgress { height:6px; border-radius:999px; background:#e5e7eb; overflow:hidden; margin-top:.4rem; }
+.aiProgress > div { height:100%; background:var(--nav-accent); width:0; transition:width .3s ease; }
+.aiAttachment details { margin-top:.45rem; }
+.aiAttachment summary { cursor:pointer; font-size:.85rem; color:#374151; }
+.aiAttachmentText { white-space:pre-wrap; max-height:220px; overflow:auto; margin-top:.4rem; padding:.55rem .7rem; border-radius:8px; background:#fff; border:1px solid #e5e7eb; font-size:.85rem; line-height:1.45; }
+.aiOriginalFiles, .aiMessageFiles { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.6rem; }
+.aiOriginalFiles:empty, .aiMessageFiles:empty { display:none; }
+.aiMessageFiles { justify-content:flex-end; margin-top:0; }
+.aiFileChip { display:inline-block; padding:.28rem .6rem; border-radius:999px; background:#eef2f4; color:#374151; font-size:.84rem; }

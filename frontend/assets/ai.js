@@ -22,6 +22,10 @@
   const originalOptionsEl = document.getElementById("aiOriginalOptions");
   const originalTextEl = document.getElementById("aiOriginalText");
   const originalImagesEl = document.getElementById("aiOriginalImages");
+  const originalFilesEl = document.getElementById("aiOriginalFiles");
+  const docInput = document.getElementById("aiDocs");
+  const audioInput = document.getElementById("aiAudio");
+  const attachmentList = document.getElementById("aiAttachmentList");
 
   const MAX_IMAGES = 3;
   const MAX_FILE_BYTES = 4 * 1024 * 1024;
@@ -53,6 +57,13 @@
     ],
     explain: [
       { key: "level", label: "Detaljeniveau", default: "normal", values: [["simple", "Helt enkelt"], ["normal", "Normal"], ["technical", "Teknisk"]] }
+    ],
+    referat: [
+      { key: "type", label: "Type", default: "meeting", values: [["meeting", "Mødereferat"], ["decisions", "Beslutningsreferat"], ["visit", "Kundebesøg / samtale"], ["brief", "Kort resumé"]] },
+      { key: "detail", label: "Detaljeniveau", default: "normal", values: [["short", "Kort"], ["normal", "Normal"], ["detailed", "Udførligt"]] },
+      { key: "format", label: "Form", default: "bullets", values: [["bullets", "Punktform"], ["prose", "Løbende tekst"]] },
+      { key: "actions", label: "Handlingspunkter", default: "yes", values: [["yes", "Med opfølgning"], ["no", "Uden"]] },
+      { key: "language", label: "Sprog", default: "da", values: [["da", "Dansk"], ["en", "Engelsk"]] }
     ],
     bullets: [
       { key: "detail", label: "Detaljer", default: "short", values: [["short", "Kort"], ["detailed", "Detaljeret"]] },
@@ -192,6 +203,508 @@
     });
   }
 
+  /* ================= Dokumenter og lydfiler ================= */
+
+  const MAX_ATTACHMENTS = 8;
+  const MAX_TEXT_PER_ATTACHMENT = 400000;
+  const MAX_BINARY_BYTES = 10 * 1024 * 1024;       // PDF og andre filer der sendes som fil
+  const AUDIO_DIRECT_BYTES = 8 * 1024 * 1024;      // mindre lydfiler sendes som de er
+  const AUDIO_DIRECT_EXT = ["mp3", "m4a", "wav", "webm", "ogg", "oga", "flac", "mp4", "mpeg", "mpga"];
+  const AUDIO_EXT = [...AUDIO_DIRECT_EXT, "wma", "aac", "opus", "mov", "m4v", "3gp", "amr", "aiff", "aif"];
+  const CHUNK_SECONDS = 150;                       // ca. 2,5 min pr. del (~4,8 MB som 16 kHz WAV)
+  const TRANSCRIBE_CONCURRENCY = 3;
+  const TEXT_EXT = ["txt", "csv", "tsv", "md", "json", "xml", "html", "htm", "log", "eml", "vtt", "srt",
+    "js", "ts", "css", "sql", "ps1", "psm1", "sh", "bat", "cmd", "py", "cs", "java", "yml", "yaml", "ini", "cfg", "conf", "rtf"];
+
+  const LIBS = {
+    mammoth: "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js",
+    xlsx: "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+    jszip: "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
+  };
+  const loadedLibs = {};
+
+  let attachments = [];
+  let attachmentSeq = 0;
+
+  function loadScript(url) {
+    if (!loadedLibs[url]) {
+      loadedLibs[url] = new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = url;
+        s.onload = resolve;
+        s.onerror = () => { delete loadedLibs[url]; reject(new Error("Kunne ikke indlæse hjælpebibliotek")); };
+        document.head.appendChild(s);
+      });
+    }
+    return loadedLibs[url];
+  }
+
+  function fileExt(name) {
+    const m = /\.([a-z0-9]+)$/i.exec(String(name || ""));
+    return m ? m[1].toLowerCase() : "";
+  }
+
+  function formatBytes(bytes) {
+    if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+    if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  function formatDuration(sec) {
+    const s = Math.round(sec);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h ? `${h} t ${m} min` : `${m} min ${s % 60} sek`;
+  }
+
+  function isAudioFile(file) {
+    return file.type.startsWith("audio/") || file.type.startsWith("video/") || AUDIO_EXT.includes(fileExt(file.name));
+  }
+
+  function isProcessing() {
+    return attachments.some(a => a.status === "processing");
+  }
+
+  function updateSendState() {
+    if (sendBtn.dataset.busy === "1") return;
+    sendBtn.disabled = isProcessing();
+  }
+
+  function renderAttachments() {
+    attachmentList.innerHTML = "";
+
+    attachments.forEach(att => {
+      const item = document.createElement("div");
+      item.className = "aiAttachment" + (att.status === "error" ? " is-error" : "");
+
+      const head = document.createElement("div");
+      head.className = "aiAttachmentHead";
+
+      const icon = document.createElement("div");
+      icon.className = "aiAttachmentIcon";
+      icon.textContent = att.source === "audio" ? "🎙️" : "📄";
+
+      const main = document.createElement("div");
+      main.className = "aiAttachmentMain";
+      const name = document.createElement("div");
+      name.className = "aiAttachmentName";
+      name.textContent = att.name;
+      name.title = att.name;
+      const meta = document.createElement("div");
+      meta.className = "aiAttachmentMeta";
+      if (att.status === "processing" && att.statusText) {
+        meta.innerHTML = `<span class="aiSpinner"></span>`;
+        meta.appendChild(document.createTextNode(att.statusText));
+      } else {
+        meta.textContent = att.statusText || formatBytes(att.size);
+      }
+      main.append(name, meta);
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "aiAttachmentRemove";
+      remove.textContent = "×";
+      remove.title = att.status === "processing" ? "Stop og fjern" : "Fjern fil";
+      remove.addEventListener("click", () => {
+        att.cancelled = true;
+        attachments = attachments.filter(x => x !== att);
+        renderAttachments();
+      });
+
+      head.append(icon, main, remove);
+      item.appendChild(head);
+
+      if (att.status === "processing" && typeof att.progress === "number") {
+        const bar = document.createElement("div");
+        bar.className = "aiProgress";
+        const fill = document.createElement("div");
+        fill.style.width = `${Math.round(att.progress * 100)}%`;
+        bar.appendChild(fill);
+        item.appendChild(bar);
+      }
+
+      if (att.status === "ready" && att.kind === "text" && att.text) {
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = att.source === "audio" ? "Vis transskription" : "Vis udtrukket tekst";
+        const pre = document.createElement("div");
+        pre.className = "aiAttachmentText";
+        pre.textContent = att.text.length > 20000 ? att.text.slice(0, 20000) + "\n…" : att.text;
+        details.append(summary, pre);
+
+        if (att.source === "audio") {
+          const copy = document.createElement("button");
+          copy.type = "button";
+          copy.className = "aiCopyMessage";
+          copy.style.marginTop = ".35rem";
+          copy.textContent = "Kopiér transskription";
+          copy.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(att.text);
+              copy.textContent = "Kopieret ✓";
+              setTimeout(() => copy.textContent = "Kopiér transskription", 1400);
+            } catch { setStatus("Kunne ikke kopiere automatisk."); }
+          });
+          details.appendChild(copy);
+        }
+        item.appendChild(details);
+      }
+
+      attachmentList.appendChild(item);
+    });
+
+    updateSendState();
+  }
+
+  function updateAttachment(att, patch) {
+    Object.assign(att, patch);
+    if (attachments.includes(att)) renderAttachments();
+  }
+
+  function limitText(text) {
+    const t = String(text || "").replace(/\u0000/g, "").trim();
+    return t.length > MAX_TEXT_PER_ATTACHMENT
+      ? t.slice(0, MAX_TEXT_PER_ATTACHMENT) + "\n\n[Teksten er afkortet – filen var for lang]"
+      : t;
+  }
+
+  /* ---------- Dokumenter ---------- */
+
+  async function extractDocx(file) {
+    await loadScript(LIBS.mammoth);
+    const result = await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    return result.value || "";
+  }
+
+  async function extractSpreadsheet(file) {
+    await loadScript(LIBS.xlsx);
+    const wb = window.XLSX.read(await file.arrayBuffer(), { type: "array" });
+    return wb.SheetNames.map(name => {
+      const csv = window.XLSX.utils.sheet_to_csv(wb.Sheets[name], { blankrows: false });
+      return `### Ark: ${name}\n${csv}`;
+    }).join("\n\n");
+  }
+
+  async function extractPptx(file) {
+    await loadScript(LIBS.jszip);
+    const zip = await window.JSZip.loadAsync(await file.arrayBuffer());
+    const num = p => Number((/(\d+)\.xml$/.exec(p) || [])[1] || 0);
+    const slides = Object.keys(zip.files).filter(p => /^ppt\/slides\/slide\d+\.xml$/.test(p)).sort((a, b) => num(a) - num(b));
+    const parser = new DOMParser();
+
+    const textOf = xml => {
+      const doc = parser.parseFromString(xml, "application/xml");
+      return Array.from(doc.getElementsByTagName("a:p"))
+        .map(p => Array.from(p.getElementsByTagName("a:t")).map(t => t.textContent).join(""))
+        .filter(line => line.trim())
+        .join("\n");
+    };
+
+    const out = [];
+    for (const path of slides) {
+      const n = num(path);
+      const slideText = textOf(await zip.file(path).async("string"));
+      const notesFile = zip.file(`ppt/notesSlides/notesSlide${n}.xml`);
+      const notes = notesFile ? textOf(await notesFile.async("string")).replace(/^\d+$/gm, "").trim() : "";
+      out.push(`### Slide ${n}\n${slideText}${notes ? `\n[Noter]\n${notes}` : ""}`);
+    }
+    return out.join("\n\n");
+  }
+
+  async function processDocument(att, file) {
+    const ext = fileExt(file.name);
+
+    try {
+      let text = null;
+
+      if (file.type.startsWith("text/") || TEXT_EXT.includes(ext)) {
+        text = await file.text();
+      } else if (ext === "docx" || ext === "docm") {
+        updateAttachment(att, { statusText: "Læser Word-dokument …" });
+        text = await extractDocx(file);
+      } else if (["xlsx", "xlsm", "xls", "xlsb", "ods"].includes(ext)) {
+        updateAttachment(att, { statusText: "Læser regneark …" });
+        text = await extractSpreadsheet(file);
+      } else if (ext === "pptx" || ext === "pptm") {
+        updateAttachment(att, { statusText: "Læser PowerPoint …" });
+        text = await extractPptx(file);
+      }
+
+      if (text !== null) {
+        const clean = limitText(text);
+        if (!clean) throw new Error("Der blev ikke fundet nogen tekst i filen.");
+        updateAttachment(att, {
+          status: "ready", kind: "text", text: clean,
+          statusText: `${formatBytes(file.size)} · ${clean.length.toLocaleString("da-DK")} tegn tekst`
+        });
+        return;
+      }
+
+      // PDF og alle andre typer sendes som fil direkte til AI.
+      if (file.size > MAX_BINARY_BYTES) {
+        throw new Error(`Filen er ${formatBytes(file.size)} – maks. 10 MB for denne filtype.`);
+      }
+      const data = await fileToDataUrl(file);
+      const mime = file.type || "application/octet-stream";
+      const fixed = data.startsWith("data:;") ? data.replace("data:;", `data:${mime};`) : data;
+      updateAttachment(att, {
+        status: "ready", kind: "file", data: fixed, mime,
+        statusText: ext === "pdf" ? `${formatBytes(file.size)} · PDF` : `${formatBytes(file.size)} · sendes som fil`
+      });
+    } catch (err) {
+      console.error("Dokument fejl:", err);
+      updateAttachment(att, { status: "error", statusText: err.message || String(err) });
+    }
+  }
+
+  /* ---------- Lydfiler ---------- */
+
+  function encodeWav(samples, sampleRate) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+
+    writeStr(0, "RIFF");
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeStr(8, "WAVE");
+    writeStr(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);          // PCM
+    view.setUint16(22, 1, true);          // mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, "data");
+    view.setUint32(40, samples.length * 2, true);
+
+    let o = 44;
+    for (let i = 0; i < samples.length; i++, o += 2) {
+      const v = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(o, v < 0 ? v * 0x8000 : v * 0x7fff, true);
+    }
+    return new Blob([buffer], { type: "audio/wav" });
+  }
+
+  async function decodeToMono16k(file) {
+    const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!AC) throw new Error("Browseren kan ikke afkode lyd. Brug Chrome eller Edge.");
+
+    const ctx = new AC(1, 16000, 16000);
+    const input = await file.arrayBuffer();
+    let audio;
+    try {
+      audio = await ctx.decodeAudioData(input);
+    } catch {
+      throw new Error("Lydformatet kunne ikke afkodes i browseren. Konverter filen til mp3 eller m4a og prøv igen.");
+    }
+
+    const len = audio.length;
+    const mono = new Float32Array(len);
+    for (let c = 0; c < audio.numberOfChannels; c++) {
+      const ch = audio.getChannelData(c);
+      for (let i = 0; i < len; i++) mono[i] += ch[i];
+    }
+    if (audio.numberOfChannels > 1) {
+      const f = 1 / audio.numberOfChannels;
+      for (let i = 0; i < len; i++) mono[i] *= f;
+    }
+    return { samples: mono, sampleRate: audio.sampleRate, duration: audio.duration };
+  }
+
+  // Deler lyden i stykker af ca. CHUNK_SECONDS og klipper i det mest stille sted
+  // inden for de sidste 12 sekunder, så sætninger så vidt muligt ikke skæres over.
+  function splitSamples(samples, sampleRate) {
+    const target = CHUNK_SECONDS * sampleRate;
+    const search = 12 * sampleRate;
+    const frame = Math.round(0.1 * sampleRate);
+    const parts = [];
+    let start = 0;
+
+    while (start < samples.length) {
+      if (samples.length - start <= target + search) {
+        parts.push([start, samples.length]);
+        break;
+      }
+      let bestEnd = start + target;
+      let bestEnergy = Infinity;
+      for (let pos = start + target - search; pos + frame <= start + target; pos += frame) {
+        let e = 0;
+        for (let i = pos; i < pos + frame; i++) e += samples[i] * samples[i];
+        if (e < bestEnergy) { bestEnergy = e; bestEnd = pos + Math.round(frame / 2); }
+      }
+      parts.push([start, bestEnd]);
+      start = bestEnd;
+    }
+    return parts;
+  }
+
+  async function transcribeBlob(blob, name, mime) {
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await fetch(`/api/ai-transcribe?name=${encodeURIComponent(name)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream", "X-File-Type": mime || blob.type || "application/octet-stream" },
+          body: blob
+        });
+        const raw = await r.text();
+        let data = {};
+        try { data = raw ? JSON.parse(raw) : {}; } catch { data = { message: raw }; }
+        if (!r.ok) throw new Error(data.message || data.error || `Fejl ${r.status}`);
+        return String(data.text || "").trim();
+      } catch (err) {
+        lastErr = err;
+        await new Promise(res => setTimeout(res, 1500 * (attempt + 1)));
+      }
+    }
+    throw lastErr;
+  }
+
+  async function processAudio(att, file) {
+    const ext = fileExt(file.name);
+
+    try {
+      // Små filer i et format OpenAI forstår sendes direkte.
+      if (file.size <= AUDIO_DIRECT_BYTES && AUDIO_DIRECT_EXT.includes(ext)) {
+        updateAttachment(att, { statusText: "Transskriberer lydfil …", progress: 0.3 });
+        const text = await transcribeBlob(file, file.name, file.type);
+        if (att.cancelled) return;
+        if (!text) throw new Error("Der blev ikke fundet nogen tale i lydfilen.");
+        updateAttachment(att, {
+          status: "ready", kind: "text", text: limitText(text), progress: null,
+          statusText: `${formatBytes(file.size)} · transskriberet · ${text.length.toLocaleString("da-DK")} tegn`
+        });
+        return;
+      }
+
+      updateAttachment(att, { statusText: "Afkoder lydfil i browseren …", progress: 0 });
+      const { samples, sampleRate, duration } = await decodeToMono16k(file);
+      if (att.cancelled) return;
+
+      const ranges = splitSamples(samples, sampleRate);
+      const results = new Array(ranges.length);
+      let done = 0;
+      let next = 0;
+
+      const setProgress = () => updateAttachment(att, {
+        progress: done / ranges.length,
+        statusText: `${formatDuration(duration)} lyd · transskriberer del ${Math.min(done + 1, ranges.length)} af ${ranges.length} …`
+      });
+      setProgress();
+
+      async function worker() {
+        while (next < ranges.length) {
+          if (att.cancelled) return;
+          const i = next++;
+          const [a, b] = ranges[i];
+          const blob = encodeWav(samples.subarray(a, b), sampleRate);
+          results[i] = await transcribeBlob(blob, `del-${i + 1}.wav`, "audio/wav");
+          done++;
+          if (!att.cancelled) setProgress();
+        }
+      }
+
+      await Promise.all(Array.from({ length: Math.min(TRANSCRIBE_CONCURRENCY, ranges.length) }, worker));
+      if (att.cancelled) return;
+
+      const text = results.filter(Boolean).join("\n\n");
+      if (!text.trim()) throw new Error("Der blev ikke fundet nogen tale i lydfilen.");
+
+      updateAttachment(att, {
+        status: "ready", kind: "text", text: limitText(text), progress: null,
+        statusText: `${formatBytes(file.size)} · ${formatDuration(duration)} · transskriberet · ${text.length.toLocaleString("da-DK")} tegn`
+      });
+    } catch (err) {
+      console.error("Lyd fejl:", err);
+      if (!att.cancelled) updateAttachment(att, { status: "error", progress: null, statusText: err.message || String(err) });
+    }
+  }
+
+  /* ---------- Fælles tilføj-funktion for begge knapper ---------- */
+
+  async function addFiles(fileList, preferred) {
+    const files = Array.from(fileList || []);
+
+    for (const file of files) {
+      // Billeder valgt via dokument-knappen lægges til billederne.
+      if (preferred === "document" && file.type.startsWith("image/") && images.length < MAX_IMAGES && file.size <= MAX_FILE_BYTES) {
+        images.push({ name: file.name, dataUrl: await fileToDataUrl(file) });
+        renderImages();
+        continue;
+      }
+
+      if (attachments.length >= MAX_ATTACHMENTS) {
+        setStatus(`Du kan højst vedhæfte ${MAX_ATTACHMENTS} filer.`);
+        break;
+      }
+
+      const source = isAudioFile(file) ? "audio" : "document";
+      const att = {
+        id: ++attachmentSeq,
+        name: file.name,
+        size: file.size,
+        source,
+        status: "processing",
+        statusText: source === "audio" ? "Forbereder lydfil …" : "Læser fil …",
+        progress: source === "audio" ? 0 : null
+      };
+      attachments.push(att);
+      renderAttachments();
+
+      if (source === "audio") processAudio(att, file);
+      else processDocument(att, file);
+    }
+  }
+
+  function readyAttachmentsPayload() {
+    return attachments
+      .filter(a => a.status === "ready")
+      .map(a => a.kind === "text"
+        ? { kind: "text", name: a.name, source: a.source, text: a.text }
+        : { kind: "file", name: a.name, source: a.source, mime: a.mime, data: a.data });
+  }
+
+  function fileChips(container, files) {
+    container.innerHTML = "";
+    (files || []).forEach(f => {
+      const chip = document.createElement("span");
+      chip.className = "aiFileChip";
+      chip.textContent = `${f.source === "audio" ? "🎙️" : "📄"} ${f.name}`;
+      container.appendChild(chip);
+    });
+  }
+
+  async function waitForBackground(id) {
+    const started = Date.now();
+    let delay = 2000;
+    while (Date.now() - started < 15 * 60 * 1000) {
+      await new Promise(res => setTimeout(res, delay));
+      delay = Math.min(delay + 500, 4000);
+      const secs = Math.round((Date.now() - started) / 1000);
+      setStatus(`AI arbejder … (${secs} sek)`, true);
+
+      const r = await fetch(`/api/ai?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+      const raw = await r.text();
+      let data = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw }; }
+      if (!r.ok) throw new Error(data.message || data.error || `Fejl ${r.status}`);
+      if (!data.pending) return data;
+    }
+    throw new Error("AI brugte for lang tid. Prøv igen, evt. med mindre indhold.");
+  }
+
+  function updatePromptForTask() {
+    if (conversationStarted) return;
+    if (task.value === "referat") {
+      promptLabel.textContent = "Ekstra instruktion eller tekst (valgfrit)";
+      prompt.placeholder = "Tilføj en lydfil eller et dokument – eller indsæt noter/transskription her.\nDu kan også skrive f.eks. deltagere, mødets formål eller hvad der skal fokuseres på.";
+    } else {
+      promptLabel.textContent = "Tekst eller spørgsmål";
+      prompt.placeholder = "Indsæt f.eks. teksten fra en PowerPoint her …";
+    }
+  }
+
   function showOriginalPrompt() {
     if (!originalPrompt) return;
     originalTaskEl.textContent = originalPrompt.taskLabel;
@@ -202,7 +715,7 @@
       chip.textContent = `${item.label}: ${item.value}`;
       originalOptionsEl.appendChild(chip);
     });
-    originalTextEl.textContent = originalPrompt.text || (originalPrompt.images.length ? "Billede vedhæftet" : "");
+    originalTextEl.textContent = originalPrompt.text || (originalPrompt.images.length ? "Billede vedhæftet" : (originalPrompt.files?.length ? "Fil vedhæftet" : ""));
     originalImagesEl.innerHTML = "";
     originalPrompt.images.forEach(img => {
       const el = document.createElement("img");
@@ -210,10 +723,11 @@
       el.alt = img.name || "Vedhæftet billede";
       originalImagesEl.appendChild(el);
     });
+    fileChips(originalFilesEl, originalPrompt.files);
     originalPromptEl.hidden = false;
   }
 
-  function addMessage(role, text, attachedImages = []) {
+  function addMessage(role, text, attachedImages = [], attachedFiles = []) {
     conversationEl.hidden = false;
 
     const msg = document.createElement("div");
@@ -225,9 +739,16 @@
 
     const bubble = document.createElement("div");
     bubble.className = "aiMessageBubble";
-    bubble.textContent = text || (attachedImages.length ? "Billede vedhæftet" : "");
+    bubble.textContent = text || (attachedImages.length ? "Billede vedhæftet" : (attachedFiles.length ? "Fil vedhæftet" : ""));
 
     msg.append(roleEl, bubble);
+
+    if (attachedFiles.length) {
+      const files = document.createElement("div");
+      files.className = "aiMessageFiles";
+      fileChips(files, attachedFiles);
+      msg.appendChild(files);
+    }
 
     if (attachedImages.length) {
       const imgs = document.createElement("div");
@@ -288,6 +809,7 @@
     originalOptionsEl.innerHTML = "";
     originalTextEl.textContent = "";
     originalImagesEl.innerHTML = "";
+    originalFilesEl.innerHTML = "";
     taskWrap.hidden = false;
     newConversationBtn.hidden = true;
     savePdfBtn.hidden = true;
@@ -301,6 +823,10 @@
     prompt.value = "";
     images = [];
     renderImages();
+    attachments.forEach(a => a.cancelled = true);
+    attachments = [];
+    renderAttachments();
+    updatePromptForTask();
     setStatus("");
     prompt.focus();
   }
@@ -396,6 +922,7 @@
       }
       y += 2;
       if (originalPrompt.text) writeText(originalPrompt.text, { size: 10, gapAfter: 5 });
+      if (originalPrompt.files?.length) writeText(`Vedhæftet: ${originalPrompt.files.map(f => f.name).join(", ")}`, { size: 9, gapAfter: 4 });
       writeImages(originalPrompt.images);
 
       writeText("Samtale", { size: 13, style: "bold", gapAfter: 5 });
@@ -406,6 +933,7 @@
         const label = item.role === "user" ? "Dig" : "Herrup AI";
         writeText(label, { size: 9, style: "bold", gapAfter: 2 });
         if (item.text) writeText(item.text, { size: 10, gapAfter: 4, indent: 2 });
+        if (item.files?.length) writeText(`Vedhæftet: ${item.files.map(f => f.name).join(", ")}`, { size: 9, gapAfter: 3, indent: 2 });
         writeImages(item.images);
         ensureSpace(5);
       }
@@ -434,10 +962,25 @@
     renderImages();
   });
 
+  docInput.addEventListener("change", async () => {
+    const files = docInput.files;
+    await addFiles(files, "document");
+    docInput.value = "";
+  });
+
+  audioInput.addEventListener("change", async () => {
+    const files = audioInput.files;
+    await addFiles(files, "audio");
+    audioInput.value = "";
+  });
+
   clearBtn.addEventListener("click", () => {
     prompt.value = "";
     images = [];
     renderImages();
+    attachments.forEach(a => a.cancelled = true);
+    attachments = [];
+    renderAttachments();
     setStatus("");
     prompt.focus();
   });
@@ -449,13 +992,19 @@
 
   async function send() {
     const text = prompt.value.trim();
-    if (!text && images.length === 0) {
-      setStatus("Skriv et spørgsmål eller tilføj et billede.");
+    if (isProcessing()) {
+      setStatus("Vent til filerne er færdigbehandlet.");
+      return;
+    }
+    const sentAttachments = readyAttachmentsPayload();
+    if (!text && images.length === 0 && sentAttachments.length === 0) {
+      setStatus("Skriv et spørgsmål eller tilføj et billede, dokument eller en lydfil.");
       prompt.focus();
       return;
     }
 
     const sentImages = images.map(x => ({ ...x }));
+    const sentFiles = sentAttachments.map(a => ({ name: a.name, source: a.source }));
     const sentTask = task.value;
     const sentTaskLabel = task.options[task.selectedIndex]?.text || sentTask;
     const selectedTaskOptions = getSelectedTaskOptions();
@@ -465,6 +1014,7 @@
     const isFirstMessage = !conversationStarted;
 
     sendBtn.disabled = true;
+    sendBtn.dataset.busy = "1";
     clearBtn.disabled = true;
     newConversationBtn.disabled = true;
     savePdfBtn.disabled = true;
@@ -480,6 +1030,7 @@
           task: sentTask,
           prompt: text,
           images: sentImages.map(x => x.dataUrl),
+          attachments: sentAttachments,
           options: sentOptions,
           previousResponseId: currentPreviousResponseId
         })
@@ -488,7 +1039,9 @@
       const raw = await response.text();
       let data = {};
       try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw }; }
+      if (response.status === 413) throw new Error("Filerne er for store til at sende samlet. Fjern en eller flere filer.");
       if (!response.ok) throw new Error(data.message || data.error || `Fejl ${response.status}`);
+      if (data.pending && data.responseId) data = await waitForBackground(data.responseId);
 
       if (isFirstMessage) {
         originalPrompt = {
@@ -497,13 +1050,14 @@
           optionLabels: sentOptionLabels,
           options: sentOptions,
           text,
-          images: sentImages
+          images: sentImages,
+          files: sentFiles
         };
-        conversationHistory.push({ role: "user", text, images: sentImages, isOriginal: true });
+        conversationHistory.push({ role: "user", text, images: sentImages, files: sentFiles, isOriginal: true });
         showOriginalPrompt();
       } else {
-        conversationHistory.push({ role: "user", text, images: sentImages, isOriginal: false });
-        addMessage("user", text, sentImages);
+        conversationHistory.push({ role: "user", text, images: sentImages, files: sentFiles, isOriginal: false });
+        addMessage("user", text, sentImages, sentFiles);
       }
 
       const answerText = data.answer || "Der kom ikke noget svar.";
@@ -516,6 +1070,8 @@
       prompt.value = "";
       images = [];
       renderImages();
+      attachments = attachments.filter(a => a.status === "processing");
+      renderAttachments();
       setStatus("");
       prompt.focus();
 
@@ -525,7 +1081,8 @@
       console.error("AI fejl:", err);
       setStatus(`Fejl: ${err.message || err}`);
     } finally {
-      sendBtn.disabled = false;
+      delete sendBtn.dataset.busy;
+      sendBtn.disabled = isProcessing();
       clearBtn.disabled = false;
       newConversationBtn.disabled = false;
       savePdfBtn.disabled = false;
@@ -534,8 +1091,9 @@
     }
   }
 
-  task.addEventListener("change", renderTaskOptions);
+  task.addEventListener("change", () => { renderTaskOptions(); updatePromptForTask(); });
   renderTaskOptions();
+  updatePromptForTask();
 
   sendBtn.addEventListener("click", send);
   prompt.addEventListener("keydown", (e) => {

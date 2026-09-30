@@ -19,7 +19,14 @@ const TASKS = {
   translate: "Oversæt brugerens tekst korrekt og naturligt. Bevar betydning, navne, tal og relevant formatering.",
   explain: "Forklar indholdet praktisk og letforståeligt på samme sprog som brugeren.",
   bullets: "Omskriv indholdet til en overskuelig punktliste uden at opfinde nye oplysninger.",
-  free: "Besvar brugerens spørgsmål hjælpsomt, konkret og på samme sprog som brugeren."
+  free: "Besvar brugerens spørgsmål hjælpsomt, konkret og på samme sprog som brugeren.",
+  referat: [
+    "Lav et referat af det vedhæftede eller indsatte indhold. Det er typisk en automatisk transskription af et møde eller en samtale, men kan også være noter eller et dokument.",
+    "Transskriptioner kan indeholde fejl i ord, navne og tal. Ret åbenlyse fejl ud fra sammenhængen, men opfind aldrig indhold, beslutninger, navne, datoer eller tal.",
+    "Talere er normalt ikke markeret i en transskription. Gæt ikke på hvem der sagde hvad, medmindre det tydeligt fremgår af indholdet.",
+    "Fjern småsnak, gentagelser og fyldord. Hvis noget er uklart i kilden, så skriv at det er uklart i stedet for at gætte.",
+    "Hvis brugeren har skrevet en ekstra instruktion (f.eks. deltagere, mødets formål eller hvad der skal fokuseres på), skal den følges."
+  ].join(" ")
 };
 
 const OPTION_PROMPTS = {
@@ -105,6 +112,31 @@ const OPTION_PROMPTS = {
       technical: "Forklar det mere teknisk og detaljeret, og brug relevante fagbegreber."
     }
   },
+  referat: {
+    type: {
+      meeting: "Lav et klassisk mødereferat med overskrift, dato hvis den fremgår, deltagere hvis de fremgår, og emnerne gennemgået i den rækkefølge de blev drøftet, med de vigtigste pointer under hvert emne.",
+      decisions: "Lav et beslutningsreferat: fokuser på hvad der blev besluttet og aftalt. Drøftelser tages kun med i det omfang de forklarer en beslutning.",
+      visit: "Lav et referat af et kundebesøg eller en samtale med en kunde: kundens situation og ønsker, hvad der blev gennemgået, problemer der blev nævnt, og hvad der er aftalt.",
+      brief: "Lav et kort resumé på få afsnit af de vigtigste emner og konklusioner."
+    },
+    detail: {
+      short: "Hold referatet kort og præcist.",
+      normal: "Brug et normalt detaljeniveau.",
+      detailed: "Lav et udførligt referat, hvor væsentlige detaljer, argumenter og nuancer bevares."
+    },
+    format: {
+      bullets: "Skriv primært i punktform under korte overskrifter.",
+      prose: "Skriv i korte, sammenhængende afsnit under korte overskrifter."
+    },
+    actions: {
+      yes: "Afslut med et afsnit 'Opfølgning' med konkrete handlingspunkter. Angiv ansvarlig og deadline, hvis det fremgår af indholdet, ellers skriv 'ikke aftalt'.",
+      no: "Medtag ikke en separat liste med handlingspunkter."
+    },
+    language: {
+      da: "Skriv referatet på dansk, uanset hvilket sprog kilden er på.",
+      en: "Skriv referatet på engelsk, uanset hvilket sprog kilden er på."
+    }
+  },
   bullets: {
     detail: {
       short: "Lav en kort punktliste med kun de vigtigste punkter.",
@@ -134,6 +166,81 @@ function validResponseId(value) {
   return /^resp_[A-Za-z0-9_-]+$/.test(id) ? id : null;
 }
 
+const MAX_ATTACHMENTS = 8;
+const MAX_ATTACHMENT_TEXT = 500000;      // samlet tekst fra dokumenter/transskriptioner
+const MAX_FILE_DATA_URL = 14_500_000;    // ca. 10 MB fil som base64 data-URL
+
+function buildAttachmentContent(list) {
+  const content = [];
+  let textTotal = 0;
+
+  for (const a of list.slice(0, MAX_ATTACHMENTS)) {
+    if (!a || typeof a !== "object") continue;
+    const name = String(a.name || "vedhæftet fil").slice(0, 200);
+
+    if (a.kind === "text") {
+      const text = String(a.text || "");
+      if (!text.trim()) continue;
+      textTotal += text.length;
+      if (textTotal > MAX_ATTACHMENT_TEXT) {
+        const e = new Error("De vedhæftede filer indeholder for meget tekst. Fjern en eller flere filer.");
+        e.status = 400;
+        throw e;
+      }
+      const label = a.source === "audio" ? `Transskription af lydfilen "${name}"` : `Vedhæftet fil "${name}"`;
+      content.push({ type: "input_text", text: `${label}:\n---\n${text}\n---` });
+      continue;
+    }
+
+    if (a.kind === "file") {
+      const data = String(a.data || "");
+      if (!data.startsWith("data:")) {
+        const e = new Error(`Filen "${name}" har et ugyldigt format.`);
+        e.status = 400;
+        throw e;
+      }
+      if (data.length > MAX_FILE_DATA_URL) {
+        const e = new Error(`Filen "${name}" er for stor (maks. ca. 10 MB).`);
+        e.status = 400;
+        throw e;
+      }
+      content.push({ type: "input_file", filename: name, file_data: data });
+    }
+  }
+
+  return { content, textTotal };
+}
+
+async function pollResponse(context, apiKey, id) {
+  const r = await fetch(`https://api.openai.com/v1/responses/${encodeURIComponent(id)}`, {
+    headers: { "Authorization": `Bearer ${apiKey}` }
+  });
+  const text = await r.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+
+  if (!r.ok) {
+    return json(context, 502, { error: "openai_error", message: data?.error?.message || `OpenAI API returnerede ${r.status}` });
+  }
+
+  const st = data.status;
+  if (st === "queued" || st === "in_progress") return json(context, 200, { pending: true, responseId: id, status: st });
+
+  if (st === "completed" || st === "incomplete") {
+    let answer = extractOutputText(data);
+    if (!answer) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget tekstsvar." });
+    if (st === "incomplete") {
+      answer += `\n\n(Svaret blev afbrudt: ${data?.incomplete_details?.reason || "ukendt årsag"})`;
+    }
+    return json(context, 200, { answer, responseId: id });
+  }
+
+  return json(context, 502, {
+    error: "ai_failed",
+    message: data?.error?.message || `AI-kaldet endte med status: ${st || "ukendt"}`
+  });
+}
+
 function optionInstructions(task, options) {
   const taskOptions = OPTION_PROMPTS[task] || {};
   const input = options && typeof options === "object" && !Array.isArray(options) ? options : {};
@@ -155,6 +262,18 @@ module.exports = async function (context, req) {
     return json(context, 500, { error: "missing_setting", message: "Mangler SWA app setting: CHATGTP_AI_KEY" });
   }
 
+  // GET /api/ai?id=resp_... - henter status på et baggrundskald (bruges til store opgaver)
+  if (String(req.method || "").toUpperCase() === "GET") {
+    const id = validResponseId(req.query.id);
+    if (!id) return json(context, 400, { error: "invalid_id", message: "Ugyldigt svar-id." });
+    try {
+      return await pollResponse(context, apiKey, id);
+    } catch (e) {
+      context.log("AI poll fejl:", e.message);
+      return json(context, 500, { error: "ai_failed", message: e.message });
+    }
+  }
+
   const body = req.body || {};
   const task = TASKS[body.task] ? body.task : "free";
   const prompt = String(body.prompt || "").trim();
@@ -162,8 +281,10 @@ module.exports = async function (context, req) {
   const previousResponseId = validResponseId(body.previousResponseId);
   const options = body.options && typeof body.options === "object" ? body.options : {};
 
-  if (!prompt && images.length === 0) {
-    return json(context, 400, { error: "empty_input", message: "Skriv et spørgsmål eller tilføj et billede." });
+  const attachmentsIn = Array.isArray(body.attachments) ? body.attachments : [];
+
+  if (!prompt && images.length === 0 && attachmentsIn.length === 0) {
+    return json(context, 400, { error: "empty_input", message: "Skriv et spørgsmål eller tilføj et billede, dokument eller en lydfil." });
   }
   if (prompt.length > 30000) {
     return json(context, 400, { error: "input_too_long", message: "Teksten er for lang. Del den op i mindre dele." });
@@ -181,6 +302,24 @@ module.exports = async function (context, req) {
     content.push({ type: "input_image", image_url: image });
   }
 
+  let attachmentInfo;
+  try {
+    attachmentInfo = buildAttachmentContent(attachmentsIn);
+  } catch (e) {
+    return json(context, e.status || 400, { error: "invalid_attachment", message: e.message });
+  }
+  content.push(...attachmentInfo.content);
+  if (!content.length) {
+    return json(context, 400, { error: "empty_input", message: "De vedhæftede filer indeholdt ingen tekst." });
+  }
+
+  // Store opgaver køres som baggrundskald og hentes med GET /api/ai?id=...
+  // så de ikke rammer timeout på SWA managed functions.
+  const useBackground =
+    task === "referat" ||
+    attachmentInfo.content.length > 0 ||
+    prompt.length + attachmentInfo.textTotal > 20000;
+
   const instructions = [
     "Du er den interne AI-hjælper i Herrup Portalen.",
     "Svar som udgangspunkt på samme sprog som brugeren, medmindre opgaven er oversættelse.",
@@ -195,9 +334,13 @@ module.exports = async function (context, req) {
       model: process.env.CHATGTP_AI_MODEL || "gpt-5.6",
       instructions,
       input: [{ role: "user", content }],
-      max_output_tokens: 2500
+      max_output_tokens: useBackground ? 16000 : 2500
     };
     if (previousResponseId) requestBody.previous_response_id = previousResponseId;
+    if (useBackground) {
+      requestBody.background = true;
+      requestBody.store = true;
+    }
 
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -215,6 +358,15 @@ module.exports = async function (context, req) {
         error: "openai_error",
         message: data?.error?.message || `OpenAI API returnerede ${r.status}`
       });
+    }
+
+    if (useBackground) {
+      const id = validResponseId(data.id);
+      if (!id) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke et svar-id." });
+      if (data.status === "completed" || data.status === "incomplete" || data.status === "failed") {
+        return await pollResponse(context, apiKey, id);
+      }
+      return json(context, 202, { pending: true, responseId: id, status: data.status });
     }
 
     const answer = extractOutputText(data);

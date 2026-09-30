@@ -7,7 +7,7 @@
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
   <link rel="stylesheet" href="/assets/app.css?v=20260826" />
-  <link rel="stylesheet" href="/assets/ai.css?v=20260903-4" />
+  <link rel="stylesheet" href="/assets/ai.css?v=20260930-1" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 </head>
 <body>
@@ -59,6 +59,7 @@
           <option value="translate">Oversæt tekst</option>
           <option value="explain">Forklar indholdet</option>
           <option value="bullets">Lav punktliste</option>
+          <option value="referat">Lav referat</option>
           <option value="free">Frit spørgsmål</option>
         </select>
         <div id="aiTaskOptions" class="aiTaskOptions"></div>
@@ -70,6 +71,7 @@
         <div id="aiOriginalOptions" class="aiOriginalOptions"></div>
         <div id="aiOriginalText" class="aiOriginalText"></div>
         <div id="aiOriginalImages" class="aiOriginalImages"></div>
+        <div id="aiOriginalFiles" class="aiOriginalFiles"></div>
       </div>
 
       <div id="aiConversation" class="aiConversation" hidden aria-live="polite"></div>
@@ -80,9 +82,14 @@
       <div class="aiUploadRow">
         <label class="aiUploadBtn" for="aiImages">＋ Tilføj billede</label>
         <input id="aiImages" type="file" accept="image/*" multiple hidden>
-        <span class="muted">Du kan vedhæfte op til 3 billeder.</span>
+        <label class="aiUploadBtn" for="aiDocs">＋ Tilføj dokument</label>
+        <input id="aiDocs" type="file" multiple hidden>
+        <label class="aiUploadBtn" for="aiAudio">＋ Tilføj lydfil</label>
+        <input id="aiAudio" type="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.wma,.aac,.ogg,.oga,.opus,.webm,.flac,.mp4,.mov" multiple hidden>
       </div>
+      <div class="muted aiUploadInfo">Op til 3 billeder. Dokumenter kan være Word, Excel, PowerPoint, PDF, tekst m.m. Lydfiler må gerne være større end 25 MB – de bliver delt op og transskriberet automatisk.</div>
       <div id="aiImagePreview" class="aiImagePreview"></div>
+      <div id="aiAttachmentList" class="aiAttachmentList"></div>
 
       <div class="aiActions">
         <button id="aiSend" class="aiSend" type="button">Send</button>
@@ -103,6 +110,6 @@
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="/assets/ai.js?v=20260903-4"></script>
+  <script src="/assets/ai.js?v=20260930-1"></script>
 </body>
 </html>
