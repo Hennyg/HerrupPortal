@@ -540,3 +540,15 @@ a.btn.primary{color:#fff}
 .newsArrow{flex:0 0 26px;align-self:stretch;min-height:48px;appearance:none;border:0;background:transparent;color:#9ca3af;font-size:30px;line-height:1;cursor:pointer;border-radius:8px;padding:0}
 .newsArrow:hover{color:var(--heading);background:#eaeef3}
 .newsArrow.off{visibility:hidden}
+
+/* ── Browser/Desktop-knapper på tile (Admin: Åbn = "Browser / Desktop") ──────
+   Står i stedet for beskrivelsen og har samme højde som én linje tekst,
+   så tile'n ikke bliver større. */
+.tileActions{display:flex;gap:.4rem;margin-top:.4rem}
+.tileAction{
+  display:inline-flex;align-items:center;justify-content:center;
+  height:20px;padding:0 .7rem;box-sizing:border-box;
+  border:1px solid #d1d5db;border-radius:999px;background:#f9fafb;
+  font-size:12px;line-height:1;font-weight:600;color:#374151;text-decoration:none;
+}
+.tileAction:hover{border-color:var(--nav-accent);color:var(--nav-accent);background:#fff}

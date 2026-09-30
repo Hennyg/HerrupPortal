@@ -481,10 +481,61 @@ function wireEmployeeSearch(root) {
   });
 }
 
+// ── Browser/Desktop-tile (Admin: Åbn = "Browser / Desktop") ──────────────────
+// I stedet for beskrivelsen får tile'n to knapper: "Browser" åbner linket som
+// normalt, "Desktop" åbner filen i Office-appen via ms-excel:/ms-word:/ms-powerpoint:.
+const OFFICE_APPS = {
+  xlsx: "ms-excel", xlsm: "ms-excel", xlsb: "ms-excel", xls: "ms-excel", csv: "ms-excel",
+  docx: "ms-word", docm: "ms-word", doc: "ms-word", rtf: "ms-word",
+  pptx: "ms-powerpoint", pptm: "ms-powerpoint", ppt: "ms-powerpoint", ppsx: "ms-powerpoint"
+};
+const OFFICE_LINK_TYPES = { x: "ms-excel", w: "ms-word", p: "ms-powerpoint" };
+
+function officeDesktopUrl(url) {
+  try {
+    const u = new URL(url, location.origin);
+    let path = u.pathname;
+    let app = null;
+
+    // SharePoint-links som /:x:/r/sites/.../fil.xlsx -> /sites/.../fil.xlsx
+    const typed = /^\/:([a-z]):\/[a-z]\//i.exec(path);
+    if (typed) {
+      app = OFFICE_LINK_TYPES[typed[1].toLowerCase()] || null;
+      if (/^\/:[a-z]:\/r\//i.test(path)) path = path.replace(/^\/:[a-z]:\/r/i, "");
+    }
+
+    const ext = ((/\.([a-z0-9]+)$/i.exec(path) || [])[1] || "").toLowerCase();
+    const isOfficeFile = !!OFFICE_APPS[ext];
+    if (isOfficeFile) app = OFFICE_APPS[ext];
+    if (!app) {
+      const fileParam = (u.searchParams.get("file") || "").toLowerCase();
+      app = OFFICE_APPS[(/\.([a-z0-9]+)$/.exec(fileParam) || [])[1]] || "ms-excel";
+    }
+
+    // Direkte fil-sti bruges uden parametre. Delingslinks (/:x:/s/...) og
+    // Doc.aspx?sourcedoc=... sendes som de er - Office slår dem selv op.
+    const target = isOfficeFile ? `${u.origin}${path}` : u.href;
+    return `${app}:ofe|u|${target}`;
+  } catch {
+    return url;
+  }
+}
+
+function renderBrowserDesktopHTML(it, target) {
+  const common = `data-track="tile" data-title="${esc(it.title || "")}" data-category="${esc(it.category || "")}" data-group="${esc(it.group || "")}"`;
+  return `
+    <div class="tileActions">
+      <a class="tileAction" href="${esc(it.url)}" target="${target}" rel="noopener" data-url="${esc(it.url || "")}" ${common}>Browser</a>
+      <a class="tileAction" href="${esc(officeDesktopUrl(it.url))}" data-url="${esc(it.url || "")}" ${common}>Desktop</a>
+    </div>
+  `;
+}
+
 function renderTileHTML(it) {
   const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
   const isFavStarred = favoriteIds.has(it.id);
   const isEmpSearch = isEmployeeSearchTile(it);
+  const isBrowserDesktop = !isEmpSearch && it.openMode === "browserDesktop";
   const wrapper = document.createElement("div");
   wrapper.innerHTML = `
     <div class="tile${isEmpSearch ? " empTile" : ""}">
@@ -508,9 +559,10 @@ function renderTileHTML(it) {
           <div class="icon"></div>
         </div>
         <div class="tileTitle">${esc(it.title || "Uden titel")}</div>
-        ${isEmpSearch ? "" : `<div class="tileUrl">${esc(it.description || it.forklaring || "")}</div>`}
+        ${isEmpSearch || isBrowserDesktop ? "" : `<div class="tileUrl">${esc(it.description || it.forklaring || "")}</div>`}
       </a>
       ${isEmpSearch ? renderEmployeeSearchHTML() : ""}
+      ${isBrowserDesktop ? renderBrowserDesktopHTML(it, target) : ""}
     </div>
   `;
   const tileEl = wrapper.firstElementChild;
@@ -692,7 +744,7 @@ function wireAccordions(root) {
 }
 
 function wireTileTracking(root) {
-  root.querySelectorAll('.tileLink[data-track="tile"]').forEach(a => {
+  root.querySelectorAll('.tileLink[data-track="tile"], .tileAction[data-track="tile"]').forEach(a => {
     a.addEventListener("click", () => {
       track("Click", {
         targetUrl: safeUrl(a.getAttribute("data-url") || a.href || ""),
@@ -835,9 +887,3 @@ function renderSections(items, myFavItems) {
   syncClearBtn();
   render();
 })();
-
-
-
-
-
-
