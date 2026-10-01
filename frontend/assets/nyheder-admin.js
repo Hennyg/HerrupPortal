@@ -232,17 +232,55 @@
     }
   }
 
+  // Tydelig besked øverst på siden, der bliver stående et par sekunder.
+  function toast(text, kind = "ok") {
+    let el = document.getElementById("naToast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "naToast";
+      el.setAttribute("role", "status");
+      el.style.cssText = [
+        "position:fixed", "top:18px", "left:50%", "transform:translateX(-50%)", "z-index:9999",
+        "max-width:min(92vw,560px)", "padding:14px 20px", "border-radius:12px",
+        "font-weight:600", "font-size:1rem", "box-shadow:0 10px 30px rgba(0,0,0,.18)",
+        "transition:opacity .3s ease", "opacity:0"
+      ].join(";");
+      document.body.appendChild(el);
+    }
+    const ok = kind === "ok";
+    el.style.background = ok ? "#ecfdf5" : "#fef2f2";
+    el.style.color = ok ? "#065f46" : "#991b1b";
+    el.style.border = `1px solid ${ok ? "#a7f3d0" : "#fecaca"}`;
+    el.textContent = text;
+    el.style.opacity = "1";
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { el.style.opacity = "0"; }, ok ? 5000 : 9000);
+  }
+
   async function remove() {
     if (!currentId) return;
-    if (!confirm("Slet nyheden og dens billeder? Det kan ikke fortrydes.")) return;
+    const title = $("overskrift").value.trim() || "(uden overskrift)";
+    if (!confirm(`Vil du slette nyheden?\n\n"${title}"\n\nNyheden og dens billeder slettes permanent og kan ikke gendannes.`)) return;
+
+    const btn = $("deleteBtn");
+    const btnText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Sletter…";
+    msg("Sletter nyheden…");
+
     try {
       await api("DELETE", `/api/news-admin/${currentId}`);
       dirty = false;
       await loadList();
       fillForm(null);
-      msg("Slettet", "ok");
+      msg(`🗑️ "${title}" er slettet`, "ok");
+      toast(`🗑️ Nyheden "${title}" er slettet`, "ok");
     } catch (e) {
       msg(`Kunne ikke slette: ${e.message}`, "err");
+      toast(`Kunne ikke slette "${title}": ${e.message}`, "err");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = btnText;
     }
   }
 
