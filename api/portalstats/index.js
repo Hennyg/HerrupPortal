@@ -4,11 +4,17 @@
 //
 //   GET /api/portalstats?from=2026-09-01&to=2026-09-30
 //
-// Kræver rollen portal_admin eller portal_herrup_portal_admin. Det sikres
-// både af route-reglen i staticwebapp.config.json og her i koden.
+// Kræver rollen portal_admin eller portal_herrup_portal_admin.
+//
+// Rollerne slås op via Microsoft Graph (appRoleAssignments på login-app'en
+// AZURE_CLIENT_ID) - samme metode som api/employee-private. x-ms-client-
+// principal i backend'en indeholder IKKE rollerne fra /api/getRoles.
+//
+// Miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_URL, AZURE_CLIENT_ID
 //
 // Data: lch_accesslog (entity set cr175_lch_accesslogs), skrevet af /api/track.
 
+const fetch = globalThis.fetch;
 const { dvFetch } = require("../_dv");
 
 const ENTITY_SET = process.env.ACCESSLOG_ENTITY_SET || "cr175_lch_accesslogs";
@@ -24,18 +30,61 @@ function json(context, status, body) {
   context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, body };
 }
 
-function getRoles(req) {
+function getPrincipal(req) {
   try {
-    const cp = JSON.parse(Buffer.from(req.headers["x-ms-client-principal"] || "", "base64").toString("utf8"));
-    return (cp?.userRoles || []).map(r => String(r).toLowerCase());
+    return JSON.parse(Buffer.from(req.headers["x-ms-client-principal"] || "", "base64").toString("utf8"));
   } catch {
-    return [];
+    return null;
   }
+}
+
+async function getGraphToken() {
+  const tenant = process.env.DV_TENANT_ID, clientId = process.env.DV_CLIENT_ID, clientSecret = process.env.DV_CLIENT_SECRET;
+  if (!tenant || !clientId || !clientSecret) throw new Error("Manglende miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET");
+  const r = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "client_credentials", client_id: clientId, client_secret: clientSecret, scope: "https://graph.microsoft.com/.default" })
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error(`graph_token_error ${r.status}: ${j.error_description || JSON.stringify(j)}`);
+  return j.access_token;
+}
+
+// Brugerens portal_xxx-roller via Graph (samme som api/employee-private)
+async function getUserPortalRoles(userId) {
+  if (!userId) return [];
+  const clientId = process.env.AZURE_CLIENT_ID;
+  if (!clientId) throw new Error("Manglende miljøvariabel: AZURE_CLIENT_ID");
+  const token = await getGraphToken();
+
+  const spRes = await fetch(
+    `https://graph.microsoft.com/v1.0/servicePrincipals?$filter=appId eq '${clientId}'&$select=id,appRoles`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const spJson = await spRes.json();
+  if (!spRes.ok) throw new Error(`graph_sp_error ${spRes.status}: ${spJson.error?.message || ""}`);
+  const sp = (spJson.value || [])[0];
+  if (!sp) return [];
+
+  const aRes = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userId)}/appRoleAssignments`,
+    { headers: { Authorization: `Bearer ${token}` } });
+  const aJson = await aRes.json();
+  if (!aRes.ok) throw new Error(`graph_approles_error ${aRes.status}: ${aJson.error?.message || ""}`);
+
+  const roleIdToValue = new Map((sp.appRoles || []).map(r => [r.id, String(r.value || "").toLowerCase()]));
+  return (aJson.value || [])
+    .filter(a => a.resourceId === sp.id)
+    .map(a => roleIdToValue.get(a.appRoleId) || "")
+    .filter(Boolean);
 }
 
 module.exports = async function (context, req) {
   try {
-    if (!getRoles(req).some(r => ADMIN_ROLES.includes(r))) {
+    const principal = getPrincipal(req);
+    if (!principal?.userId) return json(context, 401, { error: "Ikke logget ind." });
+    const roles = await getUserPortalRoles(principal.userId);
+    if (!roles.some(r => ADMIN_ROLES.includes(r))) {
       return json(context, 403, { error: "Kun for portal_admin." });
     }
 
