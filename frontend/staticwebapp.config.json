@@ -11,8 +11,6 @@
     {"route":"/icons/*","allowedRoles":["anonymous","authenticated"]},
     {"route":"/sw.js","allowedRoles":["anonymous","authenticated"]},
     {"route":"/manifest.json","allowedRoles":["anonymous","authenticated"]},
-    {"route":"/statistik.html","allowedRoles":["portal_admin","portal_herrup_portal_admin"],"headers":{"cache-control":"no-cache, must-revalidate"}},
-    {"route":"/api/portalstats","allowedRoles":["portal_admin","portal_herrup_portal_admin"]},
     {"route":"/*","allowedRoles":["authenticated"],"headers":{"cache-control":"no-cache, must-revalidate"}}
   ],
   "responseOverrides": {
