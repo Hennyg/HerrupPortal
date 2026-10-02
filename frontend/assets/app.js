@@ -1,8 +1,9 @@
 
 // assets/app.js
 
-// Slå tracking til/fra (du har pt. ikke /api/track => hold den false)
-const TRACKING_ENABLED = false;
+// Brugsstatistik: sidevisninger og klik på tiles logges via /api/track til
+// Dataverse (lch_accesslog) og vises i statistik.html for portal_admin.
+const TRACKING_ENABLED = true;
 
 // ── "Mine favoritter" (stjernemarkering) ─────────────────────────────────────
 // Hvilke link-id'er den indloggede bruger har markeret med stjernen. Gemmes
@@ -800,6 +801,8 @@ function renderSections(items, myFavItems) {
 
   const adminLink = document.getElementById("adminLink");
   if (adminLink) adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
+  const statLink = document.getElementById("statLink");
+  if (statLink) statLink.classList.toggle("hidden", !(roles.includes("portal_admin") || roles.includes("portal_herrup_portal_admin")));
 
   // Hent brugerens stjernemarkerede favoritter parallelt med links, så
   // "Mine favoritter" er korrekt allerede ved første tegning af siden.

@@ -1,7 +1,7 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/admin.html","/herrup.html","/guide.html","/ai.html","/assets/*","/manifest.json","/sw.js","/icons/*","/.auth/*","/api/*"]
+    "exclude": ["/admin.html","/statistik.html","/herrup.html","/guide.html","/ai.html","/assets/*","/manifest.json","/sw.js","/icons/*","/.auth/*","/api/*"]
   },
   "routes": [
     {"route":"/login","redirect":"/.auth/login/aad?post_login_redirect_uri=.referrer","statusCode":302},
@@ -11,6 +11,8 @@
     {"route":"/icons/*","allowedRoles":["anonymous","authenticated"]},
     {"route":"/sw.js","allowedRoles":["anonymous","authenticated"]},
     {"route":"/manifest.json","allowedRoles":["anonymous","authenticated"]},
+    {"route":"/statistik.html","allowedRoles":["portal_admin","portal_herrup_portal_admin"],"headers":{"cache-control":"no-cache, must-revalidate"}},
+    {"route":"/api/portalstats","allowedRoles":["portal_admin","portal_herrup_portal_admin"]},
     {"route":"/*","allowedRoles":["authenticated"],"headers":{"cache-control":"no-cache, must-revalidate"}}
   ],
   "responseOverrides": {
