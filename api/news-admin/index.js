@@ -45,6 +45,12 @@ function buildPayload(b, user) {
   if (!["mig", "test", "alle"].includes(vis)) throw bad("Ukendt valg for hvem der må se nyheden");
   const visning = vis === "mig" ? `mig:${String(user?.email || "").toLowerCase()}` : vis;
 
+  const udlobsdato = type === "tip" ? null : normDate(b.udlobsdato);
+  const slutdato = normDate(b.slutdato);
+  if (udlobsdato && slutdato && udlobsdato > slutdato) {
+    throw bad("“Vis på forsiden til og med” kan ikke ligge efter udløbsdatoen");
+  }
+
   return {
     [T.valg]: N.VALG[type],
     [T.overskrift]: overskrift,
@@ -52,7 +58,8 @@ function buildPayload(b, user) {
     [T.brodtekst]: cleanHtml(b.brodtekst),
     [T.videourl]: String(b.videourl || "").trim() || null,
     [T.aktiv]: (b.status && N.STATUS_TEXT[b.status]) ? N.STATUS_TEXT[b.status] : (b.aktiv === false ? "Nej" : "Ja"),
-    [T.udlobsdato]: normDate(b.udlobsdato),
+    [T.udlobsdato]: udlobsdato,
+    [T.slutdato]: slutdato,
     [T.bannertekst]: bannertekst || null,
     [T.bannercolor]: normColor(banner.farve),
     // Kun ét sted ad gangen: tip-tile'n vinder, hvis begge er sat

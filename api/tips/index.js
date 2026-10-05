@@ -9,7 +9,7 @@ module.exports = async function (context, req) {
     const now = new Date();
     const select = [...N.LIST_COLS, T.brodtekst].join(",");
     const data = await N.dv(`${N.TIP_SET}?$select=${select}&$orderby=createdon desc`);
-    const rows = (data?.value || []).filter(r => N.yes(r[T.aktiv]));
+    const rows = (data?.value || []).filter(r => N.yes(r[T.aktiv]) && !N.isExpired(r, now));
 
     // Nyheder kan være begrænset til "mig" eller "test" – gælder også bjælken
     const canSee = N.viewerFilter(req);

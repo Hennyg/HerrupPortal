@@ -11,6 +11,7 @@ const T = {
   brodtekst:    "cr175_lch_brodtekst",    // hele teksten (HTML)
   valg:         "cr175_lch_valg",
   udlobsdato:   "cr175_lch_udlobsdato",   // hvornår den forsvinder fra forsiden
+  slutdato:     "cr175_lch_slutdato",     // udløbsdato: hvornår den forsvinder helt (Nyheder, forside, bjælke)
   aktiv:        "cr175_lch_aktiv",        // tekst "Ja"/"Nej"
   videourl:     "cr175_lch_videourl",
   bannertekst:  "cr175_lch_bannertekst",
@@ -361,7 +362,16 @@ function publicItem(m) {
 // ── Mapping ─────────────────────────────────────────────────────────────────
 const yes = v => ["ja", "true", "1", "aktiv", "yes"].includes(String(v ?? "").trim().toLowerCase());
 
+// Udløbet = efter slutdatoen (dagen er inkl.). Så vises nyheden ingen steder
+// for almindelige brugere – kun i redigeringen.
+function isExpired(row, now = new Date()) {
+  if (!row[T.slutdato]) return false;
+  const end = new Date(`${String(row[T.slutdato]).slice(0, 10)}T23:59:59`);
+  return !Number.isNaN(end.getTime()) && end < now;
+}
+
 function bannerActive(row, now = new Date()) {
+  if (isExpired(row, now)) return false;
   if (!String(row[T.bannertekst] || "").trim()) return false;
   if (row[T.bannerTile] !== true && row[T.bannerNavbar] !== true) return false;
   if (row[T.bannerSlut] && new Date(row[T.bannerSlut]) < now) return false;
@@ -370,6 +380,7 @@ function bannerActive(row, now = new Date()) {
 
 function frontpageActive(row, now = new Date()) {
   if (!yes(row[T.aktiv])) return false;
+  if (isExpired(row, now)) return false;
   if (!row[T.udlobsdato]) return true;
   const end = new Date(`${String(row[T.udlobsdato]).slice(0, 10)}T23:59:59`);
   return !Number.isNaN(end.getTime()) && end >= now;
@@ -407,6 +418,8 @@ function mapRow(row, { withBody = false } = {}) {
     ...parseVisning(row[T.bannerVisning]),
     indsender: row[T.indsender] || "",
     udlobsdato: row[T.udlobsdato] ? String(row[T.udlobsdato]).slice(0, 10) : null,
+    slutdato: row[T.slutdato] ? String(row[T.slutdato]).slice(0, 10) : null,
+    udlobet: isExpired(row),
     banner: {
       tekst: row[T.bannertekst] || "",
       farve: row[T.bannercolor] || "",
@@ -422,12 +435,12 @@ function mapRow(row, { withBody = false } = {}) {
   return out;
 }
 
-const LIST_COLS = [TIP_ID, T.overskrift, T.indhold, T.valg, T.udlobsdato, T.aktiv, T.videourl,
+const LIST_COLS = [TIP_ID, T.overskrift, T.indhold, T.valg, T.udlobsdato, T.slutdato, T.aktiv, T.videourl,
   T.bannertekst, T.bannercolor, T.bannerTile, T.bannerNavbar, T.bannerSlut, T.bannerVisning, T.indsender, "createdon", "modifiedon"];
 
 module.exports = {
   TIP_SET, TIP_ID, T, VALG, VALG_NAME, IMG_ID, I, EDITOR_ROLES, LIST_COLS,
   json, dv, imageMeta, getPrincipal, requireEditor, lookupRoles, hasEditorRole,
-  yes, bannerActive, frontpageActive, parseVisning, statusOf, STATUS_TEXT, mapRow,
+  yes, isExpired, bannerActive, frontpageActive, parseVisning, statusOf, STATUS_TEXT, mapRow,
   cleanHtml, syncImages, resolveVideoLink, viewerFilter, publicItem
 };

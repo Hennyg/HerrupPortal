@@ -104,6 +104,7 @@
       : `⏳ Venter på godkendelse. Indsendt af <strong>${esc(it?.indsender || "ukendt")}</strong> ${esc(fmtDate(it?.createdon, true))}.`;
     $("rejectBtn").hidden = currentStatus === "afvist";
     $("udlobsdato").value = it?.udlobsdato || "";
+    $("slutdato").value = it?.slutdato || "";
     $("bannertekst").value = it?.banner?.tekst || "";
     $("bannercolor").value = /^#[0-9a-f]{6}$/i.test(it?.banner?.farve || "") ? it.banner.farve : DEFAULT_COLOR;
     // Kun ét sted ad gangen – ældre nyheder med begge sat vises som tip-tile
@@ -149,7 +150,7 @@
       return;
     }
     $("items").innerHTML = list.map(it => `
-      <button type="button" class="naItem${it.id === currentId ? " selected" : ""}${it.status === "aktiv" || it.status === "afventer" ? "" : " inactive"}" data-id="${esc(it.id)}">
+      <button type="button" class="naItem${it.id === currentId ? " selected" : ""}${(it.status === "aktiv" || it.status === "afventer") && !it.udlobet ? "" : " inactive"}" data-id="${esc(it.id)}">
         <span class="naItemTitle">${esc(it.overskrift || it.indhold || "Uden overskrift")}</span>
         <span class="naItemMeta">
           <span class="newsTypeBadge ${esc(it.type)}">${esc(TYPE_LABEL[it.type] || "Nyhed")}</span>
@@ -157,6 +158,7 @@
           ${it.status === "afventer" ? '<span class="naPendingDot">AFVENTER</span>' : ""}
           ${it.status === "afvist" ? "<span>· Afvist</span>" : ""}
           ${it.status === "inaktiv" ? "<span>· Inaktiv</span>" : ""}
+          ${it.udlobet ? "<span>· Udløbet</span>" : ""}
           ${it.indsender ? `<span>· ${esc(it.indsender.replace(/\s*<[^>]*>/, ""))}</span>` : ""}
           ${it.banner?.active ? `<span class="naBannerDot">${esc(it.banner.tekst)}</span>` : ""}
           ${it.visning === "test" ? '<span class="naVisDot">TEST</span>' : (it.visning === "mig" ? '<span class="naVisDot">KUN MIG</span>' : "")}
@@ -190,6 +192,11 @@
     const indhold = $("indhold").value.trim();
     if (!overskrift) { msg("Skriv en overskrift", "err"); $("overskrift").focus(); return; }
     if (!indhold) { msg("Skriv en kort besked", "err"); $("indhold").focus(); return; }
+    const udlob = selectedType() === "tip" ? "" : $("udlobsdato").value;
+    const slut = $("slutdato").value;
+    if (udlob && slut && udlob > slut) {
+      msg("“Vis på forsiden til og med” kan ikke ligge efter udløbsdatoen", "err"); $("slutdato").focus(); return;
+    }
 
     const btn = $("saveBtn");
     btn.disabled = true;
@@ -205,7 +212,8 @@
         videourl: v,  // serveren omsætter OneDrive-linket til integrering
         aktiv: $("aktiv").checked,
         status: statusOverride || ((currentStatus === "afventer" || currentStatus === "afvist") ? currentStatus : ($("aktiv").checked ? "aktiv" : "inaktiv")),
-        udlobsdato: selectedType() === "tip" ? null : ($("udlobsdato").value || null),
+        udlobsdato: udlob || null,
+        slutdato: slut || null,
         visning: document.querySelector('input[name="visning"]:checked')?.value || "alle",
         banner: currentBanner()
       };
@@ -304,7 +312,7 @@
       onChange: () => { dirty = true; }
     });
 
-    ["overskrift", "indhold", "udlobsdato", "bannertekst", "bannerSlut"].forEach(id =>
+    ["overskrift", "indhold", "udlobsdato", "slutdato", "bannertekst", "bannerSlut"].forEach(id =>
       $(id).addEventListener("input", () => { dirty = true; }));
     ["aktiv", "bannerTile", "bannerNavbar", "bannercolor"].forEach(id =>
       $(id).addEventListener("change", () => { dirty = true; }));

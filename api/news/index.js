@@ -1,4 +1,4 @@
-// /api/news            → alle aktive nyheder/tips/referater (nyeste først)
+// /api/news            → alle aktive, ikke-udløbne nyheder/tips/referater (nyeste først)
 // /api/news/{id}       → én nyhed med hele teksten
 const N = require("../_news");
 const { T } = N;
@@ -19,6 +19,7 @@ module.exports = async function (context, req) {
         throw e;
       }
       if (!N.yes(row[T.aktiv])) return N.json(context, 404, { error: "Nyheden er ikke aktiv" });
+      if (N.isExpired(row)) return N.json(context, 404, { error: "Nyheden er udløbet" });
       const item = N.mapRow(row, { withBody: true });
       if (!(await N.viewerFilter(req)(item))) return N.json(context, 404, { error: "Nyheden findes ikke" });
       return N.json(context, 200, { item: N.publicItem(item) });
@@ -28,7 +29,8 @@ module.exports = async function (context, req) {
     const data = await N.dv(`${N.TIP_SET}?$select=${select}&$orderby=createdon desc&$top=500`);
     const canSee = N.viewerFilter(req);
     const items = [];
-    for (const r of (data?.value || []).filter(r => N.yes(r[T.aktiv]))) {
+    const now = new Date();
+    for (const r of (data?.value || []).filter(r => N.yes(r[T.aktiv]) && !N.isExpired(r, now))) {
       const m = N.mapRow(r);
       if (await canSee(m)) items.push(N.publicItem(m));
     }
