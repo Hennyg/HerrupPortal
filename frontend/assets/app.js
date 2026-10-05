@@ -796,8 +796,40 @@ function renderSections(items, myFavItems) {
   let me = null;
   try { me = await getMe(); } catch { me = null; }
 
-  const roles = expandRoles(rolesFromMe(me));
-  if (userLine) userLine.textContent = me?.userDetails || "Ikke logget ind";
+  let roles = expandRoles(rolesFromMe(me));
+  let shownUser = me?.userDetails || "Ikke logget ind";
+
+  // Simulering (kun portal_admin), fx til skærmbilleder:
+  //   /?visSom=bruger  → som almindelig bruger (kun portal_user)
+  //   /?visSom=pks     → som brugeren pks@lcherrup.dk (rollerne slås op i Graph)
+  //   /?visSom=mig     → tilbage til egen visning
+  // Huskes i fanen, til den lukkes. Kun visningen ændres – serveren tjekker
+  // stadig de rigtige roller, og "Mine favoritter" er stadig dine egne.
+  try {
+    const isAdmin = roles.includes("portal_admin");
+    const vis = (new URLSearchParams(location.search).get("visSom") || "").trim().toLowerCase();
+    if (vis === "mig" || !isAdmin) sessionStorage.removeItem("hpVisSom");
+    else if (vis) sessionStorage.setItem("hpVisSom", vis);
+
+    const sim = isAdmin ? sessionStorage.getItem("hpVisSom") : null;
+    if (sim === "bruger") {
+      roles = ["portal_user"];
+      console.info("Herrup Portalen: viser som almindelig bruger (portal_user). Slå fra med ?visSom=mig");
+    } else if (sim) {
+      const r = await fetch(`/api/simulate-roles?initialer=${encodeURIComponent(sim)}`, { cache: "no-store" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        sessionStorage.removeItem("hpVisSom");
+        alert(`Kan ikke vise som "${sim}": ${d.error || `HTTP ${r.status}`}`);
+      } else {
+        roles = expandRoles(d.roles);
+        shownUser = d.user?.upn || sim;
+        console.info(`Herrup Portalen: viser som ${d.user?.displayName} (${d.user?.upn}) med roller: ${roles.join(", ") || "(ingen)"}. Slå fra med ?visSom=mig`);
+      }
+    }
+  } catch (e) { console.warn("visSom:", e); }
+
+  if (userLine) userLine.textContent = shownUser;
 
   const adminLink = document.getElementById("adminLink");
   if (adminLink) adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));

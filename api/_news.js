@@ -440,7 +440,7 @@ const LIST_COLS = [TIP_ID, T.overskrift, T.indhold, T.valg, T.udlobsdato, T.slut
 
 module.exports = {
   TIP_SET, TIP_ID, T, VALG, VALG_NAME, IMG_ID, I, EDITOR_ROLES, LIST_COLS,
-  json, dv, imageMeta, getPrincipal, requireEditor, lookupRoles, hasEditorRole,
+  json, dv, imageMeta, getPrincipal, requireEditor, lookupRoles, hasEditorRole, graphToken, graphJson,
   yes, isExpired, bannerActive, frontpageActive, parseVisning, statusOf, STATUS_TEXT, mapRow,
   cleanHtml, syncImages, resolveVideoLink, viewerFilter, publicItem
 };
