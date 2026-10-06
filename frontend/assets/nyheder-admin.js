@@ -97,6 +97,17 @@
     $("udlobRow").style.display = selectedType() === "tip" ? "none" : "";
   }
 
+  // Standarddatoer for nye nyheder: forsiden i 7 dage, fjernes helt efter 2 måneder
+  function isoDate(d) {
+    const p = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  function defaultDates() {
+    const front = new Date(); front.setDate(front.getDate() + 7);
+    const end = new Date(); end.setMonth(end.getMonth() + 2);
+    return { udlobsdato: isoDate(front), slutdato: isoDate(end) };
+  }
+
   // Video-feltet: forhåndsvisning via /api/news-video (se newsCommon.js)
   let videoField = null;
   const updateVideoPreview = () => videoField?.refresh();
@@ -118,8 +129,13 @@
       ? `❌ Afvist. Indsendt af <strong>${esc(it?.indsender || "ukendt")}</strong>.`
       : `⏳ Venter på godkendelse. Indsendt af <strong>${esc(it?.indsender || "ukendt")}</strong> ${esc(fmtDate(it?.createdon, true))}.`;
     $("rejectBtn").hidden = currentStatus === "afvist";
-    $("udlobsdato").value = it?.udlobsdato || "";
-    $("slutdato").value = it?.slutdato || "";
+    // Samme knapper nederst ved Gem
+    $("approveBtn2").hidden = !pending;
+    $("rejectBtn2").hidden = !pending || currentStatus === "afvist";
+    $("saveBtn").classList.toggle("primary", !pending);   // Godkend er hovedknappen, når den venter
+    const defs = it ? {} : defaultDates();
+    $("udlobsdato").value = it ? (it.udlobsdato || "") : defs.udlobsdato;
+    $("slutdato").value = it ? (it.slutdato || "") : defs.slutdato;
     $("bannertekst").value = it?.banner?.tekst || "";
     $("bannercolor").value = /^#[0-9a-f]{6}$/i.test(it?.banner?.farve || "") ? it.banner.farve : DEFAULT_COLOR;
     // Kun ét sted ad gangen – ældre nyheder med begge sat vises som tip-tile
@@ -142,7 +158,7 @@
 
     // Overskrift + fold valgfrie afsnit ud, hvis de er i brug
     $("formTitle").textContent = currentId ? `Ret: ${it?.overskrift || "nyhed"}` : "Ny nyhed";
-    $("datesDetails").open = !!(it?.udlobsdato || it?.slutdato);
+    $("datesDetails").open = !it || !!(it.udlobsdato || it.slutdato);
     $("bannerDetails").open = !!(it?.banner?.tekst);
 
     updateCounter(); updateTypeUI(); updateBannerUI(); updateVideoPreview(); updateSaveHint();
@@ -225,7 +241,9 @@
   }
 
   // ── Gem / slet ────────────────────────────────────────────────────────────
-  async function save(statusOverride) {
+  // Gem / godkend / afvis → tilbage til forsiden, når det lykkes.
+  // Ctrl+S gemmer og bliver på siden (stay).
+  async function save(statusOverride, { stay = false } = {}) {
     if (typeof statusOverride !== "string") statusOverride = "";
     const overskrift = $("overskrift").value.trim();
     const indhold = $("indhold").value.trim();
@@ -260,6 +278,10 @@
       msg("Gemmer…");
       const r = await api(currentId ? "PUT" : "POST", currentId ? `/api/news-admin/${currentId}` : "/api/news-admin", payload);
       dirty = false;
+      if (!stay && !r.imageWarning) {
+        location.href = "/";
+        return;
+      }
       await loadList();
       const saved = r.id ? items.find(x => x.id === r.id) : null;
       if (r.id && r.id !== currentId) {
@@ -392,10 +414,14 @@
     $("listQx").addEventListener("click", () => { $("listQ").value = ""; renderList(); });
     $("newBtn").addEventListener("click", () => { if (confirmDiscard()) fillForm(null); });
     $("saveBtn").addEventListener("click", () => save());
-    $("approveBtn").addEventListener("click", () => save("aktiv"));
-    $("rejectBtn").addEventListener("click", () => {
+    const approve = () => save("aktiv");
+    const reject = () => {
       if (confirm("Afvis nyheden? Den bliver ikke vist, men kan godkendes senere.")) save("afvist");
-    });
+    };
+    $("approveBtn").addEventListener("click", approve);
+    $("rejectBtn").addEventListener("click", reject);
+    $("approveBtn2").addEventListener("click", approve);
+    $("rejectBtn2").addEventListener("click", reject);
     $("pendingChip").addEventListener("click", () => {
       listFilter = listFilter === "afventer" ? "" : "afventer";
       renderList();
@@ -404,7 +430,7 @@
     $("deleteBtn").addEventListener("click", remove);
     window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
     document.addEventListener("keydown", e => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save("", { stay: true }); }
     });
 
     const startId = new URLSearchParams(location.search).get("id");
