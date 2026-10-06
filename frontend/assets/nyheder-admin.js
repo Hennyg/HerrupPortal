@@ -156,9 +156,11 @@
   }
 
   // ── Liste ─────────────────────────────────────────────────────────────────
-  // Ikke færdige: indsendt til godkendelse, eller kun synlig for mig/redaktører
+  // Venter = indsendt af en medarbejder og ikke godkendt endnu (status "Afventer"),
+  // eller en kladde ("Kun mig"), som ikke er udløbet. Nyheder, der kun er synlige
+  // for redaktører, ligger under "Alle nyheder" med mærket REDAKTØRER.
   const isWaiting = it => it.status === "afventer" ||
-    (it.status === "aktiv" && !it.udlobet && (it.visning === "mig" || it.visning === "test"));
+    (it.status === "aktiv" && !it.udlobet && it.visning === "mig");
 
   function itemHTML(it) {
     return `
