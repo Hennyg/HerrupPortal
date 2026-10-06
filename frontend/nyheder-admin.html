@@ -13,7 +13,7 @@
 <style>
   .naFormTitle{margin:0 0 .6rem;font-size:1.25rem;color:var(--heading)}
   .naIntro{background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:.7rem .9rem;font-size:.9rem;margin-bottom:14px;line-height:1.45}
-  .naStep h3{display:flex;align-items:center;gap:8px}
+  .naStep h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .naStepNo{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--nav-accent,#c30a14);color:#fff;font-size:.8rem;font-weight:700;flex-shrink:0}
   .naOptional{font-size:.72rem;font-weight:600;color:#6b7280;background:#f3f4f6;border-radius:999px;padding:2px 8px}
   .naTypeCards{gap:10px}
@@ -110,18 +110,16 @@
           </div>
 
           <div class="formRow" style="margin-top:12px">
-            <div class="naLabelRow">
-              <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– det man ser på forsiden. 1–3 linjer</span></label>
-              <button type="button" class="naAiBtn" id="aiBtn">✨ Send tekst til AI</button>
-            </div>
-            <textarea id="indhold" class="field" rows="3" placeholder="Et par linjer om hvad nyheden handler om"></textarea>
+            <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– det man ser på forsiden. 1–3 linjer</span></label>
+            <textarea id="indhold" class="field" rows="3" placeholder="Skriv selv et par linjer om, hvad nyheden handler om.&#10;Har du en længere tekst? Sæt den ind under “Hele teksten” i trin 2, og tryk ✨ – så skriver AI den korte besked for dig."></textarea>
             <div class="naCounter" id="indholdCount">0 / 300</div>
           </div>
         </div>
 
         <!-- Trin 2 -->
         <div class="naSection naStep full">
-          <h3><span class="naStepNo">2</span> Mere indhold <span class="naOptional">valgfrit</span></h3>
+          <h3><span class="naStepNo">2</span> Mere indhold <span class="naOptional">valgfrit</span>
+            <button type="button" class="naAiBtn" id="aiBtn" style="margin-left:auto" title="Læser Hele teksten og skriver en kort besked i trin 1">✨ Dan kort besked ud fra hele teksten med AI</button></h3>
 
           <div class="formRow">
             <label>Hele teksten <span class="muted" style="font-weight:400">– vises når man klikker på nyheden. Kopiér gerne Teams-opsummeringen ind. Billeder kan sættes ind, trækkes ind eller vælges med 🖼</span></label>
