@@ -29,7 +29,12 @@
 </div>
 
 <div class="container" style="padding-top:1.25rem">
-  <a class="newsBack" href="/nyheder.html">← Alle nyheder</a>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+    <a class="newsBack" href="/nyheder.html" style="margin-bottom:0">← Alle nyheder</a>
+    <div id="editBar" hidden>
+      <a class="btn primary" id="editBtn" href="#" style="text-decoration:none">✏️ Ret nyhed</a>
+    </div>
+  </div>
 
   <div id="notFound" class="panel newsEmpty" hidden></div>
 
@@ -39,9 +44,6 @@
       <h1 id="title"></h1>
       <div class="newsLead" id="lead"></div>
       <div class="newsBody" id="body"></div>
-      <div class="naActions" id="editBar" hidden>
-        <a class="btn" id="editBtn" href="#" style="text-decoration:none">Ret nyhed</a>
-      </div>
     </article>
 
     <aside class="panel newsVideoTile" id="videoTile" hidden>
