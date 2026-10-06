@@ -10,6 +10,28 @@
 <link rel="stylesheet" href="/assets/app.css?v=20260925-news5" />
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+<style>
+  .naFormTitle{margin:0 0 .6rem;font-size:1.25rem;color:var(--heading)}
+  .naIntro{background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:.7rem .9rem;font-size:.9rem;margin-bottom:14px;line-height:1.45}
+  .naStep h3{display:flex;align-items:center;gap:8px}
+  .naStepNo{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--nav-accent,#c30a14);color:#fff;font-size:.8rem;font-weight:700;flex-shrink:0}
+  .naOptional{font-size:.72rem;font-weight:600;color:#6b7280;background:#f3f4f6;border-radius:999px;padding:2px 8px}
+  .naTypeCards{gap:10px}
+  .naTypeCards label{border:1px solid #e5e7eb;border-radius:10px;padding:8px 12px;background:#fff;align-items:flex-start;flex:1 1 180px}
+  .naTypeCards label:has(input:checked){border-color:var(--nav-accent,#c30a14);box-shadow:0 0 0 2px rgba(195,10,20,.12)}
+  .naTypeCards input{margin-top:3px}
+  .naTypeCards small{display:block;font-weight:400;color:#6b7280;font-size:.78rem}
+  .naMore{margin-top:12px}
+  .naMore > summary{cursor:pointer;font-weight:600;color:var(--heading);list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .naMore > summary::-webkit-details-marker{display:none}
+  .naMore > summary::after{content:"▸";color:#9ca3af;margin-left:auto;transition:transform .15s}
+  .naMore[open] > summary::after{transform:rotate(90deg)}
+  .naMoreBig{margin-top:0}
+  .naMoreBig > summary{font-size:.98rem}
+  .naSummaryHint{font-weight:400;font-size:.85rem}
+  .naActionsSticky{position:sticky;bottom:0;background:#fff;z-index:5;padding-bottom:12px;margin-left:-1px;margin-right:-1px}
+  .naSaveHint{font-size:.85rem;color:#374151}
+</style>
 </head>
 <body class="adminPage">
 <div class="navbar">
@@ -62,121 +84,161 @@
         </div>
         <div class="muted" style="font-size:.8rem;margin-top:6px">Du kan rette alle felter, før du godkender. “Gem” gemmer uden at udgive.</div>
       </div>
+      <h2 class="naFormTitle" id="formTitle">Ny nyhed</h2>
+      <div class="naIntro">
+        👋 <strong>Sådan gør du:</strong> Udfyld <strong>trin 1</strong> – resten er valgfrit. Tryk <strong>Gem</strong> nederst, når du er klar.
+        Vil du øve dig først, så vælg <em>Kun mig</em> under trin 3.
+      </div>
+
       <div class="naGrid">
-        <div class="formRow full">
-          <label>Type</label>
-          <div class="naRadios">
-            <label><input type="radio" name="type" value="nyhed" checked> 📢 Nyhed</label>
-            <label><input type="radio" name="type" value="olkassemode"> 🍺 Ølkassemøde</label>
-            <label><input type="radio" name="type" value="tip"> 💡 Tip</label>
-          </div>
-        </div>
+        <!-- Trin 1 -->
+        <div class="naSection naStep full">
+          <h3><span class="naStepNo">1</span> Hvad vil du fortælle?</h3>
 
-        <div class="formRow full">
-          <label for="overskrift">Overskrift</label>
-          <input id="overskrift" class="field" maxlength="200" placeholder="Fx Ølkassemøde 19. september 2026" />
-        </div>
-
-        <div class="formRow full">
-          <div class="naLabelRow">
-            <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– vises på forsiden og i nyhedsoversigten</span></label>
-            <button type="button" class="naAiBtn" id="aiBtn">✨ Send tekst til AI</button>
-          </div>
-          <textarea id="indhold" class="field" rows="3" placeholder="Et par linjer om hvad nyheden handler om"></textarea>
-          <div class="naCounter" id="indholdCount">0 / 300</div>
-        </div>
-
-        <div class="formRow full">
-          <label>Hele teksten <span class="muted" style="font-weight:400">– kopiér gerne Teams-opsummeringen ind. Billeder kan indsættes, trækkes ind eller vælges med 🖼</span></label>
-          <div class="naEditorWrap"><div id="editor"></div></div>
-        </div>
-
-        <div class="formRow full">
-          <div class="naLabelRow">
-            <label for="videourl">Video <span class="muted" style="font-weight:400">– indsæt linket fra OneDrive</span></label>
-            <a href="#" id="videoHelpLink" class="naHelpLink">❓ Sådan får du en video fra din pc ind her</a>
-          </div>
-          <input id="videourl" class="field" type="url" autocomplete="off" placeholder="Indsæt linket fra OneDrive (Del → Kopiér link)" />
-          <div id="videoPreview" class="naVideoPreview"></div>
-        </div>
-
-        <div class="naSection">
-          <h3>Synlighed</h3>
-          <div class="naChecks" style="margin-bottom:10px" id="aktivRow">
-            <label><input type="checkbox" id="aktiv" checked> Aktiv (vises)</label>
-          </div>
-          <div class="formRow" style="margin-bottom:10px">
-            <label>Hvem må se nyheden</label>
-            <div class="naRadios">
-              <label><input type="radio" name="visning" value="mig"> Kun mig</label>
-              <label><input type="radio" name="visning" value="test"> Testgruppe</label>
-              <label><input type="radio" name="visning" value="alle" checked> Alle</label>
-            </div>
-            <div class="muted" style="font-size:.8rem">Gælder nyheden overalt – forsiden, Nyheder og bjælken. Testgruppe = portal_admin og portal_hp_nyheder.</div>
-          </div>
-          <div class="formRow" id="udlobRow">
-            <label for="udlobsdato">Vis på forsiden til og med</label>
-            <input id="udlobsdato" class="field" type="date" />
-            <div class="muted" style="font-size:.8rem">Tom = altid. Nyheden bliver liggende under Nyheder bagefter.</div>
-          </div>
-          <div class="formRow" style="margin-top:10px">
-            <label for="slutdato">Udløbsdato <span class="muted" style="font-weight:400">– forsvinder helt til og med denne dag</span></label>
-            <input id="slutdato" class="field" type="date" />
-            <div class="muted" style="font-size:.8rem">Tom = udløber aldrig. Efter datoen vises nyheden hverken på forsiden, under Nyheder eller i bjælken – men den kan stadig ses og rettes her.</div>
-          </div>
-        </div>
-
-        <div class="naSection">
-          <h3>Nyhedsbjælke</h3>
           <div class="formRow">
-            <label for="bannertekst">Label</label>
-            <input id="bannertekst" class="field" maxlength="30" placeholder="Tom = ingen bjælke" />
-            <div class="naPresets">
-              <button type="button" class="naPreset" data-text="LIVE">LIVE</button>
-              <button type="button" class="naPreset" data-text="BREAKING">BREAKING</button>
-              <button type="button" class="naPreset" data-text="NYT">NYT</button>
-              <button type="button" class="naPreset" data-text="VIGTIGT">VIGTIGT</button>
+            <label>Hvad slags opslag er det?</label>
+            <div class="naRadios naTypeCards">
+              <label><input type="radio" name="type" value="nyhed" checked> <span>📢 <strong>Nyhed</strong><small>Almindelig nyhed til alle</small></span></label>
+              <label><input type="radio" name="type" value="olkassemode"> <span>🍺 <strong>Ølkassemøde</strong><small>Referat og video fra mødet</small></span></label>
+              <label><input type="radio" name="type" value="tip"> <span>💡 <strong>Tip</strong><small>Et godt råd på forsiden</small></span></label>
             </div>
           </div>
-          <div class="formRow" style="margin-top:10px">
-            <label>Farve</label>
-            <div class="naSwatches" id="swatches">
-              <span class="naSwatch" data-color="#FFD400" style="background:#FFD400" title="Gul"></span>
-              <span class="naSwatch" data-color="#FF8A00" style="background:#FF8A00" title="Orange"></span>
-              <span class="naSwatch" data-color="#C30A14" style="background:#C30A14" title="Rød"></span>
-              <span class="naSwatch" data-color="#1F6C7A" style="background:#1F6C7A" title="Petrol"></span>
-              <span class="naSwatch" data-color="#111827" style="background:#111827" title="Sort"></span>
-              <input type="color" id="bannercolor" class="naColor" value="#FFD400" title="Vælg selv" />
+
+          <div class="formRow" style="margin-top:12px">
+            <label for="overskrift">Overskrift</label>
+            <input id="overskrift" class="field" maxlength="200" placeholder="Fx Ølkassemøde 19. september 2026" />
+          </div>
+
+          <div class="formRow" style="margin-top:12px">
+            <div class="naLabelRow">
+              <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– det man ser på forsiden. 1–3 linjer</span></label>
+              <button type="button" class="naAiBtn" id="aiBtn">✨ Send tekst til AI</button>
+            </div>
+            <textarea id="indhold" class="field" rows="3" placeholder="Et par linjer om hvad nyheden handler om"></textarea>
+            <div class="naCounter" id="indholdCount">0 / 300</div>
+          </div>
+        </div>
+
+        <!-- Trin 2 -->
+        <div class="naSection naStep full">
+          <h3><span class="naStepNo">2</span> Mere indhold <span class="naOptional">valgfrit</span></h3>
+
+          <div class="formRow">
+            <label>Hele teksten <span class="muted" style="font-weight:400">– vises når man klikker på nyheden. Kopiér gerne Teams-opsummeringen ind. Billeder kan sættes ind, trækkes ind eller vælges med 🖼</span></label>
+            <div class="naEditorWrap"><div id="editor"></div></div>
+          </div>
+
+          <div class="formRow" style="margin-top:12px">
+            <div class="naLabelRow">
+              <label for="videourl">Video <span class="muted" style="font-weight:400">– link fra OneDrive</span></label>
+              <a href="#" id="videoHelpLink" class="naHelpLink">❓ Sådan får du en video fra din pc ind her</a>
+            </div>
+            <input id="videourl" class="field" type="url" autocomplete="off" placeholder="Indsæt linket fra OneDrive (Del → Kopiér link)" />
+            <div id="videoPreview" class="naVideoPreview"></div>
+          </div>
+        </div>
+
+        <!-- Trin 3 -->
+        <div class="naSection naStep full">
+          <h3><span class="naStepNo">3</span> Hvem skal se den?</h3>
+
+          <div class="formRow">
+            <div class="naRadios naTypeCards">
+              <label><input type="radio" name="visning" value="alle" checked> <span>👥 <strong>Alle medarbejdere</strong><small>Udgives med det samme</small></span></label>
+              <label><input type="radio" name="visning" value="test"> <span>🧪 <strong>Redaktører</strong><small>Kun nyhedsredaktører – til gennemsyn</small></span></label>
+              <label><input type="radio" name="visning" value="mig"> <span>🙋 <strong>Kun mig</strong><small>Kladde – til at øve eller vente med</small></span></label>
             </div>
           </div>
-          <div class="formRow" style="margin-top:10px">
-            <label>Placering</label>
-            <div class="naRadios">
-              <label><input type="radio" name="bannerPlace" id="bannerTile" value="tile" checked> I tip-tile'n</label>
-              <label><input type="radio" name="bannerPlace" id="bannerNavbar" value="navbar"> Under navbaren</label>
+
+          <div class="naChecks" style="margin-top:12px" id="aktivRow">
+            <label><input type="checkbox" id="aktiv" checked> Vis nyheden <span class="muted">(fjern fluebenet for at skjule den uden at slette)</span></label>
+          </div>
+
+          <details class="naMore" id="datesDetails">
+            <summary>📅 Hvor længe skal den vises? <span class="naOptional">valgfrit</span></summary>
+            <div class="naGrid" style="margin-top:10px">
+              <div class="formRow" id="udlobRow">
+                <label for="udlobsdato">Vis på forsiden til og med</label>
+                <input id="udlobsdato" class="field" type="date" />
+                <div class="muted" style="font-size:.8rem">Tom = så længe den er blandt de nyeste. Bagefter kan den stadig findes under Nyheder.</div>
+              </div>
+              <div class="formRow">
+                <label for="slutdato">Fjern nyheden helt efter</label>
+                <input id="slutdato" class="field" type="date" />
+                <div class="muted" style="font-size:.8rem">Tom = den bliver liggende. Efter datoen kan kun redaktører se den (her).</div>
+              </div>
             </div>
-          </div>
-          <div class="formRow" style="margin-top:10px">
-            <div class="muted" style="font-size:.8rem">Når en bruger har åbnet nyheden, stopper bjælken for den bruger.</div>
-            <div><button type="button" class="btn" id="resetSeenBtn" style="margin-top:6px">Vis bjælken igen for mig</button></div>
-          </div>
-          <div class="formRow" style="margin-top:10px">
-            <label for="bannerSlut">Bjælken slutter</label>
-            <input id="bannerSlut" class="field" type="datetime-local" />
-            <div class="muted" style="font-size:.8rem">Tom = indtil den slås fra</div>
-          </div>
-          <div class="formRow" style="margin-top:10px">
-            <label for="bannerMax">Stop efter antal besøg på forsiden</label>
-            <input id="bannerMax" class="field" type="number" min="1" max="999" step="1" placeholder="Tom = ingen grænse" style="max-width:180px" />
-            <div class="muted" style="font-size:.8rem">Bjælken vises de første X gange, brugeren åbner forsiden, efter nyheden er lagt op eller rettet. Tælles pr. browser.</div>
-          </div>
-          <div class="naPreview" id="bannerPreview"></div>
+          </details>
+        </div>
+
+        <!-- Trin 4 -->
+        <div class="naSection naStep full">
+          <details class="naMore naMoreBig" id="bannerDetails">
+            <summary><span class="naStepNo">4</span> Kørende nyhedsbjælke <span class="naOptional">valgfrit</span>
+              <span class="muted naSummaryHint">– en farvet bjælke med rullende tekst, der fanger opmærksomheden</span></summary>
+
+            <div class="naGrid" style="margin-top:12px">
+              <div class="formRow">
+                <label for="bannertekst">Ord i bjælken</label>
+                <input id="bannertekst" class="field" maxlength="30" placeholder="Tom = ingen bjælke" />
+                <div class="naPresets">
+                  <button type="button" class="naPreset" data-text="NYT">NYT</button>
+                  <button type="button" class="naPreset" data-text="VIGTIGT">VIGTIGT</button>
+                  <button type="button" class="naPreset" data-text="LIVE">LIVE</button>
+                  <button type="button" class="naPreset" data-text="BREAKING">BREAKING</button>
+                </div>
+              </div>
+              <div class="formRow">
+                <label>Farve</label>
+                <div class="naSwatches" id="swatches">
+                  <span class="naSwatch" data-color="#FFD400" style="background:#FFD400" title="Gul"></span>
+                  <span class="naSwatch" data-color="#FF8A00" style="background:#FF8A00" title="Orange"></span>
+                  <span class="naSwatch" data-color="#C30A14" style="background:#C30A14" title="Rød"></span>
+                  <span class="naSwatch" data-color="#1F6C7A" style="background:#1F6C7A" title="Petrol"></span>
+                  <span class="naSwatch" data-color="#111827" style="background:#111827" title="Sort"></span>
+                  <input type="color" id="bannercolor" class="naColor" value="#FFD400" title="Vælg selv" />
+                </div>
+              </div>
+              <div class="formRow full">
+                <label>Hvor skal den vises?</label>
+                <div class="naRadios">
+                  <label><input type="radio" name="bannerPlace" id="bannerTile" value="tile" checked> I nyhedsboksen på forsiden</label>
+                  <label><input type="radio" name="bannerPlace" id="bannerNavbar" value="navbar"> Under menulinjen på alle sider</label>
+                </div>
+              </div>
+              <div class="formRow full">
+                <label>Sådan ser den ud</label>
+                <div class="naPreview" id="bannerPreview"></div>
+                <div class="muted" id="bannerPreviewEmpty" style="font-size:.85rem">Skriv et ord i bjælken (fx NYT) for at se den.</div>
+              </div>
+              <div class="formRow full">
+                <label>Hvornår stopper den?</label>
+                <div class="muted" style="font-size:.85rem;margin-bottom:6px">Den stopper altid af sig selv for den enkelte, når de har læst nyheden. Du kan også stoppe den tidligere:</div>
+              </div>
+              <div class="formRow">
+                <label for="bannerSlut">På et bestemt tidspunkt</label>
+                <input id="bannerSlut" class="field" type="datetime-local" />
+              </div>
+              <div class="formRow">
+                <label for="bannerMax">Når man har været på forsiden</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <input id="bannerMax" class="field" type="number" min="1" max="999" step="1" placeholder="fx 5" style="max-width:110px" />
+                  <span class="muted">gange</span>
+                </div>
+              </div>
+              <div class="formRow full">
+                <div><button type="button" class="btn" id="resetSeenBtn">Vis bjælken igen for mig</button>
+                <span class="muted" style="font-size:.8rem;margin-left:6px">– hvis du selv vil se den igen</span></div>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
-      <div class="naActions">
+      <div class="naActions naActionsSticky">
         <button type="button" class="btn primary" id="saveBtn">Gem</button>
         <a class="btn" id="viewBtn" href="#" target="_blank" rel="noopener" hidden style="text-decoration:none">Vis nyhed</a>
+        <span class="naSaveHint" id="saveHint"></span>
         <span class="naMsg" id="msg"></span>
         <span class="spacer"></span>
         <button type="button" class="btn danger" id="deleteBtn" hidden>🗑️ Slet nyhed</button>
@@ -189,6 +251,6 @@
 <script src="/assets/newsEditor.js?v=20260925-1"></script>
 <script src="/assets/newsCommon.js?v=20260925-3"></script>
 <script src="/assets/newsTicker.js?v=20260925-2"></script>
-<script src="/assets/nyheder-admin.js?v=20261006-1"></script>
+<script src="/assets/nyheder-admin.js?v=20261006-2"></script>
 </body>
 </html>

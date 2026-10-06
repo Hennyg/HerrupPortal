@@ -65,12 +65,26 @@
     const off = !b.tekst;
     $("bannerTile").disabled = off;
     $("bannerNavbar").disabled = off;
+    $("bannerPreviewEmpty").hidden = !!b.tekst;
     window.HerrupTicker?.preview($("bannerPreview"), b.tekst ? {
       ...b,
       overskrift: $("overskrift").value.trim() || "Overskrift",
       indhold: $("indhold").value.trim() || "Kort besked",
       hasBody: false
     } : null);
+  }
+
+  // Fortæl i klart sprog, hvad der sker, når man trykker Gem
+  function updateSaveHint() {
+    const vis = document.querySelector('input[name="visning"]:checked')?.value || "alle";
+    const pending = currentStatus === "afventer" || currentStatus === "afvist";
+    let t = "";
+    if (pending) t = "";
+    else if (!$("aktiv").checked) t = "🙈 Skjult – ingen kan se den, før du sætter flueben i “Vis nyheden”.";
+    else if (vis === "mig") t = "🙋 Kun du kan se den.";
+    else if (vis === "test") t = "🧪 Kun redaktører kan se den.";
+    else t = currentId ? "👥 Alle medarbejdere kan se den." : "👥 Udgives til alle medarbejdere, når du gemmer.";
+    $("saveHint").textContent = t;
   }
 
   function updateCounter() {
@@ -126,7 +140,12 @@
     if (currentId) u.searchParams.set("id", currentId); else u.searchParams.delete("id");
     history.replaceState(null, "", u);
 
-    updateCounter(); updateTypeUI(); updateBannerUI(); updateVideoPreview();
+    // Overskrift + fold valgfrie afsnit ud, hvis de er i brug
+    $("formTitle").textContent = currentId ? `Ret: ${it?.overskrift || "nyhed"}` : "Ny nyhed";
+    $("datesDetails").open = !!(it?.udlobsdato || it?.slutdato);
+    $("bannerDetails").open = !!(it?.banner?.tekst);
+
+    updateCounter(); updateTypeUI(); updateBannerUI(); updateVideoPreview(); updateSaveHint();
     renderList();
     dirty = false;
     msg("");
@@ -318,7 +337,8 @@
       $(id).addEventListener("input", () => { dirty = true; }));
     ["aktiv", "bannerTile", "bannerNavbar", "bannercolor"].forEach(id =>
       $(id).addEventListener("change", () => { dirty = true; }));
-    document.querySelectorAll('input[name="visning"]').forEach(r => r.addEventListener("change", () => { dirty = true; }));
+    document.querySelectorAll('input[name="visning"]').forEach(r => r.addEventListener("change", () => { dirty = true; updateSaveHint(); }));
+    $("aktiv").addEventListener("change", updateSaveHint);
 
     $("resetSeenBtn").addEventListener("click", () => {
       if (!currentId) return;
