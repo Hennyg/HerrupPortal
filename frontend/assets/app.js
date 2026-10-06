@@ -814,6 +814,7 @@ function renderSections(items, myFavItems) {
     const sim = isAdmin ? sessionStorage.getItem("hpVisSom") : null;
     if (sim === "bruger") {
       roles = ["portal_user"];
+      shownUser = "Vis som: kontakter";
       console.info("Herrup Portalen: viser som almindelig bruger (portal_user). Slå fra med ?visSom=mig");
     } else if (sim) {
       const r = await fetch(`/api/simulate-roles?initialer=${encodeURIComponent(sim)}`, { cache: "no-store" });
@@ -823,7 +824,7 @@ function renderSections(items, myFavItems) {
         alert(`Kan ikke vise som "${sim}": ${d.error || `HTTP ${r.status}`}`);
       } else {
         roles = expandRoles(d.roles);
-        shownUser = d.user?.upn || sim;
+        shownUser = `Vis som: ${String(d.user?.upn || sim).split("@")[0].toUpperCase()}`;
         console.info(`Herrup Portalen: viser som ${d.user?.displayName} (${d.user?.upn}) med roller: ${roles.join(", ") || "(ingen)"}. Slå fra med ?visSom=mig`);
       }
     }
