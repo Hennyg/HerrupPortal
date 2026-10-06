@@ -54,7 +54,8 @@
       farve: $("bannercolor").value.toUpperCase(),
       tile: $("bannerTile").checked,
       navbar: $("bannerNavbar").checked,
-      slut: $("bannerSlut").value ? new Date($("bannerSlut").value).toISOString() : null
+      slut: $("bannerSlut").value ? new Date($("bannerSlut").value).toISOString() : null,
+      max: $("bannerMax").value ? Number($("bannerMax").value) : null
     };
   }
 
@@ -112,6 +113,7 @@
     $("bannerTile").checked = !onNavbar;
     $("bannerNavbar").checked = onNavbar;
     $("bannerSlut").value = toLocalInput(it?.banner?.slut);
+    $("bannerMax").value = it?.banner?.max || "";
     const vis = it?.visning || "alle";
     document.querySelectorAll('input[name="visning"]').forEach(r => { r.checked = r.value === vis; });
     $("resetSeenBtn").hidden = !currentId;
@@ -312,7 +314,7 @@
       onChange: () => { dirty = true; }
     });
 
-    ["overskrift", "indhold", "udlobsdato", "slutdato", "bannertekst", "bannerSlut"].forEach(id =>
+    ["overskrift", "indhold", "udlobsdato", "slutdato", "bannertekst", "bannerSlut", "bannerMax"].forEach(id =>
       $(id).addEventListener("input", () => { dirty = true; }));
     ["aktiv", "bannerTile", "bannerNavbar", "bannercolor"].forEach(id =>
       $(id).addEventListener("change", () => { dirty = true; }));

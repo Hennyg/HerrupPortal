@@ -43,10 +43,49 @@
     const map = readSeen();
     delete map[id];
     writeSeen(map);
+    resetViews(id);   // "Vis bjælken igen for mig" nulstiller også besøgstælleren
   }
   function isSeen(b) {
     const e = readSeen()[b.id];
     return !!e && e.v === (b.modifiedon || "");
+  }
+
+  // ── Antal besøg på forsiden pr. bjælke (i denne browser) ─────────────────
+  // Har bjælken en grænse (b.max), vises den de første X gange forsiden åbnes,
+  // efter nyheden er lagt op eller rettet (ny modifiedon nulstiller tælleren).
+  // Gemmes som { id: { v, n, at } } – højst 100 nyheder, så det fylder intet.
+  const VIEWS_KEY = "herrup-banner-views";
+  const countedNow = new Set();   // tæl kun én gang pr. sidevisning
+  function readViews() {
+    try { return JSON.parse(localStorage.getItem(VIEWS_KEY) || "{}") || {}; } catch { return {}; }
+  }
+  function writeViews(map) {
+    const entries = Object.entries(map).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)).slice(0, 100);
+    try { localStorage.setItem(VIEWS_KEY, JSON.stringify(Object.fromEntries(entries))); } catch { /* ignoreres */ }
+  }
+  function viewsOf(b, map = readViews()) {
+    const e = map[b.id];
+    return e && e.v === (b.modifiedon || "") ? (e.n || 0) : 0;
+  }
+  function isUsedUp(b) {
+    return Number(b.max) > 0 && viewsOf(b) >= Number(b.max);
+  }
+  // Kaldes på forsiden: tæl et besøg for hver bjælke med grænse, der vises nu
+  function countVisit(list) {
+    const map = readViews();
+    let changed = false;
+    for (const b of list) {
+      if (!(Number(b.max) > 0) || countedNow.has(b.id)) continue;
+      countedNow.add(b.id);
+      map[b.id] = { v: b.modifiedon || "", n: viewsOf(b, map) + 1, at: Date.now() };
+      changed = true;
+    }
+    if (changed) writeViews(map);
+  }
+  function resetViews(id) {
+    const map = readViews();
+    delete map[id];
+    writeViews(map);
   }
 
   function segmentHTML(b, withLabel) {
@@ -116,8 +155,12 @@
   }
 
   // banners: array fra /api/tips → { id, tekst, farve, tile, navbar, overskrift, indhold, hasBody }
+  // tile = true betyder forsiden – kun der tælles besøg
   function render(banners, { tile = true } = {}) {
-    const list = Array.isArray(banners) ? banners.filter(b => b && b.tekst && !isSeen(b)) : [];
+    const list = Array.isArray(banners)
+      ? banners.filter(b => b && b.tekst && !isSeen(b) && (countedNow.has(b.id) || !isUsedUp(b)))
+      : [];
+    if (tile) countVisit(list);
     renderNav(list.filter(b => b.navbar));
     if (tile) renderTile(list.filter(b => b.tile));
   }

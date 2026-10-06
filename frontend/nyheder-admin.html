@@ -165,6 +165,11 @@
             <input id="bannerSlut" class="field" type="datetime-local" />
             <div class="muted" style="font-size:.8rem">Tom = indtil den slås fra</div>
           </div>
+          <div class="formRow" style="margin-top:10px">
+            <label for="bannerMax">Stop efter antal besøg på forsiden</label>
+            <input id="bannerMax" class="field" type="number" min="1" max="999" step="1" placeholder="Tom = ingen grænse" style="max-width:180px" />
+            <div class="muted" style="font-size:.8rem">Bjælken vises de første X gange, brugeren åbner forsiden, efter nyheden er lagt op eller rettet. Tælles pr. browser.</div>
+          </div>
           <div class="naPreview" id="bannerPreview"></div>
         </div>
       </div>
@@ -184,6 +189,6 @@
 <script src="/assets/newsEditor.js?v=20260925-1"></script>
 <script src="/assets/newsCommon.js?v=20260925-3"></script>
 <script src="/assets/newsTicker.js?v=20260925-2"></script>
-<script src="/assets/nyheder-admin.js?v=20261005-1"></script>
+<script src="/assets/nyheder-admin.js?v=20261006-1"></script>
 </body>
 </html>

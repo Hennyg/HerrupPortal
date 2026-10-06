@@ -19,6 +19,7 @@ const T = {
   bannerTile:   "cr175_lch_banner_tile",
   bannerNavbar: "cr175_lch_banner_navbar",
   bannerSlut:   "cr175_lch_banner_slut",
+  bannerMax:    "cr175_lch_banner_max",   // bjælken stopper efter X besøg på forsiden (pr. browser)
   // Hvem må se NYHEDEN (og dermed også dens bjælke): "alle", "test" eller "mig:<mail>".
   // Kolonnen hedder "banner_visning" af historiske grunde.
   bannerVisning:"cr175_lch_banner_visning",
@@ -426,6 +427,7 @@ function mapRow(row, { withBody = false } = {}) {
       tile: row[T.bannerTile] === true,
       navbar: row[T.bannerNavbar] === true,
       slut: row[T.bannerSlut] || null,
+      max: Number(row[T.bannerMax]) > 0 ? Number(row[T.bannerMax]) : null,
       active: bannerActive(row)
     },
     createdon: row.createdon || null,
@@ -436,7 +438,7 @@ function mapRow(row, { withBody = false } = {}) {
 }
 
 const LIST_COLS = [TIP_ID, T.overskrift, T.indhold, T.valg, T.udlobsdato, T.slutdato, T.aktiv, T.videourl,
-  T.bannertekst, T.bannercolor, T.bannerTile, T.bannerNavbar, T.bannerSlut, T.bannerVisning, T.indsender, "createdon", "modifiedon"];
+  T.bannertekst, T.bannercolor, T.bannerTile, T.bannerNavbar, T.bannerSlut, T.bannerMax, T.bannerVisning, T.indsender, "createdon", "modifiedon"];
 
 module.exports = {
   TIP_SET, TIP_ID, T, VALG, VALG_NAME, IMG_ID, I, EDITOR_ROLES, LIST_COLS,

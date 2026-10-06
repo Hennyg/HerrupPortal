@@ -45,6 +45,11 @@ function buildPayload(b, user) {
   if (!["mig", "test", "alle"].includes(vis)) throw bad("Ukendt valg for hvem der må se nyheden");
   const visning = vis === "mig" ? `mig:${String(user?.email || "").toLowerCase()}` : vis;
 
+  const maxRaw = banner.max === null || banner.max === undefined || banner.max === "" ? null : Number(banner.max);
+  if (maxRaw !== null && (!Number.isInteger(maxRaw) || maxRaw < 1 || maxRaw > 999)) {
+    throw bad("Antal besøg skal være et helt tal mellem 1 og 999");
+  }
+
   const udlobsdato = type === "tip" ? null : normDate(b.udlobsdato);
   const slutdato = normDate(b.slutdato);
   if (udlobsdato && slutdato && udlobsdato > slutdato) {
@@ -66,6 +71,7 @@ function buildPayload(b, user) {
     [T.bannerTile]: !!(bannertekst && banner.tile),
     [T.bannerNavbar]: !!(bannertekst && banner.navbar && !banner.tile),
     [T.bannerSlut]: normDateTime(banner.slut),
+    [T.bannerMax]: maxRaw,
     [T.bannerVisning]: visning
   };
 }
