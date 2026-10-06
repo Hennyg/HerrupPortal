@@ -38,7 +38,9 @@ const I = {
   tipValue: "_cr175_lch_tip_value"
 };
 
-const EDITOR_ROLES = ["portal_hp_nyheder", "portal_admin", "portal_herrup_portal_admin"];
+// Må oprette, rette og godkende nyheder (nyheder-admin.html).
+// Redaktør-rollen findes med og uden "ø", så begge stavemåder virker.
+const EDITOR_ROLES = ["portal_hp_nyheder", "portal_hp_nyheder_redaktør", "portal_hp_nyheder_redaktor", "portal_admin", "portal_herrup_portal_admin"];
 
 // ── Svar ────────────────────────────────────────────────────────────────────
 function json(context, status, body) {
@@ -387,7 +389,7 @@ function frontpageActive(row, now = new Date()) {
   return !Number.isNaN(end.getTime()) && end >= now;
 }
 
-// "alle" (standard), "test" (portal_admin + portal_hp_nyheder) eller "mig:<mail>"
+// "alle" (standard), "test" (redaktørerne – se EDITOR_ROLES) eller "mig:<mail>"
 function parseVisning(v) {
   const s = String(v || "").trim();
   if (s.toLowerCase().startsWith("mig:")) return { visning: "mig", ejer: s.slice(4).trim().toLowerCase() };

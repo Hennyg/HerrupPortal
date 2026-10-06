@@ -3,7 +3,7 @@
   "use strict";
 
   const TYPE_LABEL = { nyhed: "Nyhed", olkassemode: "Ølkassemøde", tip: "Tip" };
-  const EDITOR_ROLES = ["portal_hp_nyheder", "portal_admin", "portal_herrup_portal_admin"];
+  const EDITOR_ROLES = ["portal_hp_nyheder", "portal_hp_nyheder_redaktør", "portal_hp_nyheder_redaktor", "portal_admin", "portal_herrup_portal_admin"];
 
   function esc(s) {
     return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));

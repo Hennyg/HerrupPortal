@@ -596,7 +596,7 @@ function renderPrimaryTileHTML(it) {
 
 // Nyheds-tiles under primær-boksene. Vises indtil videre kun for disse roller –
 // tilføj "portal_user" her, når alle skal kunne se dem.
-const NEWS_TILE_ROLES = ["portal_admin", "portal_hp_nyheder", "portal_herrup_portal_admin"];
+const NEWS_TILE_ROLES = ["portal_admin", "portal_hp_nyheder", "portal_hp_nyheder_redaktør", "portal_hp_nyheder_redaktor", "portal_herrup_portal_admin"];
 
 function renderNewsTileHTML(href, icon, title, badgeId) {
   return `

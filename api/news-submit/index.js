@@ -1,6 +1,7 @@
 // /api/news-submit – en medarbejder indsender en nyhed til godkendelse.
-// Nyheden gemmes med status "Afventer" og er ikke synlig, før en person med
-// portal_admin eller portal_hp_nyheder godkender den i nyheder-admin.html.
+// Nyheden gemmes med status "Afventer" og er ikke synlig, før en redaktør
+// (se EDITOR_ROLES i _news.js) godkender den i nyheder-admin.html.
+// Indsenderen kan sætte datoer, men ikke nyhedsbjælke – det gør redaktøren.
 const fetch = globalThis.fetch;
 const N = require("../_news");
 const { T } = N;
@@ -28,6 +29,16 @@ async function displayName(user) {
   }
 }
 
+// "YYYY-MM-DD" eller null. Fejl med userError, så brugeren får en pæn besked.
+function normDate(v) {
+  const s = String(v || "").trim();
+  if (!s) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(new Date(s).getTime())) {
+    throw Object.assign(new Error("Ugyldig dato"), { userError: true });
+  }
+  return s;
+}
+
 module.exports = async function (context, req) {
   const user = N.getPrincipal(req);
   if (!user) return N.json(context, 401, { error: "Ikke logget ind" });
@@ -38,6 +49,21 @@ module.exports = async function (context, req) {
     const indhold = String(b.indhold || "").trim();
     if (!overskrift) return N.json(context, 400, { error: "Skriv en overskrift" });
     if (!indhold) return N.json(context, 400, { error: "Skriv en kort besked" });
+
+    let udlobsdato, slutdato;
+    try {
+      udlobsdato = normDate(b.udlobsdato);
+      slutdato = normDate(b.slutdato);
+    } catch (e) {
+      return N.json(context, 400, { error: e.message });
+    }
+    if (udlobsdato && slutdato && udlobsdato > slutdato) {
+      return N.json(context, 400, { error: "“Vis på forsiden til og med” kan ikke ligge efter “Fjern nyheden helt efter”" });
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    if (slutdato && slutdato < today) {
+      return N.json(context, 400, { error: "“Fjern nyheden helt efter” ligger i fortiden" });
+    }
 
     const brodtekst = N.cleanHtml(b.brodtekst);
     let videourl = "";
@@ -58,6 +84,8 @@ module.exports = async function (context, req) {
         [T.indhold]: indhold,
         [T.brodtekst]: brodtekst,
         [T.videourl]: videourl || null,
+        [T.udlobsdato]: udlobsdato,
+        [T.slutdato]: slutdato,
         [T.aktiv]: "Afventer",
         [T.indsender]: indsender.slice(0, 200)
       }

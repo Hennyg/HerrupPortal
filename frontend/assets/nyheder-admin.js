@@ -156,21 +156,12 @@
   }
 
   // ── Liste ─────────────────────────────────────────────────────────────────
-  function renderList() {
-    const q = $("listQ").value.trim().toLowerCase();
-    $("listQx").style.visibility = q ? "visible" : "hidden";
-    const pendingCount = items.filter(it => it.status === "afventer").length;
-    $("pendingChip").textContent = `Afventer godkendelse (${pendingCount})`;
-    $("pendingChip").hidden = !pendingCount && listFilter !== "afventer";
-    $("pendingChip").classList.toggle("active", listFilter === "afventer");
-    const list = items.filter(it =>
-      (!listFilter || it.status === listFilter) &&
-      (!q || (it.overskrift + " " + it.indhold + " " + (it.indsender || "")).toLowerCase().includes(q)));
-    if (!list.length) {
-      $("items").innerHTML = `<div class="muted" style="padding:.5rem">${items.length ? "Ingen match" : "Ingen nyheder endnu"}</div>`;
-      return;
-    }
-    $("items").innerHTML = list.map(it => `
+  // Ikke færdige: indsendt til godkendelse, eller kun synlig for mig/redaktører
+  const isWaiting = it => it.status === "afventer" ||
+    (it.status === "aktiv" && !it.udlobet && (it.visning === "mig" || it.visning === "test"));
+
+  function itemHTML(it) {
+    return `
       <button type="button" class="naItem${it.id === currentId ? " selected" : ""}${(it.status === "aktiv" || it.status === "afventer") && !it.udlobet ? "" : " inactive"}" data-id="${esc(it.id)}">
         <span class="naItemTitle">${esc(it.overskrift || it.indhold || "Uden overskrift")}</span>
         <span class="naItemMeta">
@@ -178,14 +169,39 @@
           <span>${esc(fmtDate(it.createdon))}</span>
           ${it.status === "afventer" ? '<span class="naPendingDot">AFVENTER</span>' : ""}
           ${it.status === "afvist" ? "<span>· Afvist</span>" : ""}
-          ${it.status === "inaktiv" ? "<span>· Inaktiv</span>" : ""}
+          ${it.status === "inaktiv" ? "<span>· Skjult</span>" : ""}
           ${it.udlobet ? "<span>· Udløbet</span>" : ""}
           ${it.indsender ? `<span>· ${esc(it.indsender.replace(/\s*<[^>]*>/, ""))}</span>` : ""}
           ${it.banner?.active ? `<span class="naBannerDot">${esc(it.banner.tekst)}</span>` : ""}
-          ${it.visning === "test" ? '<span class="naVisDot">TEST</span>' : (it.visning === "mig" ? '<span class="naVisDot">KUN MIG</span>' : "")}
+          ${it.visning === "test" ? '<span class="naVisDot">REDAKTØRER</span>' : (it.visning === "mig" ? '<span class="naVisDot">KLADDE</span>' : "")}
           ${it.videourl ? "<span>🎬</span>" : ""}
         </span>
-      </button>`).join("");
+      </button>`;
+  }
+
+  function renderList() {
+    const q = $("listQ").value.trim().toLowerCase();
+    $("listQx").style.visibility = q ? "visible" : "hidden";
+    $("pendingChip").hidden = true;   // erstattet af "Venter"-sektionen øverst
+
+    const match = it => !q || (it.overskrift + " " + it.indhold + " " + (it.indsender || "")).toLowerCase().includes(q);
+    const waiting = items.filter(it => isWaiting(it) && match(it))
+      // Indsendte først, så kladder
+      .sort((a, b) => (a.status === "afventer" ? 0 : 1) - (b.status === "afventer" ? 0 : 1));
+    const rest = items.filter(it => !isWaiting(it) && match(it));
+    const pendingCount = items.filter(it => it.status === "afventer").length;
+
+    let html = `
+      <div class="naGroup naGroupWait">
+        <div class="naGroupHead">⏳ Venter${waiting.length ? ` (${waiting.length})` : ""}
+          ${pendingCount ? `<span class="naGroupHint">${pendingCount} til godkendelse</span>` : ""}</div>
+        ${waiting.length ? waiting.map(itemHTML).join("") : `<div class="muted naGroupEmpty">${q ? "Ingen match" : "Intet venter 🎉"}</div>`}
+      </div>
+      <div class="naGroup">
+        <div class="naGroupHead">📰 Alle nyheder</div>
+        ${rest.length ? rest.map(itemHTML).join("") : `<div class="muted naGroupEmpty">${items.length ? "Ingen match" : "Ingen nyheder endnu"}</div>`}
+      </div>`;
+    $("items").innerHTML = html;
     $("items").querySelectorAll(".naItem").forEach(b => b.addEventListener("click", () => openItem(b.dataset.id)));
   }
 

@@ -10,6 +10,14 @@
 <link rel="stylesheet" href="/assets/app.css?v=20260925-news5" />
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
 <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+<style>
+  .naIntro{background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:.7rem .9rem;font-size:.9rem;margin-bottom:14px;line-height:1.45}
+  .naStep h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .naStepNo{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--nav-accent,#c30a14);color:#fff;font-size:.8rem;font-weight:700;flex-shrink:0}
+  .naOptional{font-size:.72rem;font-weight:600;color:#6b7280;background:#f3f4f6;border-radius:999px;padding:2px 8px}
+  .naActionsSticky{position:sticky;bottom:0;background:#fff;z-index:5;padding-bottom:12px}
+  .naSaveHint{font-size:.85rem;color:#374151}
+</style>
 </head>
 <body>
 <div class="navbar">
@@ -31,37 +39,72 @@
 
 <div class="container" style="padding-top:1.25rem;max-width:900px">
   <h1 class="adminTitle">Opret nyhed</h1>
-  <div class="muted adminSub">Din nyhed bliver vist, når den er godkendt</div>
+  <div class="muted adminSub">Del en nyhed med dine kolleger</div>
 
   <section class="panel naForm" id="formPanel">
+    <div class="naIntro">
+      👋 <strong>Sådan gør du:</strong> Udfyld <strong>trin 1</strong> – resten er valgfrit. Tryk <strong>Send til godkendelse</strong> nederst.
+      En redaktør kigger nyheden igennem, før den bliver vist for alle. Redaktøren kan også give den en kørende nyhedsbjælke.
+    </div>
+
     <div class="naGrid">
-      <div class="formRow full">
-        <label for="overskrift">Overskrift</label>
-        <input id="overskrift" class="field" maxlength="200" placeholder="Hvad handler nyheden om?" />
-      </div>
-      <div class="formRow full">
-        <div class="naLabelRow">
-          <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– et par linjer, der vises på forsiden</span></label>
-          <button type="button" class="naAiBtn" id="aiBtn">✨ Send tekst til AI</button>
+      <!-- Trin 1 -->
+      <div class="naSection naStep full">
+        <h3><span class="naStepNo">1</span> Hvad vil du fortælle?</h3>
+
+        <div class="formRow">
+          <label for="overskrift">Overskrift</label>
+          <input id="overskrift" class="field" maxlength="200" placeholder="Hvad handler nyheden om?" />
         </div>
-        <textarea id="indhold" class="field" rows="3"></textarea>
-        <div class="naCounter" id="indholdCount">0 / 300</div>
-      </div>
-      <div class="formRow full">
-        <label>Hele teksten <span class="muted" style="font-weight:400">– valgfri. Billeder kan indsættes, trækkes ind eller vælges med 🖼</span></label>
-        <div class="naEditorWrap"><div id="editor"></div></div>
-      </div>
-      <div class="formRow full">
-        <div class="naLabelRow">
-          <label for="videourl">Video <span class="muted" style="font-weight:400">– valgfri. Indsæt linket fra OneDrive</span></label>
-          <a href="#" id="videoHelpLink" class="naHelpLink">❓ Sådan får du en video fra din pc ind her</a>
+
+        <div class="formRow" style="margin-top:12px">
+          <label for="indhold">Kort besked <span class="muted" style="font-weight:400">– det man ser på forsiden. 1–3 linjer</span></label>
+          <textarea id="indhold" class="field" rows="3" placeholder="Skriv selv et par linjer om, hvad nyheden handler om.&#10;Har du en længere tekst? Sæt den ind under “Hele teksten” i trin 2, og tryk ✨ – så skriver AI den korte besked for dig."></textarea>
+          <div class="naCounter" id="indholdCount">0 / 300</div>
         </div>
-        <input id="videourl" class="field" type="url" autocomplete="off" placeholder="Indsæt linket fra OneDrive (Del → Kopiér link)" />
-        <div id="videoPreview" class="naVideoPreview"></div>
+      </div>
+
+      <!-- Trin 2 -->
+      <div class="naSection naStep full">
+        <h3><span class="naStepNo">2</span> Mere indhold <span class="naOptional">valgfrit</span>
+          <button type="button" class="naAiBtn" id="aiBtn" style="margin-left:auto" title="Læser Hele teksten og skriver en kort besked i trin 1">✨ Dan kort besked ud fra hele teksten med AI</button></h3>
+
+        <div class="formRow">
+          <label>Hele teksten <span class="muted" style="font-weight:400">– vises når man klikker på nyheden. Billeder kan sættes ind, trækkes ind eller vælges med 🖼</span></label>
+          <div class="naEditorWrap"><div id="editor"></div></div>
+        </div>
+
+        <div class="formRow" style="margin-top:12px">
+          <div class="naLabelRow">
+            <label for="videourl">Video <span class="muted" style="font-weight:400">– link fra OneDrive</span></label>
+            <a href="#" id="videoHelpLink" class="naHelpLink">❓ Sådan får du en video fra din pc ind her</a>
+          </div>
+          <input id="videourl" class="field" type="url" autocomplete="off" placeholder="Indsæt linket fra OneDrive (Del → Kopiér link)" />
+          <div id="videoPreview" class="naVideoPreview"></div>
+        </div>
+      </div>
+
+      <!-- Trin 3 -->
+      <div class="naSection naStep full">
+        <h3><span class="naStepNo">3</span> Hvor længe skal den vises? <span class="naOptional">valgfrit</span></h3>
+        <div class="naGrid">
+          <div class="formRow">
+            <label for="udlobsdato">Vis på forsiden til og med</label>
+            <input id="udlobsdato" class="field" type="date" />
+            <div class="muted" style="font-size:.8rem">Tom = så længe den er blandt de nyeste. Bagefter kan den stadig findes under Nyheder.</div>
+          </div>
+          <div class="formRow">
+            <label for="slutdato">Fjern nyheden helt efter</label>
+            <input id="slutdato" class="field" type="date" />
+            <div class="muted" style="font-size:.8rem">Tom = den bliver liggende. Brug den fx til tilbud eller arrangementer med en slutdato.</div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="naActions">
+
+    <div class="naActions naActionsSticky">
       <button type="button" class="btn primary" id="sendBtn">Send til godkendelse</button>
+      <span class="naSaveHint">📨 Sendes til en redaktør – den bliver først vist, når den er godkendt.</span>
       <span class="naMsg" id="msg"></span>
     </div>
   </section>
@@ -69,7 +112,7 @@
   <section class="panel newsEmpty" id="donePanel" hidden>
     <div style="font-size:2.2rem">✅</div>
     <h2 style="color:var(--heading);margin:.3rem 0">Tak! Din nyhed er sendt til godkendelse</h2>
-    <div>Du kan se den under Nyheder, når den er godkendt.</div>
+    <div>En redaktør kigger på den. Du kan se den under Nyheder, når den er godkendt.</div>
     <div class="naActions" style="justify-content:center;border-top:0">
       <button type="button" class="btn" id="againBtn">Opret en nyhed mere</button>
       <a class="btn primary" href="/">Til forsiden</a>
@@ -79,8 +122,8 @@
 
 <script src="/assets/vendor/quill.js"></script>
 <script src="/assets/newsEditor.js?v=20260925-1"></script>
-<script src="/assets/newsCommon.js?v=20260925-3"></script>
+<script src="/assets/newsCommon.js?v=20261006-1"></script>
 <script src="/assets/newsTicker.js?v=20260925-2"></script>
-<script src="/assets/nyhed-opret.js?v=20260925-3"></script>
+<script src="/assets/nyhed-opret.js?v=20261006-1"></script>
 </body>
 </html>
