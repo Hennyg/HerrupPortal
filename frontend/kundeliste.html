@@ -24,6 +24,7 @@
     <div class="nav">
       <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
       <span class="sep">|</span>
+      <a class="navExtra" href="/importlog.html">Importlog</a>
       <a href="/logout">Log ud</a>
     </div>
   </div>
@@ -110,7 +111,8 @@
         const r = await fetch('/api/importlog');
         const j = await r.json();
         const latest = (j.logs || [])[0];
-        el.textContent = latest ? `Sidste import kørt: ${fmtDateTime(latest.starttid || latest.createdon)}` : 'Sidste import kørt: ingen log';
+        const txt = latest ? `Sidste import kørt: ${fmtDateTime(latest.starttid || latest.createdon)}` : 'Sidste import kørt: ingen log';
+        el.innerHTML = `<a class="link" href="/importlog.html" title="Se importlog">${esc(txt)}</a>`;
       } catch {
         el.textContent = 'Sidste import kørt: ukendt';
       }
@@ -148,6 +150,3 @@
   </script>
 </body>
 </html>
-
-
-

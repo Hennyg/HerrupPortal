@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <title>Importlog – Kundeliste</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/assets/kundeliste/app.css" />
+  <style>
+    #tbody tr.clickable-row { cursor: pointer; }
+    #tbody tr.detailRow td { background: #f9fafb; }
+    .logDetail { display: grid; gap: 10px; padding: 6px 2px; }
+    .logDetail pre { white-space: pre-wrap; word-break: break-word; margin: 0; font-size: .82rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; max-height: 320px; overflow: auto; }
+    .logDetail .kv { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .85rem; }
+    .logDetail .kv b { font-weight: 600; }
+    td.num, th.num { text-align: right; }
+    @media (max-width: 640px) { .navExtra, .hideMobile { display: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <div class="logo" aria-label="Herrup Portal"></div>
+        <div>Importlog</div>
+      </div>
+      <div class="nav">
+        <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
+        <span class="sep">|</span>
+        <a href="/kundeliste.html">← Kundeliste</a>
+        <a href="/logout">Log ud</a>
+      </div>
+    </div>
+    <div class="nav-accent"></div>
+  </div>
+
+  <main class="pageWrap">
+    <section class="toolbar">
+      <input id="q" type="search" placeholder="Søg i status, fil, computer, fejl..." style="min-width:280px" autocomplete="off" />
+      <select id="statusFilter">
+        <option value="">Alle</option>
+        <option value="fejl">Kun med fejl</option>
+      </select>
+      <div class="toolbarSpacer"></div>
+      <div id="countText" class="muted small"></div>
+      <button id="btnRefresh">Opdater</button>
+    </section>
+
+    <div id="status" class="status loading"><div class="spinner"></div> Henter importlog...</div>
+
+    <section class="tableWrap">
+      <table class="dataTable">
+        <thead><tr>
+          <th>Start</th>
+          <th>Status</th>
+          <th class="hideMobile">Import</th>
+          <th class="num">Kunder</th>
+          <th class="num hideMobile">Oprettet</th>
+          <th class="num hideMobile">Opdateret</th>
+          <th class="num hideMobile">Deaktiveret</th>
+          <th class="num">Fejl</th>
+          <th class="hideMobile">Varighed</th>
+          <th class="hideMobile">Computer</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/assets/kundeliste/common.js"></script>
+  <script>
+    let logs = [];
+    const open = new Set();
+
+    initUser();
+    document.getElementById('btnRefresh').onclick = load;
+    document.getElementById('q').oninput = render;
+    document.getElementById('statusFilter').onchange = render;
+
+    function setStatus(cls, html) {
+      const el = document.getElementById('status');
+      el.className = 'status ' + cls; el.innerHTML = html; el.style.display = html ? 'flex' : 'none';
+    }
+
+    async function load() {
+      setStatus('loading', '<div class="spinner"></div> Henter importlog...');
+      try {
+        const r = await fetch('/api/importlog', { cache: 'no-store' });
+        const j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+        logs = j.logs || [];
+        setStatus('', '');
+        render();
+      } catch (e) {
+        setStatus('error', 'Kunne ikke hente importlog: ' + esc(e.message));
+      }
+    }
+
+    const hasError = l => Number(l.fejl) > 0 || String(l.status).toLowerCase().includes('fejl') || !!l.fejlbesked;
+
+    function render() {
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const onlyErr = document.getElementById('statusFilter').value === 'fejl';
+      const list = logs.filter(l =>
+        (!onlyErr || hasError(l)) &&
+        (!q || [l.status, l.importnavn, l.filnavn, l.computer, l.version, l.fejlbesked].join(' ').toLowerCase().includes(q)));
+
+      document.getElementById('countText').textContent = `${list.length} af ${logs.length} kørsler`;
+      document.getElementById('tbody').innerHTML = list.map(l => {
+        const row = `<tr class="clickable-row" data-id="${esc(l.id)}">
+          <td class="small">${fmtDateTime(l.starttid || l.createdon)}</td>
+          <td>${statusBadge(l.status)}</td>
+          <td class="small muted hideMobile">${esc(l.importnavn || l.filnavn)}</td>
+          <td class="num">${esc(l.kunder)}</td>
+          <td class="num hideMobile">${esc(l.oprettet)}</td>
+          <td class="num hideMobile">${esc(l.opdateret)}</td>
+          <td class="num hideMobile">${esc(l.deaktiveret)}</td>
+          <td class="num">${Number(l.fejl) > 0 ? `<b style="color:#b91c1c">${esc(l.fejl)}</b>` : esc(l.fejl)}</td>
+          <td class="small muted hideMobile">${esc(l.varighed)}</td>
+          <td class="small muted hideMobile">${esc(l.computer)}</td>
+        </tr>`;
+        if (!open.has(l.id)) return row;
+        return row + `<tr class="detailRow"><td colspan="10"><div class="logDetail">
+          <div class="kv">
+            <span><b>Fil:</b> ${esc(l.filnavn || '–')}</span>
+            <span><b>Import-id:</b> ${esc(l.importid || '–')}</span>
+            <span><b>Version:</b> ${esc(l.version || '–')}</span>
+            <span><b>Start:</b> ${fmtDateTime(l.starttid) || '–'}</span>
+            <span><b>Slut:</b> ${fmtDateTime(l.sluttid) || '–'}</span>
+            <span><b>Læst:</b> ${esc(l.laest || '–')}</span>
+            <span><b>Adresser:</b> ${esc(l.adresser || '–')}</span>
+            <span><b>Produkter:</b> ${esc(l.produkter || '–')}</span>
+          </div>
+          ${l.opdateretTekst ? `<div><b>Opdateret:</b><pre>${esc(l.opdateretTekst)}</pre></div>` : ''}
+          ${l.fejlbesked ? `<div><b>Fejlbesked:</b><pre>${esc(l.fejlbesked)}</pre></div>` : ''}
+          ${l.fejllinjer ? `<div><b>Fejllinjer:</b><pre>${esc(l.fejllinjer)}</pre></div>` : ''}
+          ${!l.opdateretTekst && !l.fejlbesked && !l.fejllinjer ? '<div class="muted small">Ingen yderligere detaljer</div>' : ''}
+        </div></td></tr>`;
+      }).join('') || '<tr><td colspan="10" class="muted">Ingen kørsler</td></tr>';
+
+      document.querySelectorAll('#tbody tr.clickable-row').forEach(tr => tr.onclick = () => {
+        const id = tr.dataset.id;
+        open.has(id) ? open.delete(id) : open.add(id);
+        render();
+      });
+    }
+
+    load();
+  </script>
+</body>
+</html>
