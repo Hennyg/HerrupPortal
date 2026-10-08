@@ -24,6 +24,27 @@
     return true;
   }
 
+  // Logger at brugeren har åbnet nyheden (vises i statistik.html).
+  // Brugeren bestemmes server-side ud fra login - kun én gang pr. sidevisning.
+  function trackNewsView(it) {
+    try {
+      fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType: "NewsView",
+          pageUrl: location.origin + location.pathname + location.search,
+          path: location.pathname,
+          referrer: document.referrer || "",
+          targetTitle: it.overskrift || "",
+          targetUrl: `/nyhed.html?id=${it.id}`,
+          targetCategory: it.type || ""
+        }),
+        keepalive: true
+      }).catch(() => {});
+    } catch { /* logning må aldrig forstyrre siden */ }
+  }
+
   async function init() {
     userLine();
 
@@ -43,6 +64,7 @@
 
     // Brugeren har nu set nyheden → dens bjælke stopper for brugeren
     window.HerrupTicker?.markSeen(it.id, it.modifiedon);
+    trackNewsView(it);
     window.HerrupTicker?.load();
 
     document.title = `${it.overskrift || "Nyhed"} – Herrup Portalen`;

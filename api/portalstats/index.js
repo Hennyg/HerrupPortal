@@ -125,13 +125,15 @@ module.exports = async function (context, req) {
 
     const views = events.filter(e => e.type === "PageView");
     const clicks = events.filter(e => e.type === "Click");
+    const newsViews = events.filter(e => e.type === "NewsView");
 
     // Pr. dag
     const byDay = {};
     for (let d = from; d <= to; d = addDays(d, 1)) byDay[d] = { date: d, pageviews: 0, clicks: 0, users: new Set() };
     for (const e of events) {
       const x = byDay[e.date]; if (!x) continue;
-      if (e.type === "PageView") x.pageviews++; else x.clicks++;
+      if (e.type === "PageView") x.pageviews++;
+      else if (e.type === "Click") x.clicks++;
       x.users.add(e.user);
     }
 
@@ -143,8 +145,10 @@ module.exports = async function (context, req) {
     // Brugere
     const users = {};
     for (const e of events) {
-      const u = users[e.user] = users[e.user] || { user: e.user, pageviews: 0, clicks: 0, days: new Set(), lastSeen: e.ts };
-      if (e.type === "PageView") u.pageviews++; else u.clicks++;
+      const u = users[e.user] = users[e.user] || { user: e.user, pageviews: 0, clicks: 0, newsViews: 0, days: new Set(), lastSeen: e.ts };
+      if (e.type === "PageView") u.pageviews++;
+      else if (e.type === "Click") u.clicks++;
+      else if (e.type === "NewsView") u.newsViews++;
       u.days.add(e.date);
       if (e.ts > u.lastSeen) u.lastSeen = e.ts;
     }
@@ -156,6 +160,7 @@ module.exports = async function (context, req) {
       totals: {
         pageviews: views.length,
         clicks: clicks.length,
+        newsViews: newsViews.length,
         uniqueUsers: Object.keys(users).length,
         avgUsersPerActiveDay: activeDays.length ? Math.round(activeDays.reduce((t, x) => t + x.users.size, 0) / activeDays.length * 10) / 10 : 0
       },
@@ -165,10 +170,11 @@ module.exports = async function (context, req) {
       pages: groupCount(views, e => e.path, 30),
       tiles: groupCount(clicks, e => e.title || e.url || "(uden navn)", 50, e => ({ category: e.category, url: e.url })),
       categories: groupCount(clicks, e => e.category || "(ingen kategori)", 30),
+      news: newsStats(newsViews),
       devices: groupCount(views, e => e.device, 10),
       browsers: groupCount(views, e => e.browser, 10),
       users: Object.values(users)
-        .map(u => ({ user: u.user, pageviews: u.pageviews, clicks: u.clicks, activeDays: u.days.size, lastSeen: u.lastSeen }))
+        .map(u => ({ user: u.user, pageviews: u.pageviews, clicks: u.clicks, newsViews: u.newsViews, activeDays: u.days.size, lastSeen: u.lastSeen }))
         .sort((a, b) => (b.pageviews + b.clicks) - (a.pageviews + a.clicks))
         .slice(0, 100),
       truncated: rows.length >= MAX_ROWS
@@ -207,6 +213,31 @@ function groupCount(list, keyFn, limit, extra) {
     .map(({ users, ...x }) => ({ ...x, uniqueUsers: users.size }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
+}
+
+// Læste nyheder: pr. nyhed (id fra targeturl) - hvem har åbnet den, hvornår
+// første/sidste gang og hvor mange gange. Nyeste titel vinder ved rettelser.
+function newsStats(list) {
+  const map = {};
+  for (const e of list) {
+    const id = (e.url.match(/[?&]id=([0-9a-f-]{36})/i) || [])[1]?.toLowerCase() || e.url || e.title || "(ukendt)";
+    const n = map[id] = map[id] || { id, title: e.title, category: e.category, url: e.url, count: 0, firstRead: e.ts, readers: {} };
+    n.count++;
+    if (e.title) n.title = e.title;                 // rækker er sorteret stigende → sidste titel er nyeste
+    if (e.category) n.category = e.category;
+    if (e.ts < n.firstRead) n.firstRead = e.ts;
+    const r = n.readers[e.user] = n.readers[e.user] || { user: e.user, count: 0, first: e.ts, last: e.ts };
+    r.count++;
+    if (e.ts < r.first) r.first = e.ts;
+    if (e.ts > r.last) r.last = e.ts;
+  }
+  return Object.values(map)
+    .map(n => {
+      const readers = Object.values(n.readers).sort((a, b) => a.first.localeCompare(b.first));
+      return { id: n.id, title: n.title || "(uden titel)", category: n.category, url: n.url, count: n.count, uniqueUsers: readers.length, firstRead: n.firstRead, readers };
+    })
+    .sort((a, b) => b.firstRead.localeCompare(a.firstRead))
+    .slice(0, 100);
 }
 
 function normalizePath(p) {

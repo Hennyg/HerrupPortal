@@ -1,6 +1,7 @@
 // /api/track/index.js
 //
-// Logger sidevisninger og klik på tiles til Dataverse-tabellen lch_accesslog
+// Logger sidevisninger, klik på tiles og læste nyheder (NewsView) til
+// Dataverse-tabellen lch_accesslog
 // (entity set: cr175_lch_accesslogs - kan ændres via app-indstillingen
 // ACCESSLOG_ENTITY_SET). Kaldes fra assets/app.js (index.html) og
 // assets/track.js (øvrige sider).
@@ -21,7 +22,7 @@
 const { dvFetch } = require("../_dv");
 
 const ENTITY_SET = process.env.ACCESSLOG_ENTITY_SET || "cr175_lch_accesslogs";
-const EVENT_TYPES = ["PageView", "Click"];
+const EVENT_TYPES = ["PageView", "Click", "NewsView"];
 
 function json(context, status, body) {
   context.res = {

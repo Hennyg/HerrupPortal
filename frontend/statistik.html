@@ -45,6 +45,18 @@
   .lg .ck::before { background: var(--nav-bg); }
   .note { background: #fff7e0; border-radius: 8px; padding: 8px 12px; margin-top: 10px; font-size: .9rem; }
   .err { color: #b91c1c; font-weight: 600; }
+
+  .news-item { border-bottom: 1px solid var(--divider); }
+  .news-item summary { display: grid; grid-template-columns: 1fr auto auto auto; gap: 14px; align-items: center; padding: 8px 4px; cursor: pointer; list-style: none; }
+  .news-item summary::-webkit-details-marker { display: none; }
+  .news-item summary::before { content: "▸"; color: #6b7280; margin-right: 6px; }
+  .news-item[open] summary::before { content: "▾"; }
+  .news-item .ttl { font-weight: 600; color: var(--heading); display: flex; align-items: baseline; gap: 2px; min-width: 0; }
+  .news-item .ttl span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .news-item .cat { font-size: .78rem; color: #6b7280; }
+  .news-item .num { font-size: .85rem; white-space: nowrap; text-align: right; }
+  .news-item .readers { padding: 0 4px 10px 22px; }
+  .news-filter { border: 1px solid #d1d5db; border-radius: 6px; padding: .4rem .6rem; width: 100%; max-width: 320px; margin-bottom: 8px; }
 </style>
 </head>
 
@@ -165,6 +177,7 @@
           ${card(fmt(t.uniqueUsers), "Unikke brugere")}
           ${card(fmt(t.avgUsersPerActiveDay), "Brugere pr. dag (gns.)")}
           ${card(fmt(t.clicks), "Klik på tiles")}
+          ${card(fmt(t.newsViews), "Læste nyheder")}
         </div>
         ${d.truncated ? `<div class="note">Perioden har meget data – kun de første 100.000 rækker er talt med.</div>` : ""}
       </div>
@@ -231,11 +244,46 @@
       </div>
 
       <div class="panel">
+        <h2>Nyheder – hvem har læst hvad</h2>
+        <div class="muted" style="font-size:.85rem;margin-bottom:8px">Tæller når en nyhed åbnes (nyhed.html). Kun visninger i den valgte periode medtages.</div>
+        ${newsSection(d.news || [])}
+      </div>
+
+      <div class="panel">
         <h2>Brugere</h2>
-        ${d.users.length ? `<div class="tbl-wrap"><table class="t"><thead><tr><th>Bruger</th><th class="n">Sidevisninger</th><th class="n">Klik</th><th class="n">Aktive dage</th><th class="n">Sidst set</th></tr></thead><tbody>
-          ${d.users.map(u => `<tr><td>${esc(u.user)}</td><td class="n">${fmt(u.pageviews)}</td><td class="n">${fmt(u.clicks)}</td><td class="n">${fmt(u.activeDays)}</td><td class="n">${esc(dkTime(u.lastSeen))}</td></tr>`).join("")}
+        ${d.users.length ? `<div class="tbl-wrap"><table class="t"><thead><tr><th>Bruger</th><th class="n">Sidevisninger</th><th class="n">Klik</th><th class="n">Nyheder</th><th class="n">Aktive dage</th><th class="n">Sidst set</th></tr></thead><tbody>
+          ${d.users.map(u => `<tr><td>${esc(u.user)}</td><td class="n">${fmt(u.pageviews)}</td><td class="n">${fmt(u.clicks)}</td><td class="n">${fmt(u.newsViews)}</td><td class="n">${fmt(u.activeDays)}</td><td class="n">${esc(dkTime(u.lastSeen))}</td></tr>`).join("")}
         </tbody></table></div>` : `<div class="muted">Ingen data endnu</div>`}
       </div>`;
+
+    const nf = $("newsFilter");
+    if (nf) nf.addEventListener("input", () => {
+      const q = nf.value.trim().toLowerCase();
+      content.querySelectorAll(".news-item").forEach(el => {
+        el.hidden = q && !el.dataset.search.includes(q);
+      });
+    });
+  }
+
+  function newsSection(news) {
+    if (!news.length) return `<div class="muted">Ingen læste nyheder i perioden</div>`;
+    return `
+      <input type="search" id="newsFilter" class="news-filter" placeholder="Søg nyhed eller bruger…">
+      ${news.map(n => `
+        <details class="news-item" data-search="${esc((n.title + " " + n.readers.map(r => r.user).join(" ")).toLowerCase())}">
+          <summary>
+            <div class="ttl"><span>${esc(n.title)}</span></div>
+            <div class="cat">${esc(n.category || "")}</div>
+            <div class="num"><b>${fmt(n.uniqueUsers)}</b> læsere</div>
+            <div class="num muted">${fmt(n.count)} visninger</div>
+          </summary>
+          <div class="readers">
+            ${n.url ? `<div style="margin-bottom:6px"><a href="${esc(n.url)}" target="_blank" rel="noopener">Åbn nyheden ↗</a></div>` : ""}
+            <div class="tbl-wrap"><table class="t"><thead><tr><th>Bruger</th><th class="n">Første gang</th><th class="n">Sidste gang</th><th class="n">Antal</th></tr></thead><tbody>
+              ${n.readers.map(r => `<tr><td>${esc(r.user)}</td><td class="n">${esc(dkTime(r.first))}</td><td class="n">${esc(dkTime(r.last))}</td><td class="n">${fmt(r.count)}</td></tr>`).join("")}
+            </tbody></table></div>
+          </div>
+        </details>`).join("")}`;
   }
 
   setRange("30");
