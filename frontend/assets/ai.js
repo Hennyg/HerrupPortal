@@ -27,6 +27,35 @@
   const audioInput = document.getElementById("aiAudio");
   const attachmentList = document.getElementById("aiAttachmentList");
 
+  // Lidt styling til transskription i samtalen (ai.css stiler kun inde i .aiAttachment)
+  const extraStyle = document.createElement("style");
+  extraStyle.textContent = `
+    .aiOriginalTexts { margin-top:.6rem; display:flex; flex-direction:column; gap:.4rem; }
+    .aiOriginalTexts[hidden] { display:none; }
+    .aiTextDetails summary { cursor:pointer; font-size:.85rem; color:#374151; }
+  `;
+  document.head.appendChild(extraStyle);
+
+  // Transskription/tekst for det oprindelige spørgsmål vises her
+  const originalTextsEl = document.createElement("div");
+  originalTextsEl.className = "aiOriginalTexts";
+  originalTextsEl.hidden = true;
+  originalFilesEl.insertAdjacentElement("afterend", originalTextsEl);
+
+  // "Nyt med andre valg" – genstarter med samme indhold (lydfil/dokumenter/tekst)
+  function makeRedoButton(nextTo) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = nextTo.className;
+    btn.textContent = "Nyt med andre valg";
+    btn.title = "Start forfra med samme lydfil/dokumenter, så du kan vælge andre indstillinger";
+    btn.hidden = true;
+    nextTo.insertAdjacentElement("afterend", btn);
+    return btn;
+  }
+  const redoBtn = makeRedoButton(newConversationBtn);
+  const redoBottomBtn = makeRedoButton(newConversationBottomBtn);
+
   const MAX_IMAGES = 3;
   const MAX_FILE_BYTES = 4 * 1024 * 1024;
   const TASK_OPTIONS = {
@@ -325,36 +354,52 @@
       }
 
       if (att.status === "ready" && att.kind === "text" && att.text) {
-        const details = document.createElement("details");
-        const summary = document.createElement("summary");
-        summary.textContent = att.source === "audio" ? "Vis transskription" : "Vis udtrukket tekst";
-        const pre = document.createElement("div");
-        pre.className = "aiAttachmentText";
-        pre.textContent = att.text.length > 20000 ? att.text.slice(0, 20000) + "\n…" : att.text;
-        details.append(summary, pre);
-
-        if (att.source === "audio") {
-          const copy = document.createElement("button");
-          copy.type = "button";
-          copy.className = "aiCopyMessage";
-          copy.style.marginTop = ".35rem";
-          copy.textContent = "Kopiér transskription";
-          copy.addEventListener("click", async () => {
-            try {
-              await navigator.clipboard.writeText(att.text);
-              copy.textContent = "Kopieret ✓";
-              setTimeout(() => copy.textContent = "Kopiér transskription", 1400);
-            } catch { setStatus("Kunne ikke kopiere automatisk."); }
-          });
-          details.appendChild(copy);
-        }
-        item.appendChild(details);
+        item.appendChild(buildTextDetails(att));
       }
 
       attachmentList.appendChild(item);
     });
 
     updateSendState();
+  }
+
+  // "Vis transskription" / "Vis udtrukket tekst" med kopiknap – bruges både i
+  // vedhæftningslisten og i samtalen efter der er sendt.
+  function buildTextDetails(att, showName = false) {
+    const isAudio = att.source === "audio";
+    const details = document.createElement("details");
+    details.className = "aiTextDetails";
+    const summary = document.createElement("summary");
+    const label = isAudio ? "Vis transskription" : "Vis udtrukket tekst";
+    summary.textContent = showName ? `${label} – ${att.name}` : label;
+    const pre = document.createElement("div");
+    pre.className = "aiAttachmentText";
+    pre.textContent = att.text.length > 20000 ? att.text.slice(0, 20000) + "\n…" : att.text;
+    details.append(summary, pre);
+
+    const copyLabel = isAudio ? "Kopiér transskription" : "Kopiér tekst";
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "aiCopyMessage";
+    copy.style.marginTop = ".35rem";
+    copy.textContent = copyLabel;
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(att.text);
+        copy.textContent = "Kopieret ✓";
+        setTimeout(() => copy.textContent = copyLabel, 1400);
+      } catch { setStatus("Kunne ikke kopiere automatisk."); }
+    });
+    details.appendChild(copy);
+    return details;
+  }
+
+  function renderTextDetailsInto(container, atts) {
+    container.innerHTML = "";
+    (atts || [])
+      .filter(a => a.kind === "text" && a.text)
+      .forEach(a => container.appendChild(buildTextDetails(a, true)));
+    container.hidden = !container.children.length;
   }
 
   function updateAttachment(att, patch) {
@@ -748,10 +793,11 @@
       originalImagesEl.appendChild(el);
     });
     fileChips(originalFilesEl, originalPrompt.files);
+    renderTextDetailsInto(originalTextsEl, originalPrompt.attachments);
     originalPromptEl.hidden = false;
   }
 
-  function addMessage(role, text, attachedImages = [], attachedFiles = []) {
+  function addMessage(role, text, attachedImages = [], attachedFiles = [], textAttachments = []) {
     conversationEl.hidden = false;
 
     const msg = document.createElement("div");
@@ -772,6 +818,13 @@
       files.className = "aiMessageFiles";
       fileChips(files, attachedFiles);
       msg.appendChild(files);
+    }
+
+    if (textAttachments.length) {
+      const texts = document.createElement("div");
+      texts.className = "aiOriginalTexts";
+      renderTextDetailsInto(texts, textAttachments);
+      msg.appendChild(texts);
     }
 
     if (attachedImages.length) {
@@ -813,6 +866,8 @@
     newConversationBtn.hidden = false;
     savePdfBtn.hidden = false;
     bottomActions.hidden = false;
+    redoBtn.hidden = false;
+    redoBottomBtn.hidden = false;
     composerTitle.textContent = "Fortsæt samtalen";
     promptLabel.textContent = "Opfølgende spørgsmål";
     prompt.placeholder = "Stil et opfølgende spørgsmål …";
@@ -834,7 +889,11 @@
     originalTextEl.textContent = "";
     originalImagesEl.innerHTML = "";
     originalFilesEl.innerHTML = "";
+    originalTextsEl.innerHTML = "";
+    originalTextsEl.hidden = true;
     taskWrap.hidden = false;
+    redoBtn.hidden = true;
+    redoBottomBtn.hidden = true;
     newConversationBtn.hidden = true;
     savePdfBtn.hidden = true;
     bottomActions.hidden = true;
@@ -1009,6 +1068,49 @@
     prompt.focus();
   });
 
+  function selectTaskOptions(values) {
+    Object.entries(values || {}).forEach(([key, value]) => {
+      const group = taskOptionsEl.querySelector(`.aiOptionButtons[data-option-key="${key}"]`);
+      if (!group) return;
+      group.querySelectorAll(".aiOptionButton").forEach(b => {
+        const on = b.dataset.value === value;
+        b.classList.toggle("is-selected", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    });
+    updateConditionalOptions();
+  }
+
+  function restartWithSameContent() {
+    if (!originalPrompt) return;
+    const keep = originalPrompt;
+
+    resetConversation();
+
+    task.value = keep.task;
+    renderTaskOptions();
+    selectTaskOptions(keep.options);
+    updatePromptForTask();
+
+    prompt.value = keep.text || "";
+    images = (keep.images || []).map(x => ({ ...x }));
+    renderImages();
+
+    attachments = (keep.attachments || []).map(a => ({
+      ...a,
+      id: ++attachmentSeq,
+      status: "ready",
+      cancelled: false,
+      progress: null
+    }));
+    renderAttachments();
+
+    setStatus("Samme indhold er indlæst igen – vælg andre indstillinger og tryk Send.");
+    taskWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  redoBtn.addEventListener("click", restartWithSameContent);
+  redoBottomBtn.addEventListener("click", restartWithSameContent);
   newConversationBtn.addEventListener("click", resetConversation);
   savePdfBtn.addEventListener("click", saveConversationPdf);
   newConversationBottomBtn.addEventListener("click", resetConversation);
@@ -1021,6 +1123,9 @@
       return;
     }
     const sentAttachments = readyAttachmentsPayload();
+    const sentAttachmentObjs = attachments
+      .filter(a => a.status === "ready")
+      .map(a => ({ name: a.name, size: a.size, source: a.source, kind: a.kind, text: a.text, mime: a.mime, data: a.data, statusText: a.statusText }));
     if (!text && images.length === 0 && sentAttachments.length === 0) {
       setStatus("Skriv et spørgsmål eller tilføj et billede, dokument eller en lydfil.");
       prompt.focus();
@@ -1044,6 +1149,8 @@
     savePdfBtn.disabled = true;
     newConversationBottomBtn.disabled = true;
     savePdfBottomBtn.disabled = true;
+    redoBtn.disabled = true;
+    redoBottomBtn.disabled = true;
     setStatus("AI arbejder …", true);
 
     try {
@@ -1075,13 +1182,14 @@
           options: sentOptions,
           text,
           images: sentImages,
-          files: sentFiles
+          files: sentFiles,
+          attachments: sentAttachmentObjs
         };
         conversationHistory.push({ role: "user", text, images: sentImages, files: sentFiles, isOriginal: true });
         showOriginalPrompt();
       } else {
         conversationHistory.push({ role: "user", text, images: sentImages, files: sentFiles, isOriginal: false });
-        addMessage("user", text, sentImages, sentFiles);
+        addMessage("user", text, sentImages, sentFiles, sentAttachmentObjs);
       }
 
       const answerText = data.answer || "Der kom ikke noget svar.";
@@ -1112,6 +1220,8 @@
       savePdfBtn.disabled = false;
       newConversationBottomBtn.disabled = false;
       savePdfBottomBtn.disabled = false;
+      redoBtn.disabled = false;
+      redoBottomBtn.disabled = false;
     }
   }
 
