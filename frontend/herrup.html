@@ -1,10 +1,9 @@
-
 <!doctype html>
 <html lang="da">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Brugere – Herrup Portalen</title>
+  <title>Medarbejdere – Herrup Portalen</title>
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#c30a14">
   <link rel="stylesheet" href="/assets/app.css?v=20260813" />
@@ -413,10 +412,10 @@
     <div class="navbar-inner">
       <div class="brand">
         <div class="logo" aria-label="Herrup Portal"></div>
-        <div>Brugere</div>
+        <div>Medarbejdere</div>
       </div>
       <div class="nav">
-        <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+        <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter medarbejder...</span>
         <span class="sep">|</span>
         <a href="/logout">Log ud</a>
       </div>
@@ -425,7 +424,7 @@
   </div>
 
   <div class="container" style="padding-top:1.5rem">
-    <h1 class="pageTitle">Alle brugere</h1>
+    <h1 class="pageTitle">Alle medarbejdere</h1>
     <div class="pageSub">Medlemmer af gruppen "Alle - lely center herrup"</div>
 
     <!-- Faner -->
@@ -747,7 +746,7 @@
           if (window.entraCacheWrite) window.entraCacheWrite(allUsers);
         }
       } catch (e) {
-        if (!isBackground && !shownSomething) renderError("Kunne ikke hente brugere: " + e.message);
+        if (!isBackground && !shownSomething) renderError("Kunne ikke hente medarbejdere: " + e.message);
       } finally {
         if (window.__herrupOnUsersRendered) window.__herrupOnUsersRendered();
       }
@@ -900,7 +899,7 @@
       const rows  = getFiltered();
       const tbody = document.getElementById("tbody");
       const count = document.getElementById("userCount");
-      if (count) count.textContent = `${rows.length} brugere`;
+      if (count) count.textContent = `${rows.length} ${rows.length === 1 ? "medarbejder" : "medarbejdere"}`;
       if (!rows.length) {
         tbody.innerHTML = `<tr><td colspan="6"><div class="stateMsg">Ingen resultater</div></td></tr>`;
         return;
@@ -1415,7 +1414,7 @@ if (window.updateHeaderStatus) {
     function renderOrg() {
       const container = document.getElementById("orgTree");
       if (!allUsers.length) {
-        container.innerHTML = `<div class="org-placeholder">Ingen brugere</div>`;
+        container.innerHTML = `<div class="org-placeholder">Ingen medarbejdere</div>`;
         return;
       }
 
