@@ -211,8 +211,9 @@
   const AUDIO_DIRECT_BYTES = 8 * 1024 * 1024;      // mindre lydfiler sendes som de er
   const AUDIO_DIRECT_EXT = ["mp3", "m4a", "wav", "webm", "ogg", "oga", "flac", "mp4", "mpeg", "mpga"];
   const AUDIO_EXT = [...AUDIO_DIRECT_EXT, "wma", "aac", "opus", "mov", "m4v", "3gp", "amr", "aiff", "aif"];
-  const CHUNK_SECONDS = 150;                       // ca. 2,5 min pr. del (~4,8 MB som 16 kHz WAV)
-  const TRANSCRIBE_CONCURRENCY = 3;
+  const CHUNK_SECONDS = 60;                        // ca. 1 min pr. del (~1,9 MB som 16 kHz WAV) – holder hvert kald et godt stykke under SWA's 45 sek.
+  const TRANSCRIBE_CONCURRENCY = 2;
+  const TRANSCRIBE_TIMEOUT_MS = 44000;             // SWA afbryder managed functions efter 45 sek.
   const TEXT_EXT = ["txt", "csv", "tsv", "md", "json", "xml", "html", "htm", "log", "eml", "vtt", "srt",
     "js", "ts", "css", "sql", "ps1", "psm1", "sh", "bat", "cmd", "py", "cs", "java", "yml", "yaml", "ini", "cfg", "conf", "rtf"];
 
@@ -540,22 +541,45 @@
   }
 
   async function transcribeBlob(blob, name, mime) {
+    // Sendes som JSON med base64 – samme mønster som /api/ai og /api/news-image,
+    // da rå binære POSTs gennem SWA's managed functions gav tomme 500-svar.
+    const dataUrl = await fileToDataUrl(blob);
+    const payload = JSON.stringify({
+      name,
+      mime: mime || blob.type || "application/octet-stream",
+      data: String(dataUrl).split(",")[1] || ""
+    });
+
     let lastErr = null;
     for (let attempt = 0; attempt < 3; attempt++) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), TRANSCRIBE_TIMEOUT_MS);
+      const t0 = performance.now();
       try {
-        const r = await fetch(`/api/ai-transcribe?name=${encodeURIComponent(name)}`, {
+        const r = await fetch("/api/ai-transcribe", {
           method: "POST",
-          headers: { "Content-Type": "application/octet-stream", "X-File-Type": mime || blob.type || "application/octet-stream" },
-          body: blob
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          signal: ctrl.signal
         });
         const raw = await r.text();
         let data = {};
         try { data = raw ? JSON.parse(raw) : {}; } catch { data = { message: raw }; }
-        if (!r.ok) throw new Error(data.message || data.error || `Fejl ${r.status}`);
+        if (!r.ok) throw new Error(data.message || data.error || `Fejl ${r.status}${raw ? "" : " (tomt svar)"}`);
         return String(data.text || "").trim();
       } catch (err) {
-        lastErr = err;
+        const secs = Math.round((performance.now() - t0) / 1000);
+        if (err.name === "AbortError" || secs >= 40) {
+          lastErr = new Error(`${name}: transskribering tog for lang tid (${secs} sek.) – SWA afbryder efter 45 sek.`);
+        } else if (err instanceof TypeError) {
+          lastErr = new Error(`${name}: forbindelsen blev afbrudt efter ${secs} sek. (${err.message})`);
+        } else {
+          lastErr = new Error(`${name}: ${err.message}`);
+        }
+        console.warn(`ai-transcribe forsøg ${attempt + 1} fejlede:`, lastErr.message);
         await new Promise(res => setTimeout(res, 1500 * (attempt + 1)));
+      } finally {
+        clearTimeout(timer);
       }
     }
     throw lastErr;
