@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin – Foderrådgivning</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260924-empsearch-2" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  .frWrap{ max-width:820px; margin:0 auto; }
+  .frAdd{ display:flex; gap:10px; flex-wrap:wrap; }
+  .frAdd .field{ flex:1; min-width:220px; }
+  .frMsg{ border-radius:10px; padding:.6rem .8rem; font-size:.9rem; margin-top:12px; }
+  .frMsg:empty{ display:none; }
+  .frMsg.ok{ background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; }
+  .frMsg.err{ background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+
+  .frTasks{ width:100%; border-collapse:collapse; font-size:.95rem; }
+  .frTasks th, .frTasks td{ padding:.5rem .55rem; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:middle; }
+  .frTasks th{ font-size:.85rem; color:#374151; white-space:nowrap; }
+  .frTasks tr.inactive .nameInput{ color:#9ca3af; text-decoration:line-through; }
+  .frTasks .center{ text-align:center; }
+  .frTasks input[type=checkbox]{ width:18px; height:18px; accent-color:var(--nav-bg); cursor:pointer; }
+  .nameInput{ width:100%; box-sizing:border-box; border:1px solid transparent; border-radius:6px; padding:.4rem .5rem; font:inherit; background:transparent; }
+  .nameInput:hover{ border-color:#e5e7eb; }
+  .nameInput:focus{ outline:none; border-color:var(--nav-accent); background:#fff; box-shadow:0 0 0 2px rgba(31,108,122,.15); }
+  .moveBtns{ display:flex; gap:4px; }
+  .moveBtns .btn{ padding:.3rem .55rem; line-height:1; }
+  .btn.danger{ border-color:#fecaca; color:#991b1b; }
+  .btn.danger:hover{ background:#fef2f2; }
+
+  .frEmpty{ text-align:center; padding:1.5rem 1rem; }
+
+  .noAccess{ text-align:center; padding:2.5rem 1rem; }
+  .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
+
+  @media (max-width: 520px){ .adminTitle{ font-size:30px; } }
+</style>
+</head>
+
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Foderrådgivning</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+      <span class="sep">|</span>
+      <a href="/Foderradgivning_ny.html">Ny registrering</a>
+      <a href="/Foderradgivning_liste.html">Liste</a>
+      <a href="/">← Til portal</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.5rem">
+  <div class="frWrap">
+    <h1 class="adminTitle">Admin</h1>
+    <div class="muted adminSub">Opgaver der kan vælges ved registrering</div>
+
+    <div id="noAccess" class="panel noAccess" hidden>
+      <h2>Ingen adgang</h2>
+      <div class="muted">Siden kræver admin-rollen til Foderrådgivning. Kontakt IT, hvis du skal have adgang.</div>
+    </div>
+
+    <div id="app" hidden>
+      <section class="section">
+        <div class="accent-bar" style="margin-bottom:10px;">Tilføj opgave</div>
+        <div class="panel">
+          <div class="frAdd">
+            <input id="newName" class="field" type="text" maxlength="200" placeholder="Navn på opgave" autocomplete="off">
+            <button type="button" class="btn primary" id="btnAdd">Tilføj opgave</button>
+          </div>
+          <div id="msg" class="frMsg"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="accent-bar" style="margin-bottom:10px;">Opgaver</div>
+        <div class="panel">
+          <div class="muted" style="margin-bottom:10px">
+            Ret navnet direkte i feltet (gemmes når du forlader feltet). Inaktive opgaver vises ikke ved ny registrering, men bevares på gamle registreringer.
+          </div>
+          <div style="overflow:auto">
+            <table class="frTasks">
+              <thead>
+                <tr><th>Rækkefølge</th><th style="width:100%">Opgave</th><th class="center">Aktiv</th><th></th></tr>
+              </thead>
+              <tbody id="tbody"><tr><td colspan="4" class="muted">Henter...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  let items = [];
+  let busy = false;
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  }
+
+  async function api(path, opts = {}) {
+    const r = await fetch(path, {
+      cache: "no-store",
+      ...opts,
+      headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    let data = null;
+    try { data = await r.json(); } catch { data = null; }
+    if (!r.ok || data?.error) {
+      const e = new Error(data?.error || `HTTP ${r.status}`);
+      e.status = r.status;
+      throw e;
+    }
+    return data;
+  }
+
+  function msg(type, text) {
+    const m = $("msg");
+    m.className = "frMsg " + (type || "");
+    m.textContent = text || "";
+    if (type === "ok") setTimeout(() => { if (m.textContent === text) m.textContent = ""; }, 3000);
+  }
+
+  function render() {
+    if (!items.length) {
+      $("tbody").innerHTML = `
+        <tr><td colspan="4" class="frEmpty">
+          <div style="margin-bottom:10px">Der er ingen opgaver endnu.</div>
+          <button type="button" class="btn primary" id="btnStandard">Indsæt standardlisten (15 opgaver)</button>
+        </td></tr>`;
+      $("btnStandard").addEventListener("click", insertStandard);
+      return;
+    }
+    $("tbody").innerHTML = items.map((o, i) => `
+      <tr class="${o.aktiv ? "" : "inactive"}" data-id="${esc(o.id)}">
+        <td>
+          <div class="moveBtns">
+            <button type="button" class="btn" data-move="-1" ${i === 0 ? "disabled" : ""} aria-label="Flyt op">▲</button>
+            <button type="button" class="btn" data-move="1" ${i === items.length - 1 ? "disabled" : ""} aria-label="Flyt ned">▼</button>
+          </div>
+        </td>
+        <td><input class="nameInput" type="text" maxlength="200" value="${esc(o.navn)}" data-orig="${esc(o.navn)}"></td>
+        <td class="center"><input type="checkbox" data-aktiv ${o.aktiv ? "checked" : ""} aria-label="Aktiv"></td>
+        <td><button type="button" class="btn danger" data-del>Slet</button></td>
+      </tr>`).join("");
+  }
+
+  async function run(fn, okText) {
+    if (busy) return;
+    busy = true;
+    try {
+      const data = await fn();
+      if (data?.items) items = data.items;
+      render();
+      if (okText) msg("ok", okText);
+    } catch (e) {
+      msg("err", e.message);
+      await load().catch(() => {});
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function load() {
+    const data = await api("/api/foder-opgaver?alle=1");
+    if (!data.isAdmin) { const e = new Error("Kræver admin"); e.status = 403; throw e; }
+    items = data.items || [];
+    render();
+  }
+
+  function insertStandard() {
+    run(() => api("/api/foder-opgaver", { method: "POST", body: { standard: true } }), "Standardlisten er indsat");
+  }
+
+  function add() {
+    const navn = $("newName").value.trim();
+    if (!navn) { msg("err", "Skriv et navn på opgaven"); $("newName").focus(); return; }
+    if (items.some(o => o.navn.toLowerCase() === navn.toLowerCase())) { msg("err", `"${navn}" findes allerede`); return; }
+    run(async () => {
+      const d = await api("/api/foder-opgaver", { method: "POST", body: { navn } });
+      $("newName").value = "";
+      return d;
+    }, `"${navn}" er tilføjet`);
+  }
+
+  function rename(input, id) {
+    const navn = input.value.trim();
+    const orig = input.dataset.orig;
+    if (navn === orig) return;
+    if (!navn) { input.value = orig; msg("err", "Navnet må ikke være tomt"); return; }
+    run(() => api(`/api/foder-opgaver?id=${encodeURIComponent(id)}`, { method: "PATCH", body: { navn } }), "Navnet er gemt");
+  }
+
+  function move(id, dir) {
+    const i = items.findIndex(o => o.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= items.length) return;
+    // Nummerér hele listen 10, 20, 30 … i den nye rækkefølge og gem kun dem der ændres.
+    const order = items.slice();
+    [order[i], order[j]] = [order[j], order[i]];
+    const changes = order.map((o, k) => ({ id: o.id, s: (k + 1) * 10, old: o.sortering })).filter(x => x.s !== x.old);
+    run(async () => {
+      let last = null;
+      for (const c of changes) last = await api(`/api/foder-opgaver?id=${encodeURIComponent(c.id)}`, { method: "PATCH", body: { sortering: c.s } });
+      return last;
+    });
+  }
+
+  function setAktiv(id, aktiv) {
+    run(() => api(`/api/foder-opgaver?id=${encodeURIComponent(id)}`, { method: "PATCH", body: { aktiv } }), aktiv ? "Opgaven er aktiv" : "Opgaven er gjort inaktiv");
+  }
+
+  function del(id) {
+    const o = items.find(x => x.id === id);
+    if (!o) return;
+    if (!confirm(`Slet opgaven "${o.navn}"?\n\nGamle registreringer beholder navnet. Vil du blot skjule den, så fjern fluebenet i Aktiv i stedet.`)) return;
+    run(() => api(`/api/foder-opgaver?id=${encodeURIComponent(id)}`, { method: "DELETE" }), `"${o.navn}" er slettet`);
+  }
+
+  function bind() {
+    $("btnAdd").addEventListener("click", add);
+    $("newName").addEventListener("keydown", e => { if (e.key === "Enter") add(); });
+
+    $("tbody").addEventListener("click", e => {
+      const tr = e.target.closest("tr[data-id]"); if (!tr) return;
+      const mv = e.target.closest("[data-move]");
+      if (mv) return move(tr.dataset.id, Number(mv.dataset.move));
+      if (e.target.closest("[data-del]")) return del(tr.dataset.id);
+    });
+    $("tbody").addEventListener("change", e => {
+      const tr = e.target.closest("tr[data-id]"); if (!tr) return;
+      if (e.target.matches("[data-aktiv]")) setAktiv(tr.dataset.id, e.target.checked);
+    });
+    $("tbody").addEventListener("focusout", e => {
+      const tr = e.target.closest("tr[data-id]");
+      if (tr && e.target.classList.contains("nameInput")) rename(e.target, tr.dataset.id);
+    });
+    $("tbody").addEventListener("keydown", e => {
+      if (!e.target.classList.contains("nameInput")) return;
+      if (e.key === "Enter") e.target.blur();
+      if (e.key === "Escape") { e.target.value = e.target.dataset.orig; e.target.blur(); }
+    });
+  }
+
+  async function init() {
+    try {
+      const me = await fetch("/.auth/me", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+      $("userLine").textContent = me?.clientPrincipal?.userDetails || "Ikke logget ind";
+    } catch {
+      $("userLine").textContent = "";
+    }
+    try {
+      await load();
+    } catch (e) {
+      if (e.status === 401 || e.status === 403) { $("noAccess").hidden = false; return; }
+      $("app").hidden = false;
+      $("tbody").innerHTML = `<tr><td colspan="4" style="color:#991b1b">Fejl: ${esc(e.message)}</td></tr>`;
+      return;
+    }
+    $("app").hidden = false;
+    bind();
+  }
+
+  init();
+})();
+</script>
+<script src="/assets/track.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ny registrering – Foderrådgivning</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260924-empsearch-2" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  .frWrap{ max-width:640px; margin:0 auto; }
+  .frTile{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:1rem; margin-top:14px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+  .frTile h2{ margin:0 0 .75rem; font-size:1.1rem; color:var(--heading); }
+  .frTileHead{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .frTileHead h2{ margin:0; }
+
+  .frInput{ width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:10px; padding:.75rem .8rem; font:inherit; font-size:1rem; background:#fff; }
+  .frInput:focus{ outline:none; border-color:var(--nav-accent); box-shadow:0 0 0 3px rgba(31,108,122,.15); }
+
+  .frResults{ margin-top:8px; max-height:340px; overflow:auto; border-radius:10px; }
+  .frResult{ padding:.65rem .75rem; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:6px; cursor:pointer; background:#fff; }
+  .frResult:hover, .frResult:focus{ background:#f8fafc; outline:none; border-color:var(--nav-accent); }
+  .frResultTitle{ font-weight:600; }
+  .frResultSub{ font-size:.85rem; color:#6b7280; }
+  .frSelected{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:.75rem .85rem; border:2px solid var(--nav-bg); background:#fff5f5; border-radius:10px; }
+  .frSelected .frResultTitle{ color:var(--nav-bg); }
+
+  .frDateRow{ display:grid; grid-template-columns:52px 1fr 52px; gap:8px; align-items:center; }
+  .frArrow{ height:48px; border:1px solid #d1d5db; background:#fff; border-radius:10px; font-size:1.5rem; line-height:1; cursor:pointer; color:#374151; }
+  .frArrow:hover:not(:disabled){ background:#f3f4f6; }
+  .frArrow:disabled{ opacity:.35; cursor:not-allowed; }
+  .frDateRow .frInput{ height:48px; text-align:center; }
+  .frDateText{ text-align:center; margin-top:6px; color:#374151; font-size:.92rem; }
+  .frToday{ appearance:none; border:0; background:none; color:var(--nav-accent); font:inherit; font-size:.85rem; cursor:pointer; text-decoration:underline; padding:0 0 0 6px; }
+
+  .frBtnRow{ display:grid; gap:8px; }
+  .frBtnRow.h{ grid-template-columns:repeat(5, 1fr); }
+  .frBtnRow.m{ grid-template-columns:repeat(3, 1fr); }
+  .frPick{ min-height:54px; border:2px solid #d1d5db; background:#fff; border-radius:10px; font:inherit; font-size:1.1rem; font-weight:600; cursor:pointer; color:#374151; }
+  .frPick:hover{ border-color:#9ca3af; }
+  .frPick.active{ border-color:var(--nav-bg); background:#fff1f2; color:var(--nav-bg); }
+  .frPick:focus-visible, .frChip:focus-visible, .frArrow:focus-visible{ outline:3px solid rgba(31,108,122,.35); outline-offset:2px; }
+  .frSub{ font-size:.85rem; color:#6b7280; margin:10px 0 6px; }
+  .frTotal{ margin-top:12px; font-weight:600; color:#111; }
+
+  .frChips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .frChip{ border:2px solid #d1d5db; background:#fff; border-radius:999px; padding:.55rem .95rem; font:inherit; font-size:.95rem; cursor:pointer; color:#374151; }
+  .frChip.active{ border-color:var(--nav-bg); background:#fff1f2; color:var(--nav-bg); font-weight:600; }
+
+  .frSave{ width:100%; min-height:56px; font-size:1.15rem; font-weight:700; border-radius:10px; }
+  .frMissing{ margin-top:8px; font-size:.85rem; color:#6b7280; text-align:center; }
+  .frStatus{ border-radius:10px; padding:.75rem .85rem; margin-top:14px; font-size:.95rem; }
+  .frStatus.ok{ background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; }
+  .frStatus.err{ background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+  .frStatus.info{ background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
+
+  .noAccess{ text-align:center; padding:2.5rem 1rem; }
+  .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
+
+  @media (max-width: 520px){
+    .adminTitle{ font-size:30px; }
+    .frBtnRow.h{ grid-template-columns:repeat(5, 1fr); }
+    .frPick{ font-size:1rem; }
+  }
+</style>
+</head>
+
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Foderrådgivning</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+      <span class="sep">|</span>
+      <a href="/Foderradgivning_liste.html">Liste</a>
+      <a id="adminLink" class="hidden" href="/Foderradgivning_admin.html">Admin</a>
+      <a href="/">← Til portal</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.5rem">
+  <div class="frWrap">
+    <h1 class="adminTitle">Ny registrering</h1>
+    <div class="muted adminSub">Registrér tid brugt på foderrådgivning</div>
+
+    <div id="status" class="frStatus info">Henter kunder og opgaver...</div>
+
+    <div id="noAccess" class="panel noAccess" hidden>
+      <h2>Ingen adgang</h2>
+      <div class="muted">Du har ikke rollen til Foderrådgivning. Kontakt IT, hvis du skal have adgang.</div>
+    </div>
+
+    <div id="app" hidden>
+      <!-- 1. Kunde -->
+      <section class="frTile" id="customerTile">
+        <div class="frTileHead" style="margin-bottom:.75rem">
+          <h2>1. Kunde</h2>
+          <button type="button" class="btn" id="btnRestart">Start forfra</button>
+        </div>
+        <div id="customerSearchBox">
+          <input id="customerSearch" class="frInput" type="search" placeholder="Søg kundenavn eller kundenr." autocomplete="off">
+          <div id="customerResults" class="frResults"></div>
+        </div>
+        <div id="selectedCustomer" class="frSelected" hidden>
+          <div>
+            <div class="frResultTitle" id="selName"></div>
+            <div class="frResultSub" id="selSub"></div>
+          </div>
+          <button type="button" class="btn" id="btnChangeCustomer">Skift</button>
+        </div>
+      </section>
+
+      <div id="restTiles" hidden>
+        <!-- 2. Dato -->
+        <section class="frTile">
+          <h2>2. Dato</h2>
+          <div class="frDateRow">
+            <button type="button" class="frArrow" id="datePrev" aria-label="En dag tilbage">&#8249;</button>
+            <input id="dato" class="frInput" type="date">
+            <button type="button" class="frArrow" id="dateNext" aria-label="En dag frem">&#8250;</button>
+          </div>
+          <div class="frDateText"><span id="dateText"></span><button type="button" class="frToday" id="dateToday" hidden>Gå til i dag</button></div>
+        </section>
+
+        <!-- 3. Tid -->
+        <section class="frTile">
+          <h2>3. Tid</h2>
+          <div class="frSub" style="margin-top:0">Timer</div>
+          <div class="frBtnRow h" id="hourBtns">
+            <button type="button" class="frPick" data-h="1">1</button>
+            <button type="button" class="frPick" data-h="2">2</button>
+            <button type="button" class="frPick" data-h="3">3</button>
+            <button type="button" class="frPick" data-h="4">4</button>
+            <button type="button" class="frPick" data-h="5">5</button>
+          </div>
+          <div class="frSub">Minutter</div>
+          <div class="frBtnRow m" id="minBtns">
+            <button type="button" class="frPick" data-m="15">15</button>
+            <button type="button" class="frPick" data-m="30">30</button>
+            <button type="button" class="frPick" data-m="45">45</button>
+          </div>
+          <div class="frTotal" id="timeTotal">Samlet: 0 min</div>
+          <div class="muted">Tryk igen på en valgt knap for at fravælge den.</div>
+        </section>
+
+        <!-- 4. Opgaver -->
+        <section class="frTile">
+          <h2>4. Opgaver</h2>
+          <div class="frChips" id="taskChips"></div>
+          <div class="muted" style="margin-top:8px">Du kan vælge flere opgaver.</div>
+        </section>
+
+        <!-- 5. Kommentar -->
+        <section class="frTile">
+          <h2>5. Kommentar</h2>
+          <textarea id="kommentar" class="frInput" rows="5" placeholder="Valgfri"></textarea>
+        </section>
+
+        <!-- Gem -->
+        <section class="frTile">
+          <button type="button" class="btn primary frSave" id="btnSave" disabled>Gem registrering</button>
+          <div class="frMissing" id="missing"></div>
+        </section>
+      </div>
+
+      <div id="savedBox" class="frTile" hidden>
+        <div class="frStatus ok" id="savedText" style="margin-top:0"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button type="button" class="btn primary" id="btnNew" style="flex:1;min-height:48px">Registrér en mere</button>
+          <a class="btn" href="/Foderradgivning_liste.html" style="flex:1;min-height:48px;display:flex;align-items:center;justify-content:center;text-decoration:none;color:inherit;box-sizing:border-box">Gå til listen</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const state = { kunder: [], opgaver: [], kunde: null, timer: 0, min: 0, valgte: new Set(), saving: false };
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  }
+
+  async function api(path, opts = {}) {
+    const r = await fetch(path, {
+      cache: "no-store",
+      ...opts,
+      headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    let data = null;
+    try { data = await r.json(); } catch { data = null; }
+    if (!r.ok || data?.error) {
+      const e = new Error(data?.error || `HTTP ${r.status}`);
+      e.status = r.status;
+      throw e;
+    }
+    return data;
+  }
+
+  function setStatus(type, msg) {
+    const s = $("status");
+    if (!msg) { s.hidden = true; return; }
+    s.hidden = false;
+    s.className = `frStatus ${type}`;
+    s.textContent = msg;
+  }
+
+  // ── Dato ─────────────────────────────────────────────────────────────────
+  function isoLocal(d) {
+    const p = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  function parseIso(s) {
+    const [y, m, d] = String(s).split("-").map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  }
+  const today = () => isoLocal(new Date());
+
+  function setDate(iso) {
+    const t = today();
+    if (!iso || iso > t) iso = t;
+    $("dato").value = iso;
+    updateDateUi();
+  }
+  function shiftDate(days) {
+    const d = parseIso($("dato").value || today());
+    d.setDate(d.getDate() + days);
+    setDate(isoLocal(d));
+  }
+  function updateDateUi() {
+    const v = $("dato").value;
+    const t = today();
+    $("dato").max = t;
+    $("dateNext").disabled = !v || v >= t;
+    const d = parseIso(v);
+    let txt = d.toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    txt = txt.charAt(0).toUpperCase() + txt.slice(1);
+    if (v === t) txt += " (i dag)";
+    $("dateText").textContent = txt;
+    $("dateToday").hidden = v === t;
+    validate();
+  }
+
+  // ── Kunder ───────────────────────────────────────────────────────────────
+  function renderCustomers() {
+    const q = $("customerSearch").value.trim().toLowerCase();
+    const box = $("customerResults");
+    if (q.length < 2) {
+      box.innerHTML = `<div class="muted" style="padding:6px 2px">Skriv mindst 2 tegn for at søge.</div>`;
+      return;
+    }
+    const hits = state.kunder.filter(k => (k.navn + " " + k.kundenr).toLowerCase().includes(q)).slice(0, 40);
+    if (!hits.length) {
+      box.innerHTML = `<div class="muted" style="padding:6px 2px">Ingen kunder matcher "${esc(q)}".</div>`;
+      return;
+    }
+    box.innerHTML = hits.map((k, i) => `
+      <div class="frResult" tabindex="0" data-i="${state.kunder.indexOf(k)}">
+        <div class="frResultTitle">${esc(k.navn)}</div>
+        <div class="frResultSub">${esc(k.kundenr)}${k.omraade ? " · " + esc(k.omraade) : ""}</div>
+      </div>`).join("");
+  }
+
+  function selectCustomer(k) {
+    state.kunde = k;
+    $("selName").textContent = k.navn;
+    $("selSub").textContent = k.kundenr + (k.omraade ? " · " + k.omraade : "");
+    $("customerSearchBox").hidden = true;
+    $("selectedCustomer").hidden = false;
+    $("restTiles").hidden = false;
+    validate();
+  }
+
+  function changeCustomer() {
+    state.kunde = null;
+    $("selectedCustomer").hidden = true;
+    $("customerSearchBox").hidden = false;
+    $("customerSearch").focus();
+    validate();
+  }
+
+  // ── Tid ──────────────────────────────────────────────────────────────────
+  function totalMin() { return state.timer * 60 + state.min; }
+  function fmtTime(m) {
+    const h = Math.floor(m / 60), r = m % 60;
+    if (!h) return `${r} min`;
+    return r ? `${h} t ${r} min` : `${h} t`;
+  }
+  function renderTime() {
+    document.querySelectorAll("#hourBtns .frPick").forEach(b => b.classList.toggle("active", Number(b.dataset.h) === state.timer));
+    document.querySelectorAll("#minBtns .frPick").forEach(b => b.classList.toggle("active", Number(b.dataset.m) === state.min));
+    $("timeTotal").textContent = "Samlet: " + fmtTime(totalMin());
+    validate();
+  }
+
+  // ── Opgaver ──────────────────────────────────────────────────────────────
+  function renderTasks() {
+    if (!state.opgaver.length) {
+      $("taskChips").innerHTML = `<div class="muted">Der er ingen opgaver oprettet endnu. En administrator kan tilføje dem på admin-siden.</div>`;
+      return;
+    }
+    $("taskChips").innerHTML = state.opgaver.map(o =>
+      `<button type="button" class="frChip${state.valgte.has(o.navn) ? " active" : ""}" data-navn="${esc(o.navn)}" aria-pressed="${state.valgte.has(o.navn)}">${esc(o.navn)}</button>`
+    ).join("");
+  }
+
+  // ── Validering og gem ────────────────────────────────────────────────────
+  function validate() {
+    const missing = [];
+    if (!state.kunde) missing.push("kunde");
+    if (!$("dato").value) missing.push("dato");
+    if (totalMin() <= 0) missing.push("tid");
+    if (!state.valgte.size) missing.push("mindst én opgave");
+    $("btnSave").disabled = state.saving || missing.length > 0;
+    $("missing").textContent = missing.length ? "Mangler: " + missing.join(", ") : "";
+    return missing.length === 0;
+  }
+
+  async function save() {
+    if (!validate() || state.saving) return;
+    state.saving = true;
+    $("btnSave").disabled = true;
+    $("btnSave").textContent = "Gemmer...";
+    setStatus("", "");
+
+    // Opgaver i samme rækkefølge som på listen
+    const opgaver = state.opgaver.map(o => o.navn).filter(n => state.valgte.has(n));
+    const body = {
+      kundenr: state.kunde.kundenr,
+      kundenavn: state.kunde.navn,
+      dato: $("dato").value,
+      minutter: totalMin(),
+      opgaver,
+      kommentar: $("kommentar").value.trim()
+    };
+
+    try {
+      await api("/api/foder-registreringer", { method: "POST", body });
+      $("restTiles").hidden = true;
+      $("customerTile").hidden = true;
+      $("savedText").textContent = `Gemt: ${body.kundenavn} · ${parseIso(body.dato).toLocaleDateString("da-DK")} · ${fmtTime(body.minutter)} · ${opgaver.join(", ")}`;
+      $("savedBox").hidden = false;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      setStatus("err", "Registreringen blev ikke gemt: " + e.message);
+      $("status").scrollIntoView({ behavior: "smooth", block: "center" });
+    } finally {
+      state.saving = false;
+      $("btnSave").textContent = "Gem registrering";
+      validate();
+    }
+  }
+
+  function resetForm(keepDate) {
+    const d = keepDate ? $("dato").value : today();
+    state.kunde = null;
+    state.timer = 0;
+    state.min = 0;
+    state.valgte.clear();
+    $("customerSearch").value = "";
+    $("kommentar").value = "";
+    $("savedBox").hidden = true;
+    $("customerTile").hidden = false;
+    $("restTiles").hidden = true;
+    $("selectedCustomer").hidden = true;
+    $("customerSearchBox").hidden = false;
+    setStatus("", "");
+    setDate(d);
+    renderCustomers();
+    renderTasks();
+    renderTime();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    $("customerSearch").focus();
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  function bind() {
+    $("customerSearch").addEventListener("input", renderCustomers);
+    $("customerResults").addEventListener("click", e => {
+      const it = e.target.closest(".frResult");
+      if (it) selectCustomer(state.kunder[Number(it.dataset.i)]);
+    });
+    $("customerResults").addEventListener("keydown", e => {
+      const it = e.target.closest(".frResult");
+      if (it && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); selectCustomer(state.kunder[Number(it.dataset.i)]); }
+    });
+    $("btnChangeCustomer").addEventListener("click", changeCustomer);
+    $("btnRestart").addEventListener("click", () => resetForm(false));
+
+    $("datePrev").addEventListener("click", () => shiftDate(-1));
+    $("dateNext").addEventListener("click", () => shiftDate(1));
+    $("dateToday").addEventListener("click", () => setDate(today()));
+    $("dato").addEventListener("change", () => setDate($("dato").value));
+
+    $("hourBtns").addEventListener("click", e => {
+      const b = e.target.closest(".frPick"); if (!b) return;
+      const h = Number(b.dataset.h);
+      state.timer = state.timer === h ? 0 : h;
+      renderTime();
+    });
+    $("minBtns").addEventListener("click", e => {
+      const b = e.target.closest(".frPick"); if (!b) return;
+      const m = Number(b.dataset.m);
+      state.min = state.min === m ? 0 : m;
+      renderTime();
+    });
+
+    $("taskChips").addEventListener("click", e => {
+      const b = e.target.closest(".frChip"); if (!b) return;
+      const n = b.dataset.navn;
+      if (state.valgte.has(n)) state.valgte.delete(n); else state.valgte.add(n);
+      b.classList.toggle("active", state.valgte.has(n));
+      b.setAttribute("aria-pressed", state.valgte.has(n));
+      validate();
+    });
+
+    $("btnSave").addEventListener("click", save);
+    $("btnNew").addEventListener("click", () => resetForm(true));
+  }
+
+  async function init() {
+    try {
+      const me = await fetch("/.auth/me", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+      $("userLine").textContent = me?.clientPrincipal?.userDetails || "Ikke logget ind";
+    } catch {
+      $("userLine").textContent = "";
+    }
+
+    bind();
+
+    try {
+      const [opg, kun] = await Promise.all([
+        api("/api/foder-opgaver"),
+        api("/api/kunder?aktiv=true")
+      ]);
+      state.opgaver = opg.items || [];
+      state.kunder = (kun.kunder || []).filter(k => k.navn || k.kundenr);
+      $("adminLink").classList.toggle("hidden", !opg.isAdmin);
+    } catch (e) {
+      if (e.status === 401 || e.status === 403) {
+        setStatus("", "");
+        $("noAccess").hidden = false;
+        return;
+      }
+      setStatus("err", "Data kunne ikke hentes: " + e.message);
+      return;
+    }
+
+    setStatus("", "");
+    $("app").hidden = false;
+    setDate(today());
+    renderCustomers();
+    renderTasks();
+    renderTime();
+    $("customerSearch").focus();
+  }
+
+  init();
+})();
+</script>
+<script src="/assets/track.js" defer></script>
+</body>
+</html>

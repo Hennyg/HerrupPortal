@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Oversigt – Foderrådgivning</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260924-empsearch-2" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  body.adminPage .container{ max-width:1500px; }
+
+  .frToolbar{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:12px; }
+  .frToolbar .left, .frToolbar .right{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .frToolbar .clearable{ min-width:240px; width:360px; max-width:100%; }
+  .frToggle{ display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer; user-select:none; }
+  .frToggle input{ width:18px; height:18px; accent-color:var(--nav-bg); }
+  .frSum{ font-size:.9rem; color:#374151; }
+  .frSum strong{ color:#111; }
+
+  .frTableWrap{ overflow:auto; border:1px solid #e5e7eb; border-radius:10px; max-height:calc(100vh - 290px); min-height:240px; }
+  .frTable{ width:100%; border-collapse:collapse; font-size:.9rem; }
+  .frTable th, .frTable td{ padding:.55rem .65rem; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:top; }
+  .frTable thead tr:first-child th{ position:sticky; top:0; background:#fff; z-index:2; white-space:nowrap; border-bottom:1px solid #e5e7eb; }
+  .frTable thead tr.filterRow th{ position:sticky; top:38px; background:#f8fafc; z-index:2; padding:.35rem .45rem; border-bottom:1px solid #e5e7eb; }
+  .frTable th.sortable{ cursor:pointer; }
+  .frTable th.sortable:hover{ color:var(--nav-bg); }
+  .frTable th .sortIcon{ opacity:.35; font-size:.8rem; }
+  .frTable th.sorted .sortIcon{ opacity:1; color:var(--nav-bg); }
+  .frTable tbody tr:hover{ background:#f8fafc; }
+  .frTable tbody tr.isBilled{ color:#6b7280; background:#fafafa; }
+  .frTable .num{ text-align:right; white-space:nowrap; }
+  .frTable .center{ text-align:center; }
+  .frTable input[type=checkbox]{ width:18px; height:18px; accent-color:var(--nav-bg); cursor:pointer; }
+  .colFilter{ width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:6px; padding:.35rem .45rem; font:inherit; font-size:.85rem; background:#fff; min-width:70px; }
+  .colFilter:focus{ outline:none; border-color:var(--nav-accent); box-shadow:0 0 0 2px rgba(31,108,122,.15); }
+  .taskTags{ display:flex; flex-wrap:wrap; gap:4px; max-width:420px; }
+  .taskTag{ font-size:.75rem; padding:2px 8px; border-radius:999px; background:#f1f5f9; color:#334155; white-space:nowrap; }
+  .subTxt{ font-size:.8rem; color:#6b7280; }
+
+  /* Detalje-popup (samme stil som SMS / Admin) */
+  .frOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:200; padding:1rem; }
+  .frOverlay[hidden]{ display:none; }
+  .frModal{ background:#fff; border-radius:12px; width:min(720px,96vw); max-height:90vh; overflow-y:auto; padding:1.25rem 1.5rem 1.5rem; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .frModalHeader{ display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; gap:10px; }
+  .frModalTitle{ font-weight:700; font-size:1.15rem; color:var(--heading); }
+  .frCloseBtn{ background:transparent; border:0; cursor:pointer; font-size:1.1rem; color:#6b7280; padding:2px 6px; border-radius:6px; }
+  .frCloseBtn:hover{ background:rgba(0,0,0,.05); color:#111; }
+  .frMeta{ display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; font-size:.95rem; margin:0 0 14px; }
+  .frMeta dt{ font-weight:600; color:#374151; }
+  .frMeta dd{ margin:0; }
+  .frBox{ border:1px solid #e5e7eb; border-radius:10px; padding:.7rem .85rem; white-space:pre-wrap; word-break:break-word; font-size:.92rem; max-height:280px; overflow:auto; background:#fcfcfd; }
+  .badge{ display:inline-block; font-size:.75rem; font-weight:600; padding:2px 8px; border-radius:999px; background:#e5e7eb; color:#374151; white-space:nowrap; }
+  .badge.billed{ background:#dcfce7; color:#166534; }
+  .badge.open{ background:#fef3c7; color:#92400e; }
+  .btn.danger{ border-color:#fecaca; color:#991b1b; }
+  .btn.danger:hover{ background:#fef2f2; }
+
+  .noAccess{ text-align:center; padding:2.5rem 1rem; }
+  .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
+
+  @media (max-width: 720px){
+    .adminTitle{ font-size:30px; }
+    .frToolbar .clearable{ width:100%; }
+    .frMeta{ grid-template-columns:1fr; gap:2px; }
+    .frMeta dd{ margin-bottom:6px; }
+  }
+</style>
+</head>
+
+<body class="adminPage">
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Foderrådgivning</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+      <span class="sep">|</span>
+      <a href="/Foderradgivning_ny.html">Ny registrering</a>
+      <a id="adminLink" class="hidden" href="/Foderradgivning_admin.html">Admin</a>
+      <a href="/">← Til portal</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.5rem">
+  <h1 class="adminTitle">Foderrådgivning</h1>
+  <div class="muted adminSub">Oversigt over registreret tid</div>
+
+  <div id="noAccess" class="panel noAccess" hidden>
+    <h2>Ingen adgang</h2>
+    <div class="muted">Du har ikke rollen til Foderrådgivning. Kontakt IT, hvis du skal have adgang.</div>
+  </div>
+
+  <div id="app" class="panel">
+    <div class="frToolbar">
+      <div class="left">
+        <div class="clearable">
+          <input id="q" type="search" placeholder="Søg kunde, kundenr., opgave, rådgiver, kommentar…" autocomplete="off">
+          <button class="x" id="qx" type="button" aria-label="Ryd søgning">×</button>
+        </div>
+        <label class="frToggle"><input type="checkbox" id="showBilled"> Vis fakturerede</label>
+        <button type="button" class="btn" id="btnReset">Nulstil filtre</button>
+      </div>
+      <div class="right">
+        <span class="frSum" id="sumText"></span>
+        <button type="button" class="btn" id="btnReload">Opdatér</button>
+      </div>
+    </div>
+
+    <div class="frTableWrap">
+      <table class="frTable">
+        <thead>
+          <tr>
+            <th class="center" title="Markér som faktureret">Faktureret</th>
+            <th class="sortable" data-sort="dato">Dato <span class="sortIcon">⇅</span></th>
+            <th class="sortable" data-sort="kundenr">Kundenr. <span class="sortIcon">⇅</span></th>
+            <th class="sortable" data-sort="kundenavn">Kunde <span class="sortIcon">⇅</span></th>
+            <th class="sortable num" data-sort="minutter">Tid <span class="sortIcon">⇅</span></th>
+            <th>Opgaver</th>
+            <th class="sortable" data-sort="raadgiver">Rådgiver <span class="sortIcon">⇅</span></th>
+            <th>Kommentar</th>
+            <th></th>
+          </tr>
+          <tr class="filterRow">
+            <th></th>
+            <th><input class="colFilter" data-col="dato" placeholder="fx 10-2026" autocomplete="off"></th>
+            <th><input class="colFilter" data-col="kundenr" placeholder="Filter" autocomplete="off"></th>
+            <th><input class="colFilter" data-col="kundenavn" placeholder="Filter" autocomplete="off"></th>
+            <th></th>
+            <th><select class="colFilter" data-col="opgave" id="fOpgave"><option value="">Alle opgaver</option></select></th>
+            <th><select class="colFilter" data-col="raadgiver" id="fRaadgiver"><option value="">Alle</option></select></th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="9" class="muted">Henter...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Detalje-popup -->
+<div id="detailOverlay" class="frOverlay" hidden>
+  <div class="frModal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="frModalHeader">
+      <div class="frModalTitle" id="detailTitle">Registrering</div>
+      <button type="button" class="frCloseBtn" id="detailClose" aria-label="Luk">✕</button>
+    </div>
+    <dl class="frMeta" id="detailMeta"></dl>
+    <div style="font-weight:600;margin-bottom:6px">Kommentar</div>
+    <div class="frBox" id="detailComment"></div>
+    <div class="formActions" style="margin-top:16px">
+      <button type="button" class="btn primary" id="detailBill">Markér som faktureret</button>
+      <button type="button" class="btn danger" id="detailDelete" hidden>Slet</button>
+      <span style="flex:1"></span>
+      <button type="button" class="btn" id="detailClose2">Luk</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  let rows = [];
+  let filtered = [];
+  let isAdmin = false;
+  let myEmail = "";
+  let sortField = "dato";
+  let sortDir = "desc";
+  let current = null;
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  }
+
+  async function api(path, opts = {}) {
+    const r = await fetch(path, {
+      cache: "no-store",
+      ...opts,
+      headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    let data = null;
+    try { data = await r.json(); } catch { data = null; }
+    if (!r.ok || data?.error) {
+      const e = new Error(data?.error || `HTTP ${r.status}`);
+      e.status = r.status;
+      throw e;
+    }
+    return data;
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "";
+    const [y, m, d] = String(iso).slice(0, 10).split("-");
+    return `${d}-${m}-${y}`;
+  }
+  function fmtDateTime(s) {
+    return s ? new Date(s).toLocaleString("da-DK", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  }
+  function fmtTime(m) {
+    m = Number(m) || 0;
+    const h = Math.floor(m / 60), r = m % 60;
+    if (!h) return `${r} min`;
+    return r ? `${h} t ${r} min` : `${h} t`;
+  }
+  function fmtHours(m) {
+    return ((Number(m) || 0) / 60).toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // ── Data ─────────────────────────────────────────────────────────────────
+  async function load() {
+    $("tbody").innerHTML = `<tr><td colspan="9" class="muted">Henter...</td></tr>`;
+    try {
+      const data = await api("/api/foder-registreringer" + ($("showBilled").checked ? "?alle=1" : ""));
+      rows = data.items || [];
+      isAdmin = !!data.isAdmin;
+      myEmail = String(data.user?.email || "").toLowerCase();
+      $("adminLink").classList.toggle("hidden", !isAdmin);
+      fillSelects();
+      apply();
+    } catch (e) {
+      if (e.status === 401 || e.status === 403) {
+        $("app").hidden = true;
+        $("noAccess").hidden = false;
+        return;
+      }
+      $("tbody").innerHTML = `<tr><td colspan="9" style="color:#991b1b">Fejl: ${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function fillSelects() {
+    const fill = (sel, values, allText) => {
+      const keep = sel.value;
+      sel.innerHTML = `<option value="">${allText}</option>` + values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+      sel.value = values.includes(keep) ? keep : "";
+    };
+    const sortDa = a => a.sort((x, y) => x.localeCompare(y, "da"));
+    fill($("fOpgave"), sortDa([...new Set(rows.flatMap(r => r.opgaver))]), "Alle opgaver");
+    fill($("fRaadgiver"), sortDa([...new Set(rows.map(r => r.raadgiver).filter(Boolean))]), "Alle");
+  }
+
+  // ── Filtrering, sortering, visning ───────────────────────────────────────
+  function colValue(r, col) {
+    if (col === "dato") return fmtDate(r.dato) + " " + r.dato;
+    return String(r[col] ?? "");
+  }
+
+  function apply() {
+    const q = $("q").value.trim().toLowerCase();
+    $("qx").style.visibility = q ? "visible" : "hidden";
+    const showBilled = $("showBilled").checked;
+    const f = {};
+    document.querySelectorAll(".colFilter").forEach(i => { f[i.dataset.col] = i.value.trim().toLowerCase(); });
+
+    filtered = rows.filter(r => {
+      if (!showBilled && r.faktureret) return false;
+      for (const col of ["dato", "kundenr", "kundenavn"]) {
+        if (f[col] && !colValue(r, col).toLowerCase().includes(f[col])) return false;
+      }
+      if (f.opgave && !r.opgaver.some(o => o.toLowerCase() === f.opgave)) return false;
+      if (f.raadgiver && String(r.raadgiver).toLowerCase() !== f.raadgiver) return false;
+      if (!q) return true;
+      return [r.kundenr, r.kundenavn, r.raadgiver, r.kommentar, r.opgaver.join(" "), fmtDate(r.dato)]
+        .join(" ").toLowerCase().includes(q);
+    });
+
+    filtered.sort((a, b) => {
+      let res;
+      if (sortField === "minutter") res = (a.minutter || 0) - (b.minutter || 0);
+      else res = String(a[sortField] ?? "").localeCompare(String(b[sortField] ?? ""), "da", { numeric: true });
+      if (res === 0) res = String(a.createdon || "").localeCompare(String(b.createdon || ""));
+      return sortDir === "asc" ? res : -res;
+    });
+
+    document.querySelectorAll("th.sortable").forEach(th => {
+      const on = th.dataset.sort === sortField;
+      th.classList.toggle("sorted", on);
+      th.querySelector(".sortIcon").textContent = on ? (sortDir === "asc" ? "▲" : "▼") : "⇅";
+    });
+
+    render();
+  }
+
+  function render() {
+    const total = filtered.reduce((s, r) => s + (Number(r.minutter) || 0), 0);
+    $("sumText").innerHTML = `${filtered.length} registreringer · <strong>${fmtHours(total)} timer</strong>`;
+
+    if (!filtered.length) {
+      $("tbody").innerHTML = `<tr><td colspan="9" class="muted">Ingen registreringer matcher filtrene.</td></tr>`;
+      return;
+    }
+
+    $("tbody").innerHTML = filtered.map(r => `
+      <tr class="${r.faktureret ? "isBilled" : ""}">
+        <td class="center"><input type="checkbox" data-bill="${esc(r.id)}" ${r.faktureret ? "checked" : ""} title="${r.faktureret ? "Faktureret – fjern markering" : "Markér som faktureret"}"></td>
+        <td style="white-space:nowrap">${esc(fmtDate(r.dato))}</td>
+        <td>${esc(r.kundenr)}</td>
+        <td>${esc(r.kundenavn)}</td>
+        <td class="num">${esc(fmtTime(r.minutter))}</td>
+        <td><div class="taskTags">${r.opgaver.map(o => `<span class="taskTag">${esc(o)}</span>`).join("")}</div></td>
+        <td>${esc(r.raadgiver)}</td>
+        <td>${r.kommentar ? "Ja" : '<span class="subTxt">–</span>'}</td>
+        <td><button type="button" class="btn" data-show="${esc(r.id)}">Vis</button></td>
+      </tr>`).join("");
+  }
+
+  // ── Faktureret ───────────────────────────────────────────────────────────
+  async function setBilled(id, val) {
+    try {
+      const data = await api(`/api/foder-registreringer?id=${encodeURIComponent(id)}`, { method: "PATCH", body: { faktureret: val } });
+      const i = rows.findIndex(r => r.id === id);
+      if (i >= 0 && data.item) rows[i] = data.item;
+      if (current && current.id === id && data.item) { current = data.item; fillDetail(); }
+      apply();
+    } catch (e) {
+      alert("Kunne ikke opdatere: " + e.message);
+      load();
+    }
+  }
+
+  // ── Detaljer ─────────────────────────────────────────────────────────────
+  function fillDetail() {
+    const r = current;
+    $("detailTitle").textContent = r.kundenavn || "Registrering";
+    const billed = r.faktureret
+      ? `<span class="badge billed">Faktureret</span> <span class="subTxt">${esc(fmtDateTime(r.faktureretDato))}${r.faktureretAf ? " af " + esc(r.faktureretAf) : ""}</span>`
+      : `<span class="badge open">Ikke faktureret</span>`;
+    $("detailMeta").innerHTML = `
+      <dt>Kunde</dt><dd>${esc(r.kundenavn)} (${esc(r.kundenr)})</dd>
+      <dt>Dato</dt><dd>${esc(fmtDate(r.dato))}</dd>
+      <dt>Tid</dt><dd>${esc(fmtTime(r.minutter))} <span class="subTxt">(${fmtHours(r.minutter)} timer)</span></dd>
+      <dt>Opgaver</dt><dd><div class="taskTags">${r.opgaver.map(o => `<span class="taskTag">${esc(o)}</span>`).join("")}</div></dd>
+      <dt>Rådgiver</dt><dd>${esc(r.raadgiver)}${r.raadgiverMail ? ` <span class="subTxt">${esc(r.raadgiverMail)}</span>` : ""}</dd>
+      <dt>Oprettet</dt><dd>${esc(fmtDateTime(r.createdon))}</dd>
+      <dt>Status</dt><dd>${billed}</dd>`;
+    $("detailComment").textContent = r.kommentar || "Ingen kommentar";
+    $("detailBill").textContent = r.faktureret ? "Fjern faktureret" : "Markér som faktureret";
+    $("detailBill").classList.toggle("primary", !r.faktureret);
+    const own = myEmail && String(r.raadgiverMail).toLowerCase() === myEmail;
+    $("detailDelete").hidden = !(isAdmin || (own && !r.faktureret));
+  }
+
+  function openDetail(id) {
+    current = rows.find(r => r.id === id);
+    if (!current) return;
+    fillDetail();
+    $("detailOverlay").hidden = false;
+    $("detailClose").focus();
+  }
+  function closeDetail() {
+    $("detailOverlay").hidden = true;
+    current = null;
+  }
+
+  async function deleteCurrent() {
+    if (!current) return;
+    if (!confirm(`Slet registreringen for ${current.kundenavn} d. ${fmtDate(current.dato)}?`)) return;
+    try {
+      await api(`/api/foder-registreringer?id=${encodeURIComponent(current.id)}`, { method: "DELETE" });
+      rows = rows.filter(r => r.id !== current.id);
+      closeDetail();
+      apply();
+    } catch (e) {
+      alert("Kunne ikke slette: " + e.message);
+    }
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  function bind() {
+    $("q").addEventListener("input", apply);
+    $("qx").addEventListener("click", () => { $("q").value = ""; apply(); $("q").focus(); });
+    $("showBilled").addEventListener("change", load);
+    $("btnReload").addEventListener("click", load);
+    $("btnReset").addEventListener("click", () => {
+      $("q").value = "";
+      document.querySelectorAll(".colFilter").forEach(i => { i.value = ""; });
+      apply();
+    });
+    document.querySelectorAll(".colFilter").forEach(i => i.addEventListener(i.tagName === "SELECT" ? "change" : "input", apply));
+
+    document.querySelectorAll("th.sortable").forEach(th => th.addEventListener("click", () => {
+      const fld = th.dataset.sort;
+      if (sortField === fld) sortDir = sortDir === "asc" ? "desc" : "asc";
+      else { sortField = fld; sortDir = fld === "dato" || fld === "minutter" ? "desc" : "asc"; }
+      apply();
+    }));
+
+    $("tbody").addEventListener("change", e => {
+      const cb = e.target.closest("input[data-bill]");
+      if (cb) setBilled(cb.dataset.bill, cb.checked);
+    });
+    $("tbody").addEventListener("click", e => {
+      const b = e.target.closest("button[data-show]");
+      if (b) openDetail(b.dataset.show);
+    });
+
+    $("detailClose").addEventListener("click", closeDetail);
+    $("detailClose2").addEventListener("click", closeDetail);
+    $("detailBill").addEventListener("click", () => current && setBilled(current.id, !current.faktureret));
+    $("detailDelete").addEventListener("click", deleteCurrent);
+    $("detailOverlay").addEventListener("click", e => { if (e.target === $("detailOverlay")) closeDetail(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("detailOverlay").hidden) closeDetail(); });
+  }
+
+  async function init() {
+    try {
+      const me = await fetch("/.auth/me", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+      $("userLine").textContent = me?.clientPrincipal?.userDetails || "Ikke logget ind";
+    } catch {
+      $("userLine").textContent = "";
+    }
+    bind();
+    await load();
+  }
+
+  init();
+})();
+</script>
+<script src="/assets/track.js" defer></script>
+</body>
+</html>
