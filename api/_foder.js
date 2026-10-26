@@ -6,19 +6,19 @@ const fetch = globalThis.fetch;
 const { dvFetch } = require("./_dv");
 
 // ── Dataverse-tabeller (HerrupPortal-miljøet, cr175_) ──────────────────────
-// Opgaver:       cr175_lch_foder_opgave        → entity set cr175_lch_foder_opgaves
-// Registreringer: cr175_lch_foder_registrering → entity set cr175_lch_foder_registrerings
+// Opgaver:        skemanavn cr175_lch_foder_opgaves        → entity set cr175_lch_foder_opgaveses
+// Registreringer: skemanavn cr175_lch_foder_registrerings  → entity set cr175_lch_foder_registreringses
 const OPG = {
-  TABLE: process.env.FODER_OPGAVE_ENTITYSET || "cr175_lch_foder_opgaves",
-  ID: "cr175_lch_foder_opgaveid",
+  TABLE: process.env.FODER_OPGAVE_ENTITYSET || "cr175_lch_foder_opgaveses",
+  ID: "cr175_lch_foder_opgavesid",
   navn: "cr175_lch_navn",             // Tekst (primær kolonne)
   sortering: "cr175_lch_sortering",   // Heltal
   aktiv: "cr175_lch_aktiv"            // Ja/Nej (standard Ja)
 };
 
 const REG = {
-  TABLE: process.env.FODER_REG_ENTITYSET || "cr175_lch_foder_registrerings",
-  ID: "cr175_lch_foder_registreringid",
+  TABLE: process.env.FODER_REG_ENTITYSET || "cr175_lch_foder_registreringses",
+  ID: "cr175_lch_foder_registreringsid",
   titel: "cr175_lch_key",                   // Tekst (primær kolonne)
   kundenr: "cr175_lch_kundenr",             // Tekst
   kundenavn: "cr175_lch_kundenavn",         // Tekst
