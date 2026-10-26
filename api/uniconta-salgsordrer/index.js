@@ -55,6 +55,9 @@ function normalizeLine(row) {
   };
 }
 
+const ORDER_NO_FIELDS = ["OrderNumber", "OrderNo", "OrderNum", "Order"];
+const lineOrderNo = row => String(firstValue(row, ORDER_NO_FIELDS) ?? "");
+
 async function query(path) {
   const r = await unicontaFetch(path);
   const data = await r.json();
@@ -62,6 +65,47 @@ async function query(path) {
     rows: Array.isArray(data) ? data : (data.value || []),
     next: data["@odata.nextLink"] || data["odata.nextLink"] || null
   };
+}
+
+async function tryQuery(path, context) {
+  try { return await query(path); }
+  catch (e) { context.log.warn("uniconta-salgsordrer:", path, e.message); return null; }
+}
+
+// Henter linjerne for én ordre. Uniconta ignorerer i nogle tilfælde $filter på
+// ordrelinjer og returnerer alle linjer, så resultatet kontrolleres altid på
+// ordrenummeret i hver linje. Virker filteret ikke, gennemløbes linjerne
+// side for side og frasorteres her.
+async function getOrderLines(order, context) {
+  const attempts = [
+    `OrderNumber eq ${order}`,
+    `OrderNumber eq '${order}'`
+  ];
+  for (const f of attempts) {
+    const res = await tryQuery(`${LINE_ENTITY}?$filter=${encodeURIComponent(f)}&$top=1000`, context);
+    if (!res) continue;
+    if (!res.rows.length) return { rows: [], method: "filter" };
+    if (res.rows.every(r => lineOrderNo(r) === order)) return { rows: res.rows, method: "filter" };
+    if (!res.rows.some(r => lineOrderNo(r))) {
+      throw new Error("Ordrelinjerne har ikke et ordrenummer-felt. Felter på en linje: " + Object.keys(res.rows[0]).join(", "));
+    }
+  }
+
+  // Filteret blev ignoreret – gennemløb alle linjer og frasortér.
+  const pageSize = 1000;
+  const maxRows = parseInt(process.env.UNICONTA_ORDERLINE_SCAN_MAX || "100000", 10);
+  const found = [];
+  let scanned = 0;
+  let next = `${LINE_ENTITY}?$top=${pageSize}`;
+  while (next && scanned < maxRows) {
+    const page = await query(next);
+    scanned += page.rows.length;
+    for (const r of page.rows) if (lineOrderNo(r) === order) found.push(r);
+    if (page.next) next = page.next;
+    else if (page.rows.length === pageSize) next = `${LINE_ENTITY}?$top=${pageSize}&$skip=${scanned}`;
+    else next = null;
+  }
+  return { rows: found, method: "scan" };
 }
 
 module.exports = async function (context, req) {
@@ -73,14 +117,14 @@ module.exports = async function (context, req) {
 
     if (order) {
       if (!/^\d{1,12}$/.test(order)) return A.json(context, 400, { error: "Ugyldigt ordrenummer" });
-      const [head, lines] = await Promise.all([
-        query(`${ORDER_ENTITY}?$filter=${encodeURIComponent(`OrderNumber eq ${order}`)}&$top=1`),
-        query(`${LINE_ENTITY}?$filter=${encodeURIComponent(`OrderNumber eq ${order}`)}`)
-      ]);
-      if (!head.rows.length) return A.json(context, 404, { error: `Ordre ${order} blev ikke fundet` });
-      const mapped = lines.rows.map(normalizeLine)
+      const head = await query(`${ORDER_ENTITY}?$filter=${encodeURIComponent(`OrderNumber eq ${order}`)}&$top=50`);
+      const headRow = head.rows.find(r => String(firstValue(r, ORDER_NO_FIELDS) ?? "") === order);
+      if (!headRow) return A.json(context, 404, { error: `Ordre ${order} blev ikke fundet` });
+
+      const { rows, method } = await getOrderLines(order, context);
+      const mapped = rows.map(normalizeLine)
         .sort((a, b) => (a.lineNumber ?? 0) - (b.lineNumber ?? 0));
-      return A.json(context, 200, { order: normalizeOrder(head.rows[0]), lines: mapped });
+      return A.json(context, 200, { order: normalizeOrder(headRow), lines: mapped, lineMethod: method });
     }
 
     const requested = parseInt(req.query.top || "2000", 10);
