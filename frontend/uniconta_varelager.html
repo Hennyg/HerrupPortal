@@ -13,18 +13,17 @@
 
 <style>
   .vlWrap{ max-width:720px; margin:0 auto; }
-  .vlSearch{ display:flex; gap:8px; }
-  .vlInput{ flex:1; min-width:0; box-sizing:border-box; border:2px solid #d1d5db; border-radius:12px; padding:.85rem 1rem; font:inherit; font-size:1.3rem; letter-spacing:.02em; background:#fff; }
-  .vlInput:focus{ outline:none; border-color:var(--nav-accent); box-shadow:0 0 0 4px rgba(31,108,122,.15); }
-  .vlCamBtn{ flex:0 0 auto; min-width:58px; border:2px solid #d1d5db; background:#fff; border-radius:12px; font-size:1.5rem; cursor:pointer; }
-  .vlCamBtn:hover{ background:#f3f4f6; }
-  .vlCamBtn:focus-visible{ outline:3px solid rgba(31,108,122,.35); outline-offset:2px; }
+  .brandMobile{ display:none; }
 
-  .vlOptions{ display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-top:10px; }
-  .vlToggle{ display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer; user-select:none; font-size:.92rem; }
-  .vlToggle input{ width:18px; height:18px; accent-color:var(--nav-bg); }
-  .vlScanHint{ display:inline-flex; align-items:center; gap:6px; font-size:.82rem; color:#065f46; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:999px; padding:2px 10px; }
-  .vlScanHint::before{ content:""; width:8px; height:8px; border-radius:50%; background:#10b981; }
+  .vlField{ position:relative; }
+  .vlInput{ width:100%; box-sizing:border-box; border:2px solid #d1d5db; border-radius:12px; padding:.85rem 3.6rem .85rem 1rem; font:inherit; font-size:1.3rem; letter-spacing:.02em; background:#fff; }
+  .vlInput:focus{ outline:none; border-color:var(--nav-accent); box-shadow:0 0 0 4px rgba(31,108,122,.15); }
+  .vlClear{ position:absolute; right:8px; top:50%; transform:translateY(-50%); width:42px; height:42px; border:0; border-radius:50%;
+    background:#e5e7eb; color:#111; font-size:1.6rem; font-weight:700; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .vlClear:hover{ background:#d1d5db; }
+  .vlClear:active{ background:#9ca3af; }
+  .vlClear:focus-visible{ outline:3px solid rgba(31,108,122,.35); outline-offset:2px; }
+  .vlClear[hidden]{ display:none; }
 
   .vlStatus{ border-radius:10px; padding:.75rem .9rem; margin-top:14px; font-size:.95rem; }
   .vlStatus.info{ background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
@@ -60,17 +59,19 @@
   .vlChip{ border:1px solid #d1d5db; background:#fff; border-radius:999px; padding:.3rem .75rem; font:inherit; font-size:.85rem; cursor:pointer; }
   .vlChip:hover{ background:#f3f4f6; }
 
-  /* Kamera */
-  .vlCamOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:300; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1rem; gap:12px; }
-  .vlCamOverlay[hidden]{ display:none; }
-  .vlCamBox{ position:relative; width:min(520px, 100%); aspect-ratio:4/3; background:#000; border-radius:12px; overflow:hidden; }
-  .vlCamBox video{ width:100%; height:100%; object-fit:cover; }
-  .vlCamFrame{ position:absolute; left:10%; right:10%; top:32%; bottom:32%; border:3px solid rgba(255,255,255,.9); border-radius:10px; box-shadow:0 0 0 999px rgba(0,0,0,.25); }
-  .vlCamText{ color:#fff; text-align:center; font-size:.95rem; min-height:1.3em; }
-
   .noAccess{ text-align:center; padding:2.5rem 1rem; }
   .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
-  @media (max-width: 520px){ .adminTitle{ font-size:30px; } .vlInput{ font-size:1.15rem; } }
+
+  /* Telefon: ingen overskrift, "Varelager" i navbar og mindre luft */
+  @media (max-width: 640px){
+    .brandDesktop{ display:none; }
+    .brandMobile{ display:inline; }
+    .vlPageHead{ display:none; }
+    .vlContainer{ padding-top:.75rem !important; }
+    .vlInput{ font-size:1.15rem; }
+    .vlCard{ padding:.85rem .9rem; }
+    .vlAvail .n{ font-size:1.7rem; }
+  }
 </style>
 </head>
 
@@ -79,7 +80,7 @@
   <div class="navbar-inner">
     <div class="brand">
       <div class="logo" aria-label="Herrup Portal"></div>
-      <div>Uniconta</div>
+      <div><span class="brandDesktop">Uniconta</span><span class="brandMobile">Varelager</span></div>
     </div>
     <div class="nav">
       <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
@@ -90,10 +91,12 @@
   <div class="nav-accent"></div>
 </div>
 
-<div class="container" style="padding-top:1.5rem">
+<div class="container vlContainer" style="padding-top:1.5rem">
   <div class="vlWrap">
-    <h1 class="adminTitle">Varelager</h1>
-    <div class="muted adminSub">Skriv eller scan et varenummer eller en stregkode</div>
+    <div class="vlPageHead">
+      <h1 class="adminTitle">Varelager</h1>
+      <div class="muted adminSub">Skriv eller scan et varenummer eller en stregkode</div>
+    </div>
 
     <div id="noAccess" class="panel noAccess" hidden>
       <h2>Ingen adgang</h2>
@@ -101,13 +104,9 @@
     </div>
 
     <div id="app">
-      <div class="vlSearch">
-        <input id="q" class="vlInput" type="search" placeholder="Varenummer eller stregkode" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Varenummer eller stregkode">
-        <button type="button" id="btnCam" class="vlCamBtn" title="Scan med kamera" aria-label="Scan med kamera">📷</button>
-      </div>
-      <div class="vlOptions">
-        <label class="vlToggle"><input type="checkbox" id="scanMode"> Scanner-tilstand</label>
-        <span id="scanHint" class="vlScanHint" hidden>Klar til scanning</span>
+      <div class="vlField">
+        <input id="q" class="vlInput" type="text" placeholder="Varenummer eller stregkode" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="Varenummer eller stregkode">
+        <button type="button" id="btnClear" class="vlClear" aria-label="Ryd feltet" title="Ryd" hidden>×</button>
       </div>
 
       <div id="status" class="vlStatus" hidden></div>
@@ -121,28 +120,16 @@
   </div>
 </div>
 
-<div id="camOverlay" class="vlCamOverlay" hidden>
-  <div class="vlCamBox">
-    <video id="camVideo" playsinline muted></video>
-    <div class="vlCamFrame"></div>
-  </div>
-  <div id="camText" class="vlCamText">Starter kamera...</div>
-  <button type="button" id="camClose" class="btn">Luk kamera</button>
-</div>
-
 <script>
 (function () {
   "use strict";
 
   const $ = id => document.getElementById(id);
-  const SCAN_KEY = "uc_varelager_scanmode";
-  const ZXING_URL = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
 
   let timer = null;
   let seq = 0;
   let lastQuery = "";
   let recent = [];
-  let cam = { stream: null, detector: null, reader: null, raf: 0, active: false };
 
   function esc(s) {
     return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
@@ -156,6 +143,22 @@
     s.hidden = false;
     s.className = "vlStatus " + type;
     s.textContent = msg;
+  }
+
+  function updateClear() {
+    $("btnClear").hidden = !$("q").value;
+  }
+
+  // Ryd feltet og fjern varedetaljer
+  function clearAll(focus = true) {
+    clearTimeout(timer);
+    seq++;              // ignorér et opslag der stadig er undervejs
+    lastQuery = "";
+    $("q").value = "";
+    $("result").innerHTML = "";
+    setStatus("", "");
+    updateClear();
+    if (focus) $("q").focus();
   }
 
   // ── Opslag ───────────────────────────────────────────────────────────────
@@ -247,11 +250,11 @@
       </div>`;
   }
 
+  // Markér teksten, så næste scan fra håndscanneren erstatter den.
   function afterLookup() {
-    if ($("scanMode").checked) {
-      $("q").focus();
-      $("q").select();
-    }
+    const q = $("q");
+    q.focus();
+    q.select();
   }
 
   function addRecent(q) {
@@ -262,115 +265,29 @@
 
   function useQuery(q) {
     $("q").value = q;
+    updateClear();
     lookup(q);
-  }
-
-  // ── Scanner-tilstand (håndscanner som tastatur: tegn + Enter) ────────────
-  function setScanMode(on) {
-    $("scanMode").checked = on;
-    $("scanHint").hidden = !on;
-    try { localStorage.setItem(SCAN_KEY, on ? "1" : "0"); } catch {}
-    if (on) { $("q").focus(); $("q").select(); }
-  }
-
-  // Hold fokus i feltet i scanner-tilstand, medmindre brugeren arbejder i andre felter/knapper.
-  function keepFocus() {
-    if (!$("scanMode").checked || !$("camOverlay").hidden) return;
-    const a = document.activeElement;
-    if (a && a !== document.body && a !== $("q") && a.matches("input,select,textarea")) return;
-    if (a !== $("q")) $("q").focus();
-  }
-
-  // ── Kamera ───────────────────────────────────────────────────────────────
-  async function openCamera() {
-    $("camOverlay").hidden = false;
-    $("camText").textContent = "Starter kamera...";
-    cam.active = true;
-    try {
-      const formats = ["ean_13", "ean_8", "code_128", "code_39", "upc_a", "upc_e", "itf", "qr_code"];
-      if ("BarcodeDetector" in window) {
-        const supported = await BarcodeDetector.getSupportedFormats().catch(() => formats);
-        cam.detector = new BarcodeDetector({ formats: formats.filter(f => supported.includes(f)) });
-        cam.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-        const v = $("camVideo");
-        v.srcObject = cam.stream;
-        await v.play();
-        $("camText").textContent = "Hold stregkoden inden for rammen";
-        const tick = async () => {
-          if (!cam.active) return;
-          try {
-            const codes = await cam.detector.detect(v);
-            if (codes.length && codes[0].rawValue) return onScanned(codes[0].rawValue);
-          } catch {}
-          cam.raf = requestAnimationFrame(tick);
-        };
-        tick();
-      } else {
-        await loadZxing();
-        if (!cam.active) return;
-        cam.reader = new ZXing.BrowserMultiFormatReader();
-        $("camText").textContent = "Hold stregkoden inden for rammen";
-        await cam.reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" } }, audio: false },
-          $("camVideo"),
-          (result) => { if (result && cam.active) onScanned(result.getText()); }
-        );
-      }
-    } catch (e) {
-      const msg = e && e.name === "NotAllowedError"
-        ? "Adgang til kameraet blev afvist. Tillad kamera for siden i browserens indstillinger."
-        : "Kameraet kunne ikke startes: " + (e.message || e);
-      $("camText").textContent = msg;
-    }
-  }
-
-  function loadZxing() {
-    if (window.ZXing) return Promise.resolve();
-    return new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = ZXING_URL;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error("Scanner-biblioteket kunne ikke hentes"));
-      document.head.appendChild(s);
-    });
-  }
-
-  function closeCamera() {
-    cam.active = false;
-    cancelAnimationFrame(cam.raf);
-    try { cam.reader && cam.reader.reset(); } catch {}
-    cam.reader = null;
-    if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
-    cam.stream = null;
-    const v = $("camVideo");
-    try { v.pause(); } catch {}
-    v.srcObject = null;
-    $("camOverlay").hidden = true;
-  }
-
-  function onScanned(code) {
-    if (navigator.vibrate) navigator.vibrate(80);
-    closeCamera();
-    useQuery(String(code).trim());
   }
 
   // ── Init ─────────────────────────────────────────────────────────────────
   function bind() {
     const q = $("q");
+    // Håndscanneren sender tegn + Enter
     q.addEventListener("keydown", e => {
       if (e.key === "Enter") { e.preventDefault(); lookup(q.value); }
+      if (e.key === "Escape") clearAll();
     });
-    // Manuel indtastning: slå op når man holder en pause i skrivningen.
+    // Manuel indtastning: slå op når man holder en pause i skrivningen
     q.addEventListener("input", () => {
+      updateClear();
       clearTimeout(timer);
       const v = q.value.trim();
+      if (!v) { clearAll(false); return; }
       if (v.length >= 2 && v !== lastQuery) timer = setTimeout(() => lookup(v), 700);
     });
 
-    $("scanMode").addEventListener("change", e => setScanMode(e.target.checked));
-    $("btnCam").addEventListener("click", openCamera);
-    $("camClose").addEventListener("click", () => { closeCamera(); afterLookup(); });
-    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("camOverlay").hidden) closeCamera(); });
+    $("btnClear").addEventListener("mousedown", e => e.preventDefault()); // behold fokus i feltet
+    $("btnClear").addEventListener("click", () => clearAll());
 
     document.addEventListener("click", e => {
       const s = e.target.closest("[data-q]");
@@ -381,9 +298,7 @@
         box.hidden = !box.hidden;
         r.textContent = box.hidden ? "Vis alle data" : "Skjul alle data";
       }
-      setTimeout(keepFocus, 0);
     });
-    q.addEventListener("blur", () => setTimeout(keepFocus, 150));
   }
 
   async function init() {
@@ -394,10 +309,6 @@
       $("userLine").textContent = "";
     }
     bind();
-
-    let saved = null;
-    try { saved = localStorage.getItem(SCAN_KEY); } catch {}
-    setScanMode(saved === "1");
 
     // Direkte link med ?q=... slår op med det samme.
     const p = new URLSearchParams(location.search).get("q");
