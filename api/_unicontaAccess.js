@@ -28,6 +28,14 @@ const PAGES = [
     url: "/uniconta_varelager.html",
     icon: "📦",
     roles: roleList("UNICONTA_VARELAGER_ROLES", "portal_uniconta_varelager")
+  },
+  {
+    key: "salgsordre",
+    title: "Salgsordrer",
+    description: "Salgsordrer med tilhørende ordrelinjer",
+    url: "/uniconta_salgsordre.html",
+    icon: "🧾",
+    roles: roleList("UNICONTA_SALGSORDRE_ROLES", "portal_uniconta_salgsordre")
   }
 ];
 

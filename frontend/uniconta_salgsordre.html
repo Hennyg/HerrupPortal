@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Salgsordrer – Uniconta</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260924-empsearch-2" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  body.adminPage .container{ max-width:1500px; }
+
+  .soToolbar{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:12px; }
+  .soToolbar .left, .soToolbar .right{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .soToolbar .clearable{ min-width:240px; width:380px; max-width:100%; }
+  .soSum{ font-size:.9rem; color:#374151; }
+
+  .soTableWrap{ overflow:auto; border:1px solid #e5e7eb; border-radius:10px; max-height:calc(100vh - 290px); min-height:240px; }
+  .soTable{ width:100%; border-collapse:collapse; font-size:.9rem; }
+  .soTable th, .soTable td{ padding:.55rem .65rem; border-bottom:1px solid #f1f5f9; text-align:left; vertical-align:top; }
+  .soTable thead tr:first-child th{ position:sticky; top:0; background:#fff; z-index:2; white-space:nowrap; border-bottom:1px solid #e5e7eb; }
+  .soTable thead tr.filterRow th{ position:sticky; top:38px; background:#f8fafc; z-index:2; padding:.35rem .45rem; border-bottom:1px solid #e5e7eb; }
+  .soTable th.sortable{ cursor:pointer; }
+  .soTable th.sortable:hover{ color:var(--nav-bg); }
+  .soTable th .sortIcon{ opacity:.35; font-size:.8rem; }
+  .soTable th.sorted .sortIcon{ opacity:1; color:var(--nav-bg); }
+  .soTable tbody tr:hover{ background:#f8fafc; }
+  .soTable .num{ text-align:right; white-space:nowrap; }
+  .soTable .nowrap{ white-space:nowrap; }
+  .colFilter{ width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:6px; padding:.35rem .45rem; font:inherit; font-size:.85rem; background:#fff; min-width:70px; }
+  .colFilter:focus{ outline:none; border-color:var(--nav-accent); box-shadow:0 0 0 2px rgba(31,108,122,.15); }
+
+  .soOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:200; padding:1rem; }
+  .soOverlay[hidden]{ display:none; }
+  .soModal{ background:#fff; border-radius:12px; width:min(1100px,97vw); max-height:92vh; overflow-y:auto; padding:1.25rem 1.5rem 1.5rem; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .soModalHeader{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1rem; gap:10px; }
+  .soModalTitle{ font-weight:700; font-size:1.2rem; color:var(--heading); }
+  .soModalSub{ color:#6b7280; font-size:.92rem; margin-top:2px; }
+  .soCloseBtn{ background:transparent; border:0; cursor:pointer; font-size:1.1rem; color:#6b7280; padding:2px 6px; border-radius:6px; }
+  .soCloseBtn:hover{ background:rgba(0,0,0,.05); color:#111; }
+  .soFacts{ display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:10px 18px; margin-bottom:14px; }
+  .soFact .l{ font-size:.78rem; color:#6b7280; }
+  .soFact .v{ font-weight:600; color:#111; word-break:break-word; }
+  .soSection{ font-weight:700; color:#374151; margin:14px 0 6px; }
+  .soRemark{ border:1px solid #e5e7eb; border-radius:10px; padding:.6rem .8rem; white-space:pre-wrap; background:#fcfcfd; font-size:.92rem; }
+  .soLinesWrap{ overflow:auto; border:1px solid #e5e7eb; border-radius:10px; }
+  .soLines tfoot td{ font-weight:700; border-top:2px solid #e5e7eb; }
+  .soLines a{ color:var(--nav-accent); text-decoration:none; font-weight:600; }
+  .soLines a:hover{ text-decoration:underline; }
+  .soRaw{ margin-top:10px; max-height:360px; overflow:auto; border:1px solid #e5e7eb; border-radius:10px; }
+  .soRaw table{ width:100%; border-collapse:collapse; font-size:.85rem; }
+  .soRaw td{ padding:.35rem .6rem; border-bottom:1px solid #f1f5f9; vertical-align:top; word-break:break-word; }
+  .soRaw td:first-child{ font-weight:600; color:#374151; white-space:nowrap; width:1%; }
+  .soMsg{ padding:1rem; color:#6b7280; }
+  .soMsg.err{ color:#991b1b; }
+
+  .noAccess{ text-align:center; padding:2.5rem 1rem; }
+  .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
+
+  @media (max-width: 720px){
+    .adminTitle{ font-size:30px; }
+    .soToolbar .clearable{ width:100%; }
+    .soModal{ padding:1rem; }
+  }
+</style>
+</head>
+
+<body class="adminPage">
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Uniconta</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+      <span class="sep">|</span>
+      <a href="/uniconta.html">← Uniconta</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.5rem">
+  <h1 class="adminTitle">Salgsordrer</h1>
+  <div class="muted adminSub">Salgsordrer og ordrelinjer hentet direkte fra Uniconta</div>
+
+  <div id="noAccess" class="panel noAccess" hidden>
+    <h2>Ingen adgang</h2>
+    <div class="muted">Du har ikke adgang til Salgsordrer. Kontakt IT, hvis du skal have adgang.</div>
+  </div>
+
+  <div id="app" class="panel">
+    <div class="soToolbar">
+      <div class="left">
+        <div class="clearable">
+          <input id="q" type="search" placeholder="Søg ordrenr., debitor, navn, reference…" autocomplete="off">
+          <button class="x" id="qx" type="button" aria-label="Ryd søgning">×</button>
+        </div>
+        <button type="button" class="btn" id="btnReset">Nulstil filtre</button>
+      </div>
+      <div class="right">
+        <span class="soSum" id="sumText"></span>
+        <button type="button" class="btn" id="btnReload">Opdatér</button>
+      </div>
+    </div>
+
+    <div class="soTableWrap">
+      <table class="soTable">
+        <thead>
+          <tr>
+            <th class="sortable" data-sort="orderNumber">Ordrenr. <span class="sortIcon">⇅</span></th>
+            <th class="sortable" data-sort="created">Oprettet <span class="sortIcon">⇅</span></th>
+            <th class="sortable" data-sort="deliveryDate">Levering <span class="sortIcon">⇅</span></th>
+            <th class="sortable" data-sort="account">Debitor <span class="sortIcon">⇅</span></th>
+            <th class="sortable" data-sort="name">Navn <span class="sortIcon">⇅</span></th>
+            <th class="sortable" data-sort="yourRef">Deres ref. <span class="sortIcon">⇅</span></th>
+            <th class="sortable" data-sort="employee">Medarbejder <span class="sortIcon">⇅</span></th>
+            <th class="sortable num" data-sort="total">Total <span class="sortIcon">⇅</span></th>
+            <th></th>
+          </tr>
+          <tr class="filterRow">
+            <th><input class="colFilter" data-col="orderNumber" placeholder="Filter" autocomplete="off"></th>
+            <th><input class="colFilter" data-col="created" placeholder="fx 10-2026" autocomplete="off"></th>
+            <th><input class="colFilter" data-col="deliveryDate" placeholder="fx 10-2026" autocomplete="off"></th>
+            <th><input class="colFilter" data-col="account" placeholder="Filter" autocomplete="off"></th>
+            <th><input class="colFilter" data-col="name" placeholder="Filter" autocomplete="off"></th>
+            <th><input class="colFilter" data-col="yourRef" placeholder="Filter" autocomplete="off"></th>
+            <th><select class="colFilter" data-col="employee" id="fEmployee"><option value="">Alle</option></select></th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="9" class="muted">Henter...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Ordre-popup -->
+<div id="detailOverlay" class="soOverlay" hidden>
+  <div class="soModal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="soModalHeader">
+      <div>
+        <div class="soModalTitle" id="detailTitle">Ordre</div>
+        <div class="soModalSub" id="detailSub"></div>
+      </div>
+      <button type="button" class="soCloseBtn" id="detailClose" aria-label="Luk">✕</button>
+    </div>
+    <div id="detailBody"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  let orders = [];
+  let filtered = [];
+  let sortField = "orderNumber";
+  let sortDir = "desc";
+  let detailRaw = null;
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  }
+
+  async function api(path) {
+    const r = await fetch(path, { cache: "no-store" });
+    let data = null;
+    try { data = await r.json(); } catch { data = null; }
+    if (!r.ok || data?.error) {
+      const e = new Error(data?.error || `HTTP ${r.status}`);
+      e.status = r.status;
+      throw e;
+    }
+    return data;
+  }
+
+  function fmtDate(s) {
+    if (!s) return "";
+    const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m || m[1] === "0001") return "";
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+  const fmtNum = n => n === null || n === undefined ? "–" : Number(n).toLocaleString("da-DK", { maximumFractionDigits: 2 });
+  const fmtAmt = n => n === null || n === undefined ? "–" : Number(n).toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function showNoAccess() {
+    $("app").hidden = true;
+    $("noAccess").hidden = false;
+  }
+
+  // ── Liste ────────────────────────────────────────────────────────────────
+  async function load() {
+    $("tbody").innerHTML = `<tr><td colspan="9" class="muted">Henter salgsordrer fra Uniconta...</td></tr>`;
+    $("sumText").textContent = "";
+    try {
+      const data = await api("/api/uniconta/salgsordrer");
+      orders = data.orders || [];
+      const emp = [...new Set(orders.map(o => o.employee).filter(Boolean))].sort((a, b) => a.localeCompare(b, "da"));
+      const sel = $("fEmployee"), keep = sel.value;
+      sel.innerHTML = `<option value="">Alle</option>` + emp.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join("");
+      sel.value = emp.includes(keep) ? keep : "";
+      apply();
+      if (data.truncated) $("sumText").textContent += " (kun de nyeste vises)";
+    } catch (e) {
+      if (e.status === 401 || e.status === 403) return showNoAccess();
+      $("tbody").innerHTML = `<tr><td colspan="9" style="color:#991b1b">Fejl: ${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function colValue(o, col) {
+    if (col === "created" || col === "deliveryDate") return fmtDate(o[col]);
+    return String(o[col] ?? "");
+  }
+
+  function apply() {
+    const q = $("q").value.trim().toLowerCase();
+    $("qx").style.visibility = q ? "visible" : "hidden";
+    const f = {};
+    document.querySelectorAll(".colFilter").forEach(i => { f[i.dataset.col] = i.value.trim().toLowerCase(); });
+
+    filtered = orders.filter(o => {
+      for (const col of ["orderNumber", "created", "deliveryDate", "account", "name", "yourRef"]) {
+        if (f[col] && !colValue(o, col).toLowerCase().includes(f[col])) return false;
+      }
+      if (f.employee && String(o.employee).toLowerCase() !== f.employee) return false;
+      if (!q) return true;
+      return [o.orderNumber, o.account, o.name, o.yourRef, o.ourRef, o.employee, o.remark, o.deliveryName, fmtDate(o.created)]
+        .join(" ").toLowerCase().includes(q);
+    });
+
+    filtered.sort((a, b) => {
+      let res;
+      if (sortField === "total") res = (a.total ?? 0) - (b.total ?? 0);
+      else if (sortField === "orderNumber") res = (Number(a.orderNumber) || 0) - (Number(b.orderNumber) || 0);
+      else res = String(a[sortField] ?? "").localeCompare(String(b[sortField] ?? ""), "da", { numeric: true });
+      return sortDir === "asc" ? res : -res;
+    });
+
+    document.querySelectorAll("th.sortable").forEach(th => {
+      const on = th.dataset.sort === sortField;
+      th.classList.toggle("sorted", on);
+      th.querySelector(".sortIcon").textContent = on ? (sortDir === "asc" ? "▲" : "▼") : "⇅";
+    });
+
+    render();
+  }
+
+  function render() {
+    $("sumText").textContent = `${filtered.length} af ${orders.length} ordrer`;
+    if (!filtered.length) {
+      $("tbody").innerHTML = `<tr><td colspan="9" class="muted">Ingen ordrer matcher filtrene.</td></tr>`;
+      return;
+    }
+    // Vis højst 500 rækker ad gangen af hensyn til hastighed.
+    const shown = filtered.slice(0, 500);
+    $("tbody").innerHTML = shown.map(o => `
+      <tr>
+        <td class="nowrap"><strong>${esc(o.orderNumber)}</strong></td>
+        <td class="nowrap">${esc(fmtDate(o.created))}</td>
+        <td class="nowrap">${esc(fmtDate(o.deliveryDate))}</td>
+        <td>${esc(o.account)}</td>
+        <td>${esc(o.name)}</td>
+        <td>${esc(o.yourRef)}</td>
+        <td>${esc(o.employee)}</td>
+        <td class="num">${esc(fmtAmt(o.total))}${o.currency ? " " + esc(o.currency) : ""}</td>
+        <td><button type="button" class="btn" data-order="${esc(o.orderNumber)}">Vis</button></td>
+      </tr>`).join("") +
+      (filtered.length > shown.length ? `<tr><td colspan="9" class="muted">Viser de første 500 – brug søgning eller filtre for at indsnævre.</td></tr>` : "");
+  }
+
+  // ── Ordre med linjer ─────────────────────────────────────────────────────
+  async function openOrder(no) {
+    $("detailTitle").textContent = `Ordre ${no}`;
+    $("detailSub").textContent = "";
+    $("detailBody").innerHTML = `<div class="soMsg">Henter ordrelinjer...</div>`;
+    $("detailOverlay").hidden = false;
+    $("detailClose").focus();
+    detailRaw = null;
+
+    let data;
+    try {
+      data = await api(`/api/uniconta/salgsordrer?order=${encodeURIComponent(no)}`);
+    } catch (e) {
+      if (e.status === 401 || e.status === 403) { closeOrder(); return showNoAccess(); }
+      $("detailBody").innerHTML = `<div class="soMsg err">Fejl: ${esc(e.message)}</div>`;
+      return;
+    }
+
+    const o = data.order;
+    const lines = data.lines || [];
+    detailRaw = o.raw || {};
+    $("detailSub").textContent = [o.account, o.name].filter(Boolean).join(" · ");
+
+    const facts = [
+      ["Oprettet", fmtDate(o.created) || "–"],
+      ["Levering", fmtDate(o.deliveryDate) || "–"],
+      ["Deres ref.", o.yourRef || "–"],
+      ["Vores ref.", o.ourRef || "–"],
+      ["Medarbejder", o.employee || "–"],
+      ["Leveringsadresse", [o.deliveryName, o.deliveryAddress].filter(Boolean).join(", ") || "–"],
+      ["Total", o.total === null ? "–" : `${fmtAmt(o.total)}${o.currency ? " " + o.currency : ""}`]
+    ];
+
+    const linesTotal = lines.reduce((s, l) => s + (Number(l.total) || 0), 0);
+    const lineRows = lines.map(l => `
+      <tr>
+        <td class="num">${esc(fmtNum(l.lineNumber))}</td>
+        <td class="nowrap">${l.item ? `<a href="/uniconta_varelager.html?q=${encodeURIComponent(l.item)}" title="Slå op i varelager">${esc(l.item)}</a>` : ""}</td>
+        <td>${esc(l.text)}</td>
+        <td class="num">${esc(fmtNum(l.qty))}</td>
+        <td class="num">${esc(fmtNum(l.qtyDelivered))}</td>
+        <td>${esc(l.unit)}</td>
+        <td class="num">${esc(fmtAmt(l.price))}</td>
+        <td class="num">${l.discountPct ? esc(fmtNum(l.discountPct)) + " %" : ""}</td>
+        <td class="num">${esc(fmtAmt(l.total))}</td>
+      </tr>`).join("");
+
+    const rawRows = Object.entries(detailRaw)
+      .filter(([, v]) => v !== null && v !== "" && typeof v !== "object")
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("");
+
+    $("detailBody").innerHTML = `
+      <div class="soFacts">
+        ${facts.map(([l, v]) => `<div class="soFact"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div></div>`).join("")}
+      </div>
+      ${o.remark ? `<div class="soSection">Bemærkning</div><div class="soRemark">${esc(o.remark)}</div>` : ""}
+      <div class="soSection">Ordrelinjer (${lines.length})</div>
+      ${lines.length ? `
+        <div class="soLinesWrap">
+          <table class="soTable soLines">
+            <thead><tr>
+              <th class="num">Linje</th><th>Varenr.</th><th>Tekst</th><th class="num">Antal</th><th class="num">Leveret</th>
+              <th>Enhed</th><th class="num">Pris</th><th class="num">Rabat</th><th class="num">Beløb</th>
+            </tr></thead>
+            <tbody>${lineRows}</tbody>
+            <tfoot><tr><td colspan="8">I alt</td><td class="num">${esc(fmtAmt(linesTotal))}</td></tr></tfoot>
+          </table>
+        </div>` : `<div class="soMsg">Ordren har ingen linjer.</div>`}
+      <div class="formActions" style="margin-top:14px">
+        <button type="button" class="btn" id="btnRaw">Vis alle data</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn" id="detailClose2">Luk</button>
+      </div>
+      <div class="soRaw" id="rawBox" hidden><table>${rawRows}</table></div>`;
+
+    $("btnRaw").addEventListener("click", () => {
+      const box = $("rawBox");
+      box.hidden = !box.hidden;
+      $("btnRaw").textContent = box.hidden ? "Vis alle data" : "Skjul alle data";
+    });
+    $("detailClose2").addEventListener("click", closeOrder);
+  }
+
+  function closeOrder() {
+    $("detailOverlay").hidden = true;
+    detailRaw = null;
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  function bind() {
+    $("q").addEventListener("input", apply);
+    $("qx").addEventListener("click", () => { $("q").value = ""; apply(); $("q").focus(); });
+    $("btnReload").addEventListener("click", load);
+    $("btnReset").addEventListener("click", () => {
+      $("q").value = "";
+      document.querySelectorAll(".colFilter").forEach(i => { i.value = ""; });
+      apply();
+    });
+    document.querySelectorAll(".colFilter").forEach(i => i.addEventListener(i.tagName === "SELECT" ? "change" : "input", apply));
+
+    document.querySelectorAll("th.sortable").forEach(th => th.addEventListener("click", () => {
+      const fld = th.dataset.sort;
+      if (sortField === fld) sortDir = sortDir === "asc" ? "desc" : "asc";
+      else { sortField = fld; sortDir = ["orderNumber", "created", "deliveryDate", "total"].includes(fld) ? "desc" : "asc"; }
+      apply();
+    }));
+
+    $("tbody").addEventListener("click", e => {
+      const b = e.target.closest("button[data-order]");
+      if (b) openOrder(b.dataset.order);
+    });
+
+    $("detailClose").addEventListener("click", closeOrder);
+    $("detailOverlay").addEventListener("click", e => { if (e.target === $("detailOverlay")) closeOrder(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("detailOverlay").hidden) closeOrder(); });
+  }
+
+  async function init() {
+    try {
+      const me = await fetch("/.auth/me", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+      $("userLine").textContent = me?.clientPrincipal?.userDetails || "Ikke logget ind";
+    } catch {
+      $("userLine").textContent = "";
+    }
+    bind();
+    await load();
+
+    // Direkte link med ?order=123 åbner ordren.
+    const p = new URLSearchParams(location.search).get("order");
+    if (p && !$("app").hidden) openOrder(p);
+  }
+
+  init();
+})();
+</script>
+<script src="/assets/track.js" defer></script>
+</body>
+</html>
