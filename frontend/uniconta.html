@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Uniconta – Herrup Portalen</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260924-empsearch-2" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  .ucGrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:14px; }
+  .ucTile{ display:flex; gap:14px; align-items:center; text-decoration:none; color:inherit;
+    background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:1rem 1.1rem;
+    box-shadow:0 1px 2px rgba(0,0,0,.04); transition:box-shadow .15s, border-color .15s; }
+  .ucTile:hover{ box-shadow:0 6px 18px rgba(0,0,0,.1); border-color:#d1d5db; }
+  .ucTile:focus-visible{ outline:3px solid rgba(31,108,122,.35); outline-offset:2px; }
+  .ucIcon{ flex:0 0 52px; height:52px; border-radius:50%; background:#f3f4f6; display:flex; align-items:center; justify-content:center; font-size:26px; }
+  .ucTitle{ font-weight:700; font-size:1.05rem; color:var(--heading); }
+  .ucDesc{ font-size:.88rem; color:#6b7280; margin-top:2px; }
+  .ucStatus{ text-align:center; padding:1.5rem 1rem; color:#6b7280; }
+  .ucStatus.err{ color:#991b1b; }
+  .noAccess{ text-align:center; padding:2.5rem 1rem; }
+  .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
+  @media (max-width: 520px){ .adminTitle{ font-size:30px; } }
+</style>
+</head>
+
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Uniconta</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+      <span class="sep">|</span>
+      <a href="/">← Til portal</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.5rem">
+  <h1 class="adminTitle">Uniconta</h1>
+  <div class="muted adminSub">Opslag direkte i Uniconta</div>
+
+  <div id="noAccess" class="panel noAccess" hidden>
+    <h2>Ingen adgang</h2>
+    <div class="muted">Du har ikke adgang til nogen af Uniconta-siderne. Kontakt IT, hvis du skal have adgang.</div>
+  </div>
+
+  <div id="app" class="panel">
+    <div id="pages" class="ucGrid"><div class="ucStatus">Henter...</div></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  }
+
+  async function init() {
+    try {
+      const me = await fetch("/.auth/me", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+      $("userLine").textContent = me?.clientPrincipal?.userDetails || "Ikke logget ind";
+    } catch {
+      $("userLine").textContent = "";
+    }
+
+    let data;
+    try {
+      const r = await fetch("/api/uniconta/adgang", { cache: "no-store" });
+      data = await r.json().catch(() => ({}));
+      if (r.status === 401 || r.status === 403) {
+        $("app").hidden = true;
+        $("noAccess").hidden = false;
+        return;
+      }
+      if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+    } catch (e) {
+      $("pages").innerHTML = `<div class="ucStatus err">Siderne kunne ikke hentes: ${esc(e.message)}</div>`;
+      return;
+    }
+
+    $("pages").innerHTML = (data.pages || []).map(p => `
+      <a class="ucTile" href="${esc(p.url)}">
+        <div class="ucIcon" aria-hidden="true">${esc(p.icon)}</div>
+        <div>
+          <div class="ucTitle">${esc(p.title)}</div>
+          <div class="ucDesc">${esc(p.description)}</div>
+        </div>
+      </a>`).join("");
+  }
+
+  init();
+})();
+</script>
+<script src="/assets/track.js" defer></script>
+</body>
+</html>

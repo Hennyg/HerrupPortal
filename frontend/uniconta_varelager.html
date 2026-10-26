@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Varelager – Uniconta</title>
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260924-empsearch-2" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  .vlWrap{ max-width:720px; margin:0 auto; }
+  .vlSearch{ display:flex; gap:8px; }
+  .vlInput{ flex:1; min-width:0; box-sizing:border-box; border:2px solid #d1d5db; border-radius:12px; padding:.85rem 1rem; font:inherit; font-size:1.3rem; letter-spacing:.02em; background:#fff; }
+  .vlInput:focus{ outline:none; border-color:var(--nav-accent); box-shadow:0 0 0 4px rgba(31,108,122,.15); }
+  .vlCamBtn{ flex:0 0 auto; min-width:58px; border:2px solid #d1d5db; background:#fff; border-radius:12px; font-size:1.5rem; cursor:pointer; }
+  .vlCamBtn:hover{ background:#f3f4f6; }
+  .vlCamBtn:focus-visible{ outline:3px solid rgba(31,108,122,.35); outline-offset:2px; }
+
+  .vlOptions{ display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-top:10px; }
+  .vlToggle{ display:flex; align-items:center; gap:8px; font-weight:600; cursor:pointer; user-select:none; font-size:.92rem; }
+  .vlToggle input{ width:18px; height:18px; accent-color:var(--nav-bg); }
+  .vlScanHint{ display:inline-flex; align-items:center; gap:6px; font-size:.82rem; color:#065f46; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:999px; padding:2px 10px; }
+  .vlScanHint::before{ content:""; width:8px; height:8px; border-radius:50%; background:#10b981; }
+
+  .vlStatus{ border-radius:10px; padding:.75rem .9rem; margin-top:14px; font-size:.95rem; }
+  .vlStatus.info{ background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
+  .vlStatus.err{ background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+  .vlStatus.warn{ background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
+
+  .vlCard{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:1rem 1.1rem; margin-top:14px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+  .vlHead{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .vlName{ font-size:1.2rem; font-weight:700; color:var(--heading); margin:0; }
+  .vlItemNo{ color:#6b7280; font-size:.92rem; margin-top:2px; }
+  .vlAvail{ text-align:right; flex:0 0 auto; }
+  .vlAvail .n{ font-size:2rem; font-weight:800; line-height:1; color:#065f46; }
+  .vlAvail .n.zero{ color:#991b1b; }
+  .vlAvail .l{ font-size:.8rem; color:#6b7280; }
+  .vlFacts{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px 18px; margin-top:14px; }
+  .vlFact .l{ font-size:.78rem; color:#6b7280; }
+  .vlFact .v{ font-weight:600; color:#111; word-break:break-word; }
+  .badge{ display:inline-block; font-size:.75rem; font-weight:600; padding:2px 8px; border-radius:999px; background:#fee2e2; color:#991b1b; margin-left:6px; vertical-align:middle; }
+  .vlRawBtn{ margin-top:12px; }
+  .vlRaw{ margin-top:10px; max-height:360px; overflow:auto; border:1px solid #e5e7eb; border-radius:10px; }
+  .vlRaw table{ width:100%; border-collapse:collapse; font-size:.85rem; }
+  .vlRaw td{ padding:.35rem .6rem; border-bottom:1px solid #f1f5f9; vertical-align:top; word-break:break-word; }
+  .vlRaw td:first-child{ font-weight:600; color:#374151; white-space:nowrap; width:1%; }
+
+  .vlSugg{ display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+  .vlSuggBtn{ text-align:left; border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:.55rem .75rem; cursor:pointer; font:inherit; }
+  .vlSuggBtn:hover{ background:#f8fafc; border-color:var(--nav-accent); }
+  .vlSuggBtn .s{ color:#6b7280; font-size:.85rem; }
+
+  .vlRecent{ margin-top:18px; }
+  .vlRecent h2{ font-size:.95rem; color:#374151; margin:0 0 6px; }
+  .vlChips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .vlChip{ border:1px solid #d1d5db; background:#fff; border-radius:999px; padding:.3rem .75rem; font:inherit; font-size:.85rem; cursor:pointer; }
+  .vlChip:hover{ background:#f3f4f6; }
+
+  /* Kamera */
+  .vlCamOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:300; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1rem; gap:12px; }
+  .vlCamOverlay[hidden]{ display:none; }
+  .vlCamBox{ position:relative; width:min(520px, 100%); aspect-ratio:4/3; background:#000; border-radius:12px; overflow:hidden; }
+  .vlCamBox video{ width:100%; height:100%; object-fit:cover; }
+  .vlCamFrame{ position:absolute; left:10%; right:10%; top:32%; bottom:32%; border:3px solid rgba(255,255,255,.9); border-radius:10px; box-shadow:0 0 0 999px rgba(0,0,0,.25); }
+  .vlCamText{ color:#fff; text-align:center; font-size:.95rem; min-height:1.3em; }
+
+  .noAccess{ text-align:center; padding:2.5rem 1rem; }
+  .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
+  @media (max-width: 520px){ .adminTitle{ font-size:30px; } .vlInput{ font-size:1.15rem; } }
+</style>
+</head>
+
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Uniconta</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
+      <span class="sep">|</span>
+      <a href="/uniconta.html">← Uniconta</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1.5rem">
+  <div class="vlWrap">
+    <h1 class="adminTitle">Varelager</h1>
+    <div class="muted adminSub">Skriv eller scan et varenummer eller en stregkode</div>
+
+    <div id="noAccess" class="panel noAccess" hidden>
+      <h2>Ingen adgang</h2>
+      <div class="muted">Du har ikke adgang til Varelager. Kontakt IT, hvis du skal have adgang.</div>
+    </div>
+
+    <div id="app">
+      <div class="vlSearch">
+        <input id="q" class="vlInput" type="search" placeholder="Varenummer eller stregkode" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Varenummer eller stregkode">
+        <button type="button" id="btnCam" class="vlCamBtn" title="Scan med kamera" aria-label="Scan med kamera">📷</button>
+      </div>
+      <div class="vlOptions">
+        <label class="vlToggle"><input type="checkbox" id="scanMode"> Scanner-tilstand</label>
+        <span id="scanHint" class="vlScanHint" hidden>Klar til scanning</span>
+      </div>
+
+      <div id="status" class="vlStatus" hidden></div>
+      <div id="result"></div>
+
+      <div id="recentBox" class="vlRecent" hidden>
+        <h2>Seneste opslag</h2>
+        <div id="recent" class="vlChips"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="camOverlay" class="vlCamOverlay" hidden>
+  <div class="vlCamBox">
+    <video id="camVideo" playsinline muted></video>
+    <div class="vlCamFrame"></div>
+  </div>
+  <div id="camText" class="vlCamText">Starter kamera...</div>
+  <button type="button" id="camClose" class="btn">Luk kamera</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const SCAN_KEY = "uc_varelager_scanmode";
+  const ZXING_URL = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
+
+  let timer = null;
+  let seq = 0;
+  let lastQuery = "";
+  let recent = [];
+  let cam = { stream: null, detector: null, reader: null, raf: 0, active: false };
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  }
+  const fmtNum = n => n === null || n === undefined ? "–" : Number(n).toLocaleString("da-DK", { maximumFractionDigits: 2 });
+  const fmtKr = n => n === null || n === undefined ? "–" : "kr. " + Number(n).toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  function setStatus(type, msg) {
+    const s = $("status");
+    if (!msg) { s.hidden = true; return; }
+    s.hidden = false;
+    s.className = "vlStatus " + type;
+    s.textContent = msg;
+  }
+
+  // ── Opslag ───────────────────────────────────────────────────────────────
+  async function lookup(q) {
+    q = String(q || "").trim();
+    if (!q) return;
+    clearTimeout(timer);
+    lastQuery = q;
+    const my = ++seq;
+    setStatus("info", `Slår ${q} op...`);
+    $("result").innerHTML = "";
+
+    let data;
+    try {
+      const r = await fetch(`/api/uniconta/varelager?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+      data = await r.json().catch(() => ({}));
+      if (my !== seq) return;
+      if (r.status === 401 || r.status === 403) {
+        $("app").hidden = true;
+        $("noAccess").hidden = false;
+        return;
+      }
+      if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+    } catch (e) {
+      if (my !== seq) return;
+      setStatus("err", "Opslaget fejlede: " + e.message);
+      afterLookup();
+      return;
+    }
+
+    if (data.items?.length) {
+      setStatus("", "");
+      $("result").innerHTML = data.items.map((it, i) => renderItem(it, i, data.matchedOn)).join("");
+      addRecent(q);
+    } else {
+      setStatus("warn", `Ingen vare fundet på "${q}".`);
+      const s = data.suggestions || [];
+      if (s.length) {
+        $("result").innerHTML = `
+          <div class="vlCard">
+            <div style="font-weight:600">Varenumre der starter med "${esc(q)}"</div>
+            <div class="vlSugg">${s.map(x => `
+              <button type="button" class="vlSuggBtn" data-q="${esc(x.item)}">
+                <div><strong>${esc(x.item)}</strong> – ${esc(x.name)}</div>
+                <div class="s">Disponibel: ${fmtNum(x.available)}${x.unit ? " " + esc(x.unit) : ""}</div>
+              </button>`).join("")}
+            </div>
+          </div>`;
+      }
+    }
+    afterLookup();
+  }
+
+  function renderItem(it, i, matchedOn) {
+    const avail = it.available;
+    const facts = [
+      ["Lager", fmtNum(it.qty)],
+      ["Reserveret", fmtNum(it.reserved)],
+      ["I bestilling", fmtNum(it.ordered)],
+      ["Enhed", it.unit || "–"],
+      ["Varegruppe", it.group || "–"],
+      ["Stregkode (EAN)", it.ean || "–"],
+      ["Lager / lokation", [it.warehouse, it.location].filter(Boolean).join(" / ") || "–"],
+      ["Salgspris", fmtKr(it.salesPrice)],
+      ["Kostpris", fmtKr(it.costPrice)]
+    ];
+    const rawRows = Object.entries(it.raw || {})
+      .filter(([, v]) => v !== null && v !== "" && typeof v !== "object")
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("");
+
+    return `
+      <div class="vlCard">
+        <div class="vlHead">
+          <div>
+            <h2 class="vlName">${esc(it.name || "(uden navn)")}${it.blocked ? '<span class="badge">Spærret</span>' : ""}</h2>
+            <div class="vlItemNo">Varenr. ${esc(it.item)}${matchedOn === "ean" ? " · fundet via stregkode" : ""}</div>
+          </div>
+          <div class="vlAvail">
+            <div class="n${avail !== null && avail <= 0 ? " zero" : ""}">${fmtNum(avail)}</div>
+            <div class="l">Disponibel</div>
+          </div>
+        </div>
+        <div class="vlFacts">
+          ${facts.map(([l, v]) => `<div class="vlFact"><div class="l">${esc(l)}</div><div class="v">${esc(v)}</div></div>`).join("")}
+        </div>
+        <button type="button" class="btn vlRawBtn" data-raw="${i}">Vis alle data</button>
+        <div class="vlRaw" id="raw${i}" hidden><table>${rawRows}</table></div>
+      </div>`;
+  }
+
+  function afterLookup() {
+    if ($("scanMode").checked) {
+      $("q").focus();
+      $("q").select();
+    }
+  }
+
+  function addRecent(q) {
+    recent = [q, ...recent.filter(x => x !== q)].slice(0, 10);
+    $("recentBox").hidden = false;
+    $("recent").innerHTML = recent.map(x => `<button type="button" class="vlChip" data-q="${esc(x)}">${esc(x)}</button>`).join("");
+  }
+
+  function useQuery(q) {
+    $("q").value = q;
+    lookup(q);
+  }
+
+  // ── Scanner-tilstand (håndscanner som tastatur: tegn + Enter) ────────────
+  function setScanMode(on) {
+    $("scanMode").checked = on;
+    $("scanHint").hidden = !on;
+    try { localStorage.setItem(SCAN_KEY, on ? "1" : "0"); } catch {}
+    if (on) { $("q").focus(); $("q").select(); }
+  }
+
+  // Hold fokus i feltet i scanner-tilstand, medmindre brugeren arbejder i andre felter/knapper.
+  function keepFocus() {
+    if (!$("scanMode").checked || !$("camOverlay").hidden) return;
+    const a = document.activeElement;
+    if (a && a !== document.body && a !== $("q") && a.matches("input,select,textarea")) return;
+    if (a !== $("q")) $("q").focus();
+  }
+
+  // ── Kamera ───────────────────────────────────────────────────────────────
+  async function openCamera() {
+    $("camOverlay").hidden = false;
+    $("camText").textContent = "Starter kamera...";
+    cam.active = true;
+    try {
+      const formats = ["ean_13", "ean_8", "code_128", "code_39", "upc_a", "upc_e", "itf", "qr_code"];
+      if ("BarcodeDetector" in window) {
+        const supported = await BarcodeDetector.getSupportedFormats().catch(() => formats);
+        cam.detector = new BarcodeDetector({ formats: formats.filter(f => supported.includes(f)) });
+        cam.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+        const v = $("camVideo");
+        v.srcObject = cam.stream;
+        await v.play();
+        $("camText").textContent = "Hold stregkoden inden for rammen";
+        const tick = async () => {
+          if (!cam.active) return;
+          try {
+            const codes = await cam.detector.detect(v);
+            if (codes.length && codes[0].rawValue) return onScanned(codes[0].rawValue);
+          } catch {}
+          cam.raf = requestAnimationFrame(tick);
+        };
+        tick();
+      } else {
+        await loadZxing();
+        if (!cam.active) return;
+        cam.reader = new ZXing.BrowserMultiFormatReader();
+        $("camText").textContent = "Hold stregkoden inden for rammen";
+        await cam.reader.decodeFromConstraints(
+          { video: { facingMode: { ideal: "environment" } }, audio: false },
+          $("camVideo"),
+          (result) => { if (result && cam.active) onScanned(result.getText()); }
+        );
+      }
+    } catch (e) {
+      const msg = e && e.name === "NotAllowedError"
+        ? "Adgang til kameraet blev afvist. Tillad kamera for siden i browserens indstillinger."
+        : "Kameraet kunne ikke startes: " + (e.message || e);
+      $("camText").textContent = msg;
+    }
+  }
+
+  function loadZxing() {
+    if (window.ZXing) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = ZXING_URL;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("Scanner-biblioteket kunne ikke hentes"));
+      document.head.appendChild(s);
+    });
+  }
+
+  function closeCamera() {
+    cam.active = false;
+    cancelAnimationFrame(cam.raf);
+    try { cam.reader && cam.reader.reset(); } catch {}
+    cam.reader = null;
+    if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
+    cam.stream = null;
+    const v = $("camVideo");
+    try { v.pause(); } catch {}
+    v.srcObject = null;
+    $("camOverlay").hidden = true;
+  }
+
+  function onScanned(code) {
+    if (navigator.vibrate) navigator.vibrate(80);
+    closeCamera();
+    useQuery(String(code).trim());
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  function bind() {
+    const q = $("q");
+    q.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); lookup(q.value); }
+    });
+    // Manuel indtastning: slå op når man holder en pause i skrivningen.
+    q.addEventListener("input", () => {
+      clearTimeout(timer);
+      const v = q.value.trim();
+      if (v.length >= 2 && v !== lastQuery) timer = setTimeout(() => lookup(v), 700);
+    });
+
+    $("scanMode").addEventListener("change", e => setScanMode(e.target.checked));
+    $("btnCam").addEventListener("click", openCamera);
+    $("camClose").addEventListener("click", () => { closeCamera(); afterLookup(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("camOverlay").hidden) closeCamera(); });
+
+    document.addEventListener("click", e => {
+      const s = e.target.closest("[data-q]");
+      if (s) return useQuery(s.dataset.q);
+      const r = e.target.closest("[data-raw]");
+      if (r) {
+        const box = $("raw" + r.dataset.raw);
+        box.hidden = !box.hidden;
+        r.textContent = box.hidden ? "Vis alle data" : "Skjul alle data";
+      }
+      setTimeout(keepFocus, 0);
+    });
+    q.addEventListener("blur", () => setTimeout(keepFocus, 150));
+  }
+
+  async function init() {
+    try {
+      const me = await fetch("/.auth/me", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+      $("userLine").textContent = me?.clientPrincipal?.userDetails || "Ikke logget ind";
+    } catch {
+      $("userLine").textContent = "";
+    }
+    bind();
+
+    let saved = null;
+    try { saved = localStorage.getItem(SCAN_KEY); } catch {}
+    setScanMode(saved === "1");
+
+    // Direkte link med ?q=... slår op med det samme.
+    const p = new URLSearchParams(location.search).get("q");
+    if (p) useQuery(p);
+    else $("q").focus();
+  }
+
+  init();
+})();
+</script>
+<script src="/assets/track.js" defer></script>
+</body>
+</html>
