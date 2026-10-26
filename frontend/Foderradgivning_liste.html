@@ -60,6 +60,12 @@
   .btn.danger{ border-color:#fecaca; color:#991b1b; }
   .btn.danger:hover{ background:#fef2f2; }
 
+  /* QR-popup */
+  .frQrModal{ width:min(380px,96vw); text-align:center; }
+  .frQrBox{ display:flex; justify-content:center; margin:6px 0 14px; }
+  .frQrBox img{ width:280px; height:280px; max-width:100%; border:1px solid #e5e7eb; border-radius:10px; background:#fff; }
+  .frQrUrl{ width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:8px; padding:.5rem .6rem; font:inherit; font-size:.85rem; color:#374151; background:#f8fafc; }
+
   .noAccess{ text-align:center; padding:2.5rem 1rem; }
   .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
 
@@ -83,6 +89,7 @@
       <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
       <span class="sep">|</span>
       <a href="/Foderradgivning_ny.html">Ny registrering</a>
+      <a href="#" id="qrLink">QR</a>
       <a id="adminLink" class="hidden" href="/Foderradgivning_admin.html">Admin</a>
       <a href="/">← Til portal</a>
     </div>
@@ -163,6 +170,19 @@
       <span style="flex:1"></span>
       <button type="button" class="btn" id="detailClose2">Luk</button>
     </div>
+  </div>
+</div>
+
+<!-- QR-popup -->
+<div id="qrOverlay" class="frOverlay" hidden>
+  <div class="frModal frQrModal" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+    <div class="frModalHeader">
+      <div class="frModalTitle" id="qrTitle">QR til ny registrering</div>
+      <button type="button" class="frCloseBtn" id="qrClose" aria-label="Luk">✕</button>
+    </div>
+    <div class="muted" style="margin-bottom:10px">Scan med telefonen for at åbne siden Ny registrering.</div>
+    <div class="frQrBox"><img id="qrImage" alt="QR-kode til Ny registrering"></div>
+    <input id="qrUrl" class="frQrUrl" type="text" readonly>
   </div>
 </div>
 
@@ -376,8 +396,27 @@
     }
   }
 
+  // ── QR ───────────────────────────────────────────────────────────────────
+  const NY_URL = "https://nice-glacier-0d982c710.2.azurestaticapps.net/Foderradgivning_ny.html";
+
+  function openQr(e) {
+    if (e) e.preventDefault();
+    $("qrImage").src = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=12&data=${encodeURIComponent(NY_URL)}`;
+    $("qrUrl").value = NY_URL;
+    $("qrOverlay").hidden = false;
+    $("qrClose").focus();
+  }
+  function closeQr() {
+    $("qrOverlay").hidden = true;
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────────
   function bind() {
+    $("qrLink").addEventListener("click", openQr);
+    $("qrClose").addEventListener("click", closeQr);
+    $("qrUrl").addEventListener("click", () => $("qrUrl").select());
+    $("qrOverlay").addEventListener("click", e => { if (e.target === $("qrOverlay")) closeQr(); });
+
     $("q").addEventListener("input", apply);
     $("qx").addEventListener("click", () => { $("q").value = ""; apply(); $("q").focus(); });
     $("showBilled").addEventListener("change", load);
@@ -410,7 +449,11 @@
     $("detailBill").addEventListener("click", () => current && setBilled(current.id, !current.faktureret));
     $("detailDelete").addEventListener("click", deleteCurrent);
     $("detailOverlay").addEventListener("click", e => { if (e.target === $("detailOverlay")) closeDetail(); });
-    document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("detailOverlay").hidden) closeDetail(); });
+    document.addEventListener("keydown", e => {
+      if (e.key !== "Escape") return;
+      if (!$("qrOverlay").hidden) closeQr();
+      else if (!$("detailOverlay").hidden) closeDetail();
+    });
   }
 
   async function init() {
