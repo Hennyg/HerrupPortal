@@ -9,36 +9,23 @@
     $("notFound").textContent = msg;
   }
 
-  // Installeret som app (PWA) eller iPhone/iPad: SharePoint-iframes kan ikke
-  // logge ind dér (egen cookie-lagring + blokerede tredjeparts-cookies),
-  // så videoen åbnes i stedet som en almindelig side.
-  function iframeUnsafe() {
-    const standalone =
-      window.matchMedia?.("(display-mode: standalone)").matches ||
-      window.matchMedia?.("(display-mode: fullscreen)").matches ||
-      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
-      window.navigator.standalone === true;
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    return standalone || ios;
-  }
-
-  function playButton(href) {
-    return `<a class="btn primary" href="${esc(href)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">▶ Afspil video</a>`;
-  }
-
+  // SharePoint/OneDrive-video vises IKKE i iframe: uden en SharePoint-session
+  // i browseren sendes iframen til Microsoft-login, som ikke må vises i en
+  // iframe (blocked). I stedet åbnes videoen i nyt vindue, hvor login virker.
   function renderVideo(url) {
     const v = parseVideo(url);
     if (!v) return false;
-    if (v.embed && !iframeUnsafe()) {
-      $("videoBox").innerHTML = `
-        <div class="newsVideoFrame">
-          <iframe src="${esc(v.embed)}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy" title="Video"></iframe>
-        </div>
-        <div class="newsVideoHint">Afspilles ikke videoen? <a href="${esc(v.embed)}" target="_blank" rel="noopener">Åbn i nyt vindue</a></div>`;
-    } else {
-      $("videoBox").innerHTML = playButton(v.embed || v.link);
-    }
+    const href = v.embed || v.link;
+    $("videoBox").innerHTML = `
+      <a href="${esc(href)}" target="_blank" rel="noopener" title="Afspil video"
+         style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+                aspect-ratio:16/9;width:100%;border-radius:10px;background:#1f2937;color:#fff;
+                text-decoration:none;cursor:pointer">
+        <span style="display:flex;align-items:center;justify-content:center;width:72px;height:72px;
+                     border-radius:50%;background:#c30a14;font-size:30px;padding-left:6px;box-sizing:border-box">▶</span>
+        <span style="font-weight:600">Afspil video</span>
+      </a>
+      <div class="newsVideoHint">Videoen åbner i et nyt vindue.</div>`;
     return true;
   }
 
