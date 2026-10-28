@@ -9,17 +9,35 @@
     $("notFound").textContent = msg;
   }
 
+  // Installeret som app (PWA) eller iPhone/iPad: SharePoint-iframes kan ikke
+  // logge ind dér (egen cookie-lagring + blokerede tredjeparts-cookies),
+  // så videoen åbnes i stedet som en almindelig side.
+  function iframeUnsafe() {
+    const standalone =
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+      window.matchMedia?.("(display-mode: fullscreen)").matches ||
+      window.matchMedia?.("(display-mode: minimal-ui)").matches ||
+      window.navigator.standalone === true;
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    return standalone || ios;
+  }
+
+  function playButton(href) {
+    return `<a class="btn primary" href="${esc(href)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">▶ Afspil video</a>`;
+  }
+
   function renderVideo(url) {
     const v = parseVideo(url);
     if (!v) return false;
-    if (v.embed) {
+    if (v.embed && !iframeUnsafe()) {
       $("videoBox").innerHTML = `
         <div class="newsVideoFrame">
           <iframe src="${esc(v.embed)}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy" title="Video"></iframe>
         </div>
         <div class="newsVideoHint">Afspilles ikke videoen? <a href="${esc(v.embed)}" target="_blank" rel="noopener">Åbn i nyt vindue</a></div>`;
     } else {
-      $("videoBox").innerHTML = `<a class="btn primary" href="${esc(v.link)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">▶ Afspil video</a>`;
+      $("videoBox").innerHTML = playButton(v.embed || v.link);
     }
     return true;
   }
