@@ -5,7 +5,8 @@ const GROUP_NAME = "Alle - lely center herrup";
 
 const USER_FIELDS = [
   "id", "displayName", "mail", "userPrincipalName",
-  "jobTitle", "department", "mobilePhone", "businessPhones", "officeLocation", "accountEnabled"
+  "jobTitle", "department", "mobilePhone", "businessPhones", "officeLocation", "accountEnabled",
+  "employeeType"
 ].join(",");
 
 function json(context, status, body) {
@@ -288,3 +289,5 @@ module.exports = async function (context, req) {
     return json(context, 500, { error: e.message });
   }
 };
+
+

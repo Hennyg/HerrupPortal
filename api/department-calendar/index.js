@@ -140,8 +140,9 @@ async function findGroupId(token) {
 async function getMembers(token) {
   if (membersCache && Date.now() - membersCache.at < MEMBERS_CACHE_MS) return membersCache.list;
   const groupId = await findGroupId(token);
-  let url = `${GRAPH}/groups/${groupId}/members/microsoft.graph.user` +
-    `?$select=id,displayName,department,jobTitle,mail,userPrincipalName,accountEnabled&$top=999`;
+  // transitiveMembers - gruppen indeholder undergrupper (samme som /api/entra-users)
+  let url = `${GRAPH}/groups/${groupId}/transitiveMembers/microsoft.graph.user` +
+    `?$select=id,displayName,department,jobTitle,mail,userPrincipalName,accountEnabled&$top=100`;
   const list = [];
   while (url) {
     const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });

@@ -93,6 +93,9 @@
     .avatar:hover { box-shadow:0 0 0 3px rgba(133,12,24,.3); }
     .avatar img { width:36px; height:36px; object-fit:cover; border-radius:50%; }
     .nameCell { display:flex; align-items:center; gap:.6rem; }
+    /* Arbejdsmiljø (AMR/AML) - Entra "Employee Type" */
+    .amr-star { width:14px; flex-shrink:0; color:#c30a14; font-size:1rem; line-height:1; text-align:center; cursor:help; }
+    .modal-amr { color:#c30a14; font-weight:600; white-space:nowrap; }
 
     /* Status */
     .badge-ok  { background:#d1fae5; color:#065f46; font-size:.78rem; padding:2px 8px; border-radius:999px; }
@@ -593,7 +596,8 @@
       const directOpenId = new URLSearchParams(location.search).get("person");
       const entry = await entraCacheRead();
 
-      if (entraCacheIsFresh(entry)) {
+      // Cache fra før employeeType blev hentet regnes som forældet
+      if (entraCacheIsFresh(entry) && entry.data.some(u => "employeeType" in u)) {
         // Browser-cachen er varm — render med det samme, intet netværkskald for listen.
         applyUserList(entry.data);
         if (directOpenId) {
@@ -906,8 +910,10 @@
       }
       tbody.innerHTML = rows.map(u => {
         const av = avatarHTML(u, 36);
+        const amr = amrRole(u);
         return `<tr>
           <td><div class="nameCell">
+            <span class="amr-star"${amr ? ` title="${esc(amr)}"` : ""}>${amr ? "★" : ""}</span>
             <div class="avatar" onclick="openModal('${esc(u.id)}')" title="Se detaljer">${av}</div>
             <div style="cursor:pointer" onclick="openModal('${esc(u.id)}')">${esc(u.displayName||"–")}</div>
           </div></td>
@@ -971,7 +977,9 @@
       // Header
       renderModalAvatar(u);
       document.getElementById("mName").textContent  = u.displayName || "";
-      document.getElementById("mTitle").textContent = u.jobTitle    || "";
+      const amr = amrRole(u);
+      document.getElementById("mTitle").innerHTML = esc(u.jobTitle || "") +
+        (amr ? `${u.jobTitle ? " &nbsp;·&nbsp; " : ""}<span class="modal-amr">★ ${esc(amr)}</span>` : "");
 
       const badges = [];
       if (u.department)       badges.push(u.department);
@@ -1527,6 +1535,14 @@ card.title = u.displayName || "";
         ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
     }
     function escAttr(s) { return esc(s); }
+
+    // Arbejdsmiljørolle fra Entra "Employee Type", fx
+    // "Arbejdsmiljø repræsentant (AMR)" / "Arbejdsmiljø ledelsesansvarlig (AML)".
+    // Andre værdier i feltet ignoreres.
+    function amrRole(u) {
+      const t = String(u?.employeeType || "").trim();
+      return /arbejdsmilj|\(AM[RL]\)/i.test(t) ? t : "";
+    }
     function renderError(msg) {
       document.getElementById("tbody").innerHTML =
         `<tr><td colspan="5"><div class="stateMsg" style="color:#c30a14">${esc(msg)}</div></td></tr>`;
