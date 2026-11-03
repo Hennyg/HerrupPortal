@@ -1,4 +1,3 @@
-
 // assets/app.js
 
 // Brugsstatistik: sidevisninger og klik på tiles logges via /api/track til
@@ -482,6 +481,138 @@ function wireEmployeeSearch(root) {
   });
 }
 
+// ── Medarbejdere i det øverste søgefelt ─────────────────────────────────────
+// Når man skriver i søgefeltet øverst på forsiden (#q), vises matchende
+// medarbejdere i en boks over app-listen. Kun for brugere, der har adgang til
+// Personalelisten (dvs. ser en tile med URL /herrup.html). Klik åbner
+// personens kort i herrup.html i en ny fane - samme som søgningen på tile'n.
+// Data: browser-cachen (IndexedDB) hvis den er varm, ellers /api/entra-users-search.
+let peopleSearchEnabled = false;
+let peopleTimer = null;
+let peopleSeq = 0;
+const PEOPLE_MAX = 8;
+
+function injectPeopleCss() {
+  if (document.getElementById("peopleHitsCss")) return;
+  const st = document.createElement("style");
+  st.id = "peopleHitsCss";
+  st.textContent = `
+    .peopleHits { margin:12px 0 4px; }
+    .peopleHits[hidden] { display:none; }
+    .peopleHits h3 { margin:0 0 8px; font-size:1rem; color:var(--heading,#2c3e50); display:flex; align-items:baseline; gap:8px; }
+    .peopleHits h3 .muted { font-weight:400; font-size:.85rem; }
+    .peopleGrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:8px; }
+    .personHit { display:flex; align-items:center; gap:10px; text-align:left; width:100%;
+                 appearance:none; font:inherit; cursor:pointer; background:#fff;
+                 border:1px solid #e5e7eb; border-radius:12px; padding:8px 10px;
+                 transition:border-color .15s, box-shadow .15s; }
+    .personHit:hover, .personHit:focus { border-color:#850c18; box-shadow:0 4px 12px rgba(133,12,24,.12); outline:none; }
+    .personHit .pav { width:38px; height:38px; border-radius:50%; flex-shrink:0; overflow:hidden;
+                      background:#eef1f6; color:#2c3e50; font-weight:700; font-size:.85rem;
+                      display:flex; align-items:center; justify-content:center; }
+    .personHit .pav img { width:100%; height:100%; object-fit:cover; }
+    .personHit .pn { font-weight:700; color:#111827; font-size:.9rem; line-height:1.2; }
+    .personHit .ps { color:#6b7280; font-size:.78rem; line-height:1.2; }
+    .personHit .pt { min-width:0; }
+    .personHit .pn, .personHit .ps { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .peopleInfo { color:#6b7280; font-size:.85rem; padding:4px 0; }
+  `;
+  document.head.appendChild(st);
+}
+
+function peopleContainer() {
+  let box = document.getElementById("peopleHits");
+  if (box) return box;
+  const sections = document.getElementById("sections");
+  if (!sections) return null;
+  injectPeopleCss();
+  box = document.createElement("div");
+  box.id = "peopleHits";
+  box.className = "peopleHits";
+  box.hidden = true;
+  sections.parentNode.insertBefore(box, sections);
+  box.addEventListener("click", (e) => {
+    const btn = e.target.closest(".personHit[data-id]");
+    if (!btn) return;
+    window.open(`/herrup.html?person=${encodeURIComponent(btn.dataset.id)}`, "_blank", "noopener");
+  });
+  return box;
+}
+
+function personInitials(name) {
+  return String(name || "?").trim().split(/\s+/).slice(0, 2).map(p => (p[0] || "").toUpperCase()).join("") || "?";
+}
+
+function updatePeopleHits(rawQuery) {
+  const box = peopleContainer();
+  if (!box) return;
+  const q = String(rawQuery || "").trim();
+  clearTimeout(peopleTimer);
+  if (!peopleSearchEnabled || q.length < 2) {
+    peopleSeq++;
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  peopleTimer = setTimeout(() => searchPeople(q, box), 250);
+}
+
+async function searchPeople(q, box) {
+  const seq = ++peopleSeq;
+  try {
+    let list;
+    const entry = (typeof entraCacheRead === "function") ? await entraCacheRead() : null;
+    if (entry && typeof entraCacheIsFresh === "function" && entraCacheIsFresh(entry)) {
+      // Varm cache - filtrér lokalt (navn, mail, stilling, afdeling)
+      const ql = q.toLowerCase();
+      list = entry.data.filter(u => u.accountEnabled !== false && (
+        (u.displayName || "").toLowerCase().includes(ql) ||
+        (u.mail || "").toLowerCase().includes(ql) ||
+        (u.jobTitle || "").toLowerCase().includes(ql) ||
+        (u.department || "").toLowerCase().includes(ql)
+      ));
+      // Navne der starter med søgningen først
+      list.sort((a, b) => {
+        const as = (a.displayName || "").toLowerCase().startsWith(ql) ? 0 : 1;
+        const bs = (b.displayName || "").toLowerCase().startsWith(ql) ? 0 : 1;
+        return as - bs || (a.displayName || "").localeCompare(b.displayName || "", "da");
+      });
+    } else {
+      // Kold cache - let søge-endpoint (starter-med på navn/mail)
+      const r = await fetch(`/api/entra-users-search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      list = Array.isArray(data) ? data : [];
+      if (typeof entraCacheWarm === "function") entraCacheWarm();
+    }
+    if (seq !== peopleSeq) return;
+
+    if (!list.length) { box.hidden = true; box.innerHTML = ""; return; }
+
+    const shown = list.slice(0, PEOPLE_MAX);
+    box.innerHTML = `
+      <h3>Medarbejdere <span class="muted">${list.length > PEOPLE_MAX ? `${PEOPLE_MAX} af ${list.length} – skriv mere for at indsnævre` : list.length}</span></h3>
+      <div class="peopleGrid">
+        ${shown.map(u => `
+          <button type="button" class="personHit" data-id="${esc(u.id)}" title="Åbn ${esc(u.displayName || "")} i personalelisten">
+            <span class="pav">${u.photo ? `<img src="${esc(u.photo)}" alt="">` : esc(personInitials(u.displayName))}</span>
+            <span class="pt">
+              <div class="pn">${esc(u.displayName || "–")}</div>
+              <div class="ps">${esc([u.jobTitle, u.department].filter(Boolean).join(" · "))}</div>
+            </span>
+          </button>`).join("")}
+      </div>`;
+    box.hidden = false;
+  } catch (e) {
+    if (seq !== peopleSeq) return;
+    const msg = e instanceof TypeError
+      ? "Forbindelsen blev afbrudt – din login-session er sandsynligvis udløbet. Genindlæs siden."
+      : e.message;
+    box.innerHTML = `<div class="peopleInfo">Kunne ikke søge efter medarbejdere: ${esc(msg)}</div>`;
+    box.hidden = false;
+  }
+}
+
 // ── Browser/Desktop-tile (Admin: Åbn = "Browser / Desktop") ──────────────────
 // I stedet for beskrivelsen får tile'n to knapper: "Browser" åbner linket som
 // normalt, "Desktop" åbner filen i Office-appen via ms-excel:/ms-word:/ms-powerpoint:.
@@ -884,6 +1015,7 @@ function renderSections(items, myFavItems) {
   setSelectOptions(grpSel, groups, { includeEmpty: true, emptyText: "Alle grupper" });
 
   const q = document.getElementById("q");
+  if (q) q.placeholder = itemsAll.some(isEmployeeSearchTile) ? "Søg i apps og medarbejdere..." : "Søg...";
   const qx = document.getElementById("qx");
 
   function syncClearBtn() {
@@ -891,8 +1023,13 @@ function renderSections(items, myFavItems) {
     qx.style.visibility = q.value ? "visible" : "hidden";
   }
 
+  // Medarbejdersøgning i det øverste søgefelt - kun hvis brugeren har adgang
+  // til Personalelisten (ser en /herrup.html-tile)
+  peopleSearchEnabled = itemsAll.some(isEmployeeSearchTile);
+
   function render() {
     const qq = (q?.value || "").toLowerCase();
+    updatePeopleHits(q?.value || "");
     const cat = catSel?.value || "";
     const grp = grpSel?.value || "";
     const matchesSearch = (x) => !qq
