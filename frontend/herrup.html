@@ -1465,7 +1465,7 @@ if (window.updateHeaderStatus) {
         heading.innerHTML = `${esc(deptName)} <span class="dept-count">${members.length}</span>`;
         section.appendChild(heading);
 
-        // Række med avatar-kort: ledere + deres folk fra andre afdelinger
+        // Række med avatar-kort: chef (evt. fra anden afdeling) og ledere
         // øverst, resten af afdelingen på næste linje
         const row = document.createElement("div");
         row.className = "dept-row";
@@ -1475,9 +1475,8 @@ if (window.updateHeaderStatus) {
           const isGuest  = layout.guests.has(u.id);
           const card = document.createElement("div");
           card.className = "dept-card" + (isLeader ? " leader" : "") + (isGuest ? " guest" : "");
-          const mgr = isGuest && u.managerId ? byId.get(u.managerId) : null;
           card.title = isGuest
-            ? `${u.displayName || ""} – afdeling ${u.department || "ukendt"}${mgr ? `, leder: ${mgr.displayName}` : ""}`
+            ? `${u.displayName || ""} – chef for afdelingen, men står selv i ${u.department || "ingen afdeling"}`
             : (u.displayName || "");
           const phone = bizPhone(u) || u.mobilePhone || "";
           card.innerHTML = `
@@ -1519,65 +1518,61 @@ if (window.updateHeaderStatus) {
       return map;
     }
 
-    // Opstilling af én afdeling:
-    //  - Ledere = afdelingens medlemmer, som er Manager for nogen (uanset
-    //    hvilken afdeling medarbejderne er i). Øverste leder i afdelingen først.
-    //  - Gæster = personer fra ANDRE afdelinger, som har en af afdelingens
-    //    ledere som Manager (fx afdelingsledere under en servicechef). De står
-    //    lige efter lederne, med deres egen afdeling på kortet. De står
-    //    stadig også i deres egen afdeling.
-    //  - Resten af afdelingen alfabetisk på næste linje.
+    // Opstilling af én afdeling - KUN afdelingens egne medlemmer, plus chefen:
+    //  - Chefen = den person, som flest i afdelingen har som Manager i Entra.
+    //    Står chefen i afdelingen, rykkes han/hun først. Står chefen i en
+    //    anden afdeling, tilføjes chefen først (med sin egen afdeling på kortet).
+    //  - Derefter evt. andre ledere i afdelingen (medlemmer som er Manager for
+    //    andre i samme afdeling), og så resten alfabetisk.
+    //  - Personer, som chefen har under sig i andre afdelinger, vises IKKE her.
     // Uden manager-data bruges titlen ("chef"/"leder") midlertidigt.
     function deptLayout(deptName, members, reportsOf) {
       const byName = (a, b) => (a.displayName || "").localeCompare(b.displayName || "", "da");
-      const leaders = new Map(); // id -> { depth, reports }
+      const leaders = new Map(); // id -> { rank, reports }
       const guests  = new Set();
 
       if (!reportsOf.size) {
         const top  = members.filter(isLeaderTitle).sort(byName);
         const rest = members.filter(u => !isLeaderTitle(u)).sort(byName);
-        top.forEach(u => leaders.set(u.id, { depth: 0, reports: 0 }));
+        top.forEach(u => leaders.set(u.id, { rank: 0, reports: 0 }));
         return { top, rest, leaders, guests };
       }
 
       const memberIds = new Set(members.map(u => u.id));
+
+      // Hvor mange i afdelingen har hver person som Manager?
+      const count = new Map();
       members.forEach(u => {
-        const reps = reportsOf.get(u.id);
-        if (!reps?.length) return;
-        // Hvor mange ledere fra samme afdeling står over personen?
-        let depth = 0, cur = u;
-        const seen = new Set([u.id]);
-        while (cur?.managerId && memberIds.has(cur.managerId) && !seen.has(cur.managerId)) {
-          seen.add(cur.managerId);
-          depth++;
-          cur = byId.get(cur.managerId);
-        }
-        leaders.set(u.id, { depth, reports: reps.length });
+        if (u.managerId && u.managerId !== u.id) count.set(u.managerId, (count.get(u.managerId) || 0) + 1);
       });
 
-      const guestList = [];
-      if (deptName !== "Uden afdeling") {
-        leaders.forEach((_, leaderId) => {
-          (reportsOf.get(leaderId) || []).forEach(r => {
-            if (!memberIds.has(r.id) && !guests.has(r.id)) { guests.add(r.id); guestList.push(r); }
-          });
-        });
+      // Chefen: flest rapporter i afdelingen. Uafgjort -> en i afdelingen foretrækkes.
+      let chefId = null, best = 0;
+      count.forEach((n, id) => {
+        if (n > best || (n === best && memberIds.has(id) && !memberIds.has(chefId))) { chefId = id; best = n; }
+      });
+
+      const top = [];
+      if (chefId) {
+        const chef = byId.get(chefId);
+        if (chef) {
+          leaders.set(chef.id, { rank: 0, reports: best });
+          if (!memberIds.has(chef.id) && deptName !== "Uden afdeling") guests.add(chef.id);
+          if (memberIds.has(chef.id) || guests.has(chef.id)) top.push(chef);
+        }
       }
 
-      const leaderList = members.filter(u => leaders.has(u.id)).sort((a, b) => {
-        const la = leaders.get(a.id), lb = leaders.get(b.id);
-        if (la.depth !== lb.depth) return la.depth - lb.depth;
-        if (la.reports !== lb.reports) return lb.reports - la.reports;
-        return byName(a, b);
-      });
-      // Gæster: dem der selv er ledere først, derefter alfabetisk
-      guestList.sort((a, b) => {
-        const la = reportsOf.has(a.id) ? 0 : 1, lb = reportsOf.has(b.id) ? 0 : 1;
-        return la - lb || byName(a, b);
-      });
-      const rest = members.filter(u => !leaders.has(u.id)).sort(byName);
+      // Andre ledere i afdelingen (Manager for andre i samme afdeling)
+      const subLeaders = members
+        .filter(u => u.id !== chefId && count.has(u.id))
+        .sort((a, b) => count.get(b.id) - count.get(a.id) || byName(a, b));
+      subLeaders.forEach(u => leaders.set(u.id, { rank: 1, reports: count.get(u.id) }));
+      top.push(...subLeaders);
 
-      return { top: [...leaderList, ...guestList], rest, leaders, guests };
+      const topIds = new Set(top.map(u => u.id));
+      const rest = members.filter(u => !topIds.has(u.id)).sort(byName);
+
+      return { top, rest, leaders, guests };
     }
 
     function isLeaderTitle(u) {
