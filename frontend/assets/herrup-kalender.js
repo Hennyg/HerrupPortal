@@ -4,6 +4,10 @@
 // "Vagt/Ferie" i herrup-vagtferie.js). Viser personens dag som en tidslinje:
 // kun tidspunkter, status og kategorier med farver - aldrig mødeemner.
 // Data: /api/person-calendar?user=<id>&date=YYYY-MM-DD
+//
+// Er kalenderen tom, og står personen i vagt/ferieplanen med fx Syg eller
+// Ferie den dag, vises det som en heldagsaftale øverst. Samme regel bruges af
+// Afdeling-fanen via window.herrupAbsenceFor (defineret her).
 (() => {
   const TZ = "Europe/Copenhagen";
   const HOUR_PX = 44;            // højde pr. time i tidslinjen
@@ -21,6 +25,33 @@
   };
   const WEEKDAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
   const MONTHS = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"];
+
+  // Koder fra vagt/ferieplanen (api/vagtferieplan LEGEND), der betyder at
+  // personen ikke er på arbejde: Syg, Ferie, Feriefridag, Barsel,
+  // Orlov (O deles med Optælling i planen), Afspadsering, Kursus
+  const ABSENCE_CODES = new Set(["S", "F", "FF", "B", "O", "A", "K"]);
+  const ABSENCE_COLOR = "#8764b8";
+
+  // Personens fravær fra vagt/ferieplanen på en given dag, eller null.
+  // Navnematch som "Dagens status" i herrup-vagtferie.js.
+  async function absenceFor(name, dateIso) {
+    try {
+      let data = window.__vagtFerieData;
+      if (!data && typeof window.preloadVagtFerie === "function") data = await window.preloadVagtFerie();
+      const q = String(name || "").toLowerCase().trim();
+      if (!data || !q) return null;
+      const list = data.employees || [];
+      const emp = list.find(e => (e.name || "").toLowerCase() === q)
+               || list.find(e => (e.name || "").toLowerCase().includes(q))
+               || null;
+      const day = (emp?.days || []).find(d => d.date === dateIso && ABSENCE_CODES.has(String(d.code || "").toUpperCase()));
+      return day ? { code: day.code, text: day.text || day.code } : null;
+    } catch {
+      return null;
+    }
+  }
+  window.herrupAbsenceFor = absenceFor;
+  window.herrupAbsenceColor = ABSENCE_COLOR;
 
   const cache = new Map(); // "<userId>|<date>" -> { at, data }
   let panel = null, button = null, loadSeq = 0;
@@ -133,7 +164,12 @@
     const seq = ++loadSeq;
 
     const hit = cache.get(key);
-    if (hit && Date.now() - hit.at < CACHE_MS) { render(hit.data); return; }
+    if (hit && Date.now() - hit.at < CACHE_MS) {
+      const abs = await absenceFor(u.displayName, hit.data.date);
+      if (seq !== loadSeq) return;
+      render(hit.data, abs);
+      return;
+    }
 
     panel.innerHTML = `<div class="stateMsg" style="padding:1.5rem 0;"><div class="spinner"></div><div>Henter kalender…</div></div>`;
     try {
@@ -142,7 +178,9 @@
       if (seq !== loadSeq) return;
       if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
       cache.set(key, { at: Date.now(), data });
-      render(data);
+      const abs = await absenceFor(u.displayName, data.date);
+      if (seq !== loadSeq) return;
+      render(data, abs);
     } catch (e) {
       if (seq !== loadSeq) return;
       panel.innerHTML = `<div class="hk-empty">Kunne ikke hente kalenderen: ${esc(e.message)}</div>`;
@@ -163,7 +201,7 @@
       `<span class="hk-chip" style="background:${esc(c.color)};color:${textOn(c.color)}">${esc(c.name)}</span>`).join("");
     const first = ev.categories?.[0]?.name;
     const label = [time, first || status, ev.isPrivate ? "Privat" : ""].filter(Boolean).join(" · ");
-    const title = [time, status, ...(ev.categories || []).map(c => c.name), ev.isPrivate ? "Privat" : ""].filter(Boolean).join(" · ");
+    const title = [time, status, ...(ev.categories || []).map(c => c.name), ev.isPrivate ? "Privat" : "", ev.fromPlan ? "fra vagt/ferieplanen" : ""].filter(Boolean).join(" · ");
     return `<div class="hk-ev ${esc(ev.showAs)}" style="${style}background-color:${esc(bg)};color:${fg}" title="${esc(title)}">
       <span class="t">${esc(label)}</span>${chips ? `<div>${chips}</div>` : ""}
     </div>`;
@@ -192,9 +230,15 @@
     return items;
   }
 
-  function render(data) {
+  function render(data, absence) {
     const date = data.date;
-    const all = data.events || [];
+    const real = data.events || [];
+    // Fravær fra vagt/ferieplanen, når kalenderen ikke har noget (ledige aftaler tæller ikke)
+    const absEv = absence && !real.some(e => e.showAs !== "free")
+      ? { start: `${date}T00:00:00`, end: `${date}T23:59:00`, isAllDay: true, showAs: "oof", isPrivate: false,
+          categories: [{ name: absence.text, color: ABSENCE_COLOR }], fromPlan: true }
+      : null;
+    const all = absEv ? [absEv, ...real] : real;
     // Møder der starter i går/slutter i morgen klippes til dagen
     const timed = all.filter(e => !e.isAllDay).map(e => ({
       ...e,
@@ -237,7 +281,7 @@
       <div>
         <div class="hk-head">
           <div class="hk-date">${esc(dkLong(date))}</div>
-          <div class="hk-muted">${all.length ? `${all.length} aftale${all.length === 1 ? "" : "r"}` : ""}</div>
+          <div class="hk-muted">${absEv ? "Fra vagt/ferieplanen" : real.length ? `${real.length} aftale${real.length === 1 ? "" : "r"}` : ""}</div>
         </div>
         ${all.length ? "" : `<div class="hk-empty">Ingen aftaler i kalenderen i dag.</div>`}
         ${allDay.length ? `<div class="hk-allday">${allDay.map(e => eventHtml(e, "")).join("")}</div>` : ""}
