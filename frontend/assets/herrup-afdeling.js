@@ -8,6 +8,10 @@
 // Kun farvekoder - ledig / optaget / arbejder andetsteds. Ingen mødeinfo.
 // Fraværende og foreløbig vises som optaget.
 //
+// Er en persons kalender tom, og står personen i vagt/ferieplanen med fx Syg
+// eller Ferie, farves hele dagen som fravær og teksten står ved navnet.
+// (window.herrupAbsenceFor kommer fra herrup-kalender.js.)
+//
 // Er der for mange personer til at navnene kan stå vandret, drejes de 90°.
 // Klik på et navn åbner den persons kort.
 //
@@ -28,6 +32,7 @@
     "4": "away"    // arbejder andetsteds
   };
   const TEXT = { free: "Ledig", busy: "Optaget", away: "Arbejder andetsteds", unknown: "Ukendt" };
+  const ABSENCE_BG = () => window.herrupAbsenceColor || "#8764b8";
   const WEEKDAYS = ["søn", "man", "tir", "ons", "tor", "fre", "lør"];
 
   const cache = new Map(); // "<userId>|<date>" -> { at, data }
@@ -91,11 +96,14 @@
       td.ha-busy    { background:repeating-linear-gradient(45deg, rgba(255,255,255,.18) 0 6px, transparent 6px 12px), #c2410c; }
       td.ha-away    { background:radial-gradient(rgba(255,255,255,.35) 1.5px, transparent 1.6px) 0 0/7px 7px, #0f766e; }
       td.ha-unknown { background:#e5e7eb; }
+      td.ha-absent  { background:repeating-linear-gradient(-45deg, rgba(255,255,255,.28) 0 3px, transparent 3px 7px), ${ABSENCE_BG()}; }
+      table.ha-sched th.col .ab { color:#850c18; font-weight:600; }
       td.ha-past    { opacity:.45; }
       .ha-legend .free    { background:#dbeafe; border:1px solid #1e3a8a; box-sizing:border-box; }
       .ha-legend .busy    { background:repeating-linear-gradient(45deg, rgba(255,255,255,.18) 0 4px, transparent 4px 8px), #c2410c; }
       .ha-legend .away    { background:radial-gradient(rgba(255,255,255,.35) 1.5px, transparent 1.6px) 0 0/5px 5px, #0f766e; }
       .ha-legend .unknown { background:#e5e7eb; }
+      .ha-legend .absent  { background:repeating-linear-gradient(-45deg, rgba(255,255,255,.28) 0 2px, transparent 2px 5px), ${ABSENCE_BG()}; }
       .ha-empty { padding:1.2rem 0; color:#6b7280; }
     `;
     document.head.appendChild(st);
@@ -178,7 +186,7 @@
     lastUserId = u.id;
 
     const hit = cache.get(key);
-    if (hit && Date.now() - hit.at < CACHE_MS) { render(hit.data); return; }
+    if (hit && Date.now() - hit.at < CACHE_MS) { await show(hit.data, seq); return; }
 
     // Behold det gamle gitter (nedtonet) ved dagskift, så modalen ikke hopper
     const wrap = panel.querySelector(".ha-wrap");
@@ -198,7 +206,7 @@
       if (seq !== loadSeq) return;
       if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
       cache.set(key, { at: Date.now(), data });
-      render(data);
+      await show(data, seq);
     } catch (e) {
       if (seq !== loadSeq) return;
       const msg = e instanceof TypeError
@@ -206,6 +214,20 @@
         : e.message;
       panel.innerHTML = `${navHtml()}<div class="ha-empty">Kunne ikke hente afdelingen: ${esc(msg)}</div>`;
     }
+  }
+
+  // Slå fravær op i vagt/ferieplanen for dem, der intet har i kalenderen
+  async function show(data, seq) {
+    const absences = new Map();
+    if (typeof window.herrupAbsenceFor === "function") {
+      await Promise.all((data.people || []).map(async p => {
+        if (p.view && /[1-4]/.test(p.view)) return; // har noget i kalenderen
+        const abs = await window.herrupAbsenceFor(p.name, data.date);
+        if (abs) absences.set(p.id, abs);
+      }));
+    }
+    if (seq !== loadSeq) return;
+    render(data, absences);
   }
 
   // ---------- Tegn ----------
@@ -222,7 +244,7 @@
       </div>`;
   }
 
-  function render(data) {
+  function render(data, absences = new Map()) {
     lastData = data;
     const people = data.people || [];
     const me = currentUser()?.id;
@@ -244,7 +266,8 @@
 
     let html = `<table class="ha-sched"><thead><tr><th class="time"></th>`;
     for (const p of people) {
-      html += `<th class="col ${p.id === me ? "me" : ""}" data-id="${esc(p.id)}" title="${esc(p.name)}${p.jobTitle ? ` – ${esc(p.jobTitle)}` : ""}"><span class="nm">${esc(p.name)}</span></th>`;
+      const abs = absences.get(p.id);
+      html += `<th class="col ${p.id === me ? "me" : ""}" data-id="${esc(p.id)}" title="${esc(p.name)}${p.jobTitle ? ` – ${esc(p.jobTitle)}` : ""}${abs ? ` – ${esc(abs.text)}` : ""}"><span class="nm">${esc(p.name)}${abs ? ` <span class="ab">· ${esc(abs.text)}</span>` : ""}</span></th>`;
     }
     html += `</tr></thead><tbody>`;
 
@@ -254,8 +277,11 @@
       const past = data.date < today || (data.date === today && e <= nowMin);
       html += `<tr class="${isHour ? "hour-start" : ""}"><th class="time">${isHour ? minToHhmm(s) : ""}</th>`;
       for (const p of people) {
-        const st = p.view ? (CODE[p.view[i]] || "unknown") : "unknown";
-        const tip = `${p.name} ${minToHhmm(s)}–${minToHhmm(e)}: ${p.error && !p.view ? p.error : TEXT[st]}`;
+        const abs = absences.get(p.id);
+        const st = abs ? "absent" : p.view ? (CODE[p.view[i]] || "unknown") : "unknown";
+        const tip = abs
+          ? `${p.name}: ${abs.text} (vagt/ferieplanen)`
+          : `${p.name} ${minToHhmm(s)}–${minToHhmm(e)}: ${p.error && !p.view ? p.error : TEXT[st]}`;
         html += `<td class="ha-${st}${past ? " ha-past" : ""}" title="${esc(tip)}"></td>`;
       }
       html += `</tr>`;
@@ -268,6 +294,7 @@
         <span><i class="free"></i>Ledig</span>
         <span><i class="busy"></i>Optaget</span>
         <span><i class="away"></i>Arbejder andetsteds</span>
+        ${absences.size ? `<span><i class="absent"></i>Fravær (vagt/ferieplan)</span>` : ""}
       </div>
       <div class="ha-wrap">${html}</div>`;
 
