@@ -1,6 +1,7 @@
 const { fetchAll } = require("../_dvKunde");
 
 const TABLE = "cr1eb_lch_kundes";
+const PRODUKT_TABLE = "cr1eb_lch_kundeprodukts";
 const SELECT = [
   "cr1eb_lch_kundeid",
   "cr1eb_lch_kundenr",
@@ -29,6 +30,23 @@ function mapRow(r) {
   };
 }
 
+// Kundenumre med mindst ét aktivt produkt, hvor installationsdato er "xx"
+// (= produktet er ikke aktivt - samme regel som på kunde.html).
+// Fejler stille, så kundelisten altid kan vises.
+async function kundenrMedXX(context) {
+  try {
+    const filter = "cr1eb_lch_aktiv eq true and contains(cr1eb_lch_installationsdato,'xx')";
+    const rows = await fetchAll(`${PRODUKT_TABLE}?$select=cr1eb_lch_kundenr,cr1eb_lch_installationsdato&$filter=${encodeURIComponent(filter)}&$top=5000`);
+    return new Set(rows
+      .filter(r => String(r.cr1eb_lch_installationsdato || "").trim().toLowerCase() === "xx")
+      .map(r => String(r.cr1eb_lch_kundenr || "").trim())
+      .filter(Boolean));
+  } catch (e) {
+    context.log("kunder: kunne ikke hente xx-produkter", e.message);
+    return new Set();
+  }
+}
+
 module.exports = async function (context, req) {
   try {
     const q = String(req.query.q || "").trim().toLowerCase();
@@ -39,7 +57,8 @@ module.exports = async function (context, req) {
     if (aktiv === "false") filter = "cr1eb_lch_aktiv eq false";
 
     const path = `${TABLE}?$select=${SELECT}${filter ? `&$filter=${encodeURIComponent(filter)}` : ""}&$orderby=cr1eb_lch_navn asc&$top=5000`;
-    let rows = (await fetchAll(path)).map(mapRow);
+    const [raw, xx] = await Promise.all([fetchAll(path), kundenrMedXX(context)]);
+    let rows = raw.map(mapRow).map(k => ({ ...k, harXX: xx.has(String(k.kundenr).trim()) }));
 
     if (q.length >= 2) {
       rows = rows.filter(k => [k.kundenr, k.navn, k.omraade, k.kundestatus].join(" ").toLowerCase().includes(q));
@@ -51,5 +70,3 @@ module.exports = async function (context, req) {
     json(context, e.status || 500, { error: e.message, kunder: [] });
   }
 };
-
-
