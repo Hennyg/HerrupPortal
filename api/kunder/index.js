@@ -30,15 +30,15 @@ function mapRow(r) {
   };
 }
 
-// Kundenumre med mindst ét aktivt produkt, hvor installationsdato er "xx"
-// (= produktet er ikke aktivt - samme regel som på kunde.html).
+// Kundenumre med mindst ét aktivt produkt, hvor installationsdato indeholder
+// "xx", fx "xx-xx-xxxx" (= ikke aktivt endnu - samme regel som på kunde.html).
 // Fejler stille, så kundelisten altid kan vises.
 async function kundenrMedXX(context) {
   try {
     const filter = "cr1eb_lch_aktiv eq true and contains(cr1eb_lch_installationsdato,'xx')";
     const rows = await fetchAll(`${PRODUKT_TABLE}?$select=cr1eb_lch_kundenr,cr1eb_lch_installationsdato&$filter=${encodeURIComponent(filter)}&$top=5000`);
     return new Set(rows
-      .filter(r => String(r.cr1eb_lch_installationsdato || "").trim().toLowerCase() === "xx")
+      .filter(r => /xx/i.test(String(r.cr1eb_lch_installationsdato || "")))
       .map(r => String(r.cr1eb_lch_kundenr || "").trim())
       .filter(Boolean));
   } catch (e) {
