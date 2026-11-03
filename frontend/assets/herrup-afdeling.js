@@ -66,15 +66,12 @@
     const st = document.createElement("style");
     st.id = "herrupAfdCss";
     st.textContent = `
-      .ha-head { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
-      .ha-dept { font-weight:700; color:#2c3e50; font-size:1.05rem; }
-      .ha-muted { color:#6b7280; font-size:.85rem; }
-      .ha-nav { display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-top:8px; }
+      .ha-nav { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
       .ha-nav button { border:1px solid #d1d5db; background:#fff; border-radius:6px; padding:.3rem .6rem; cursor:pointer; font-weight:700; min-width:34px; }
       .ha-nav button:hover { background:#f3f4f6; }
       .ha-nav input { border:1px solid #d1d5db; border-radius:6px; padding:.25rem .4rem; }
       .ha-nav .lbl { font-weight:700; color:#2c3e50; margin-left:6px; }
-      .ha-legend { display:flex; gap:14px; flex-wrap:wrap; margin:10px 0 8px; font-size:.8rem; color:#374151; }
+      .ha-legend { display:flex; gap:14px; flex-wrap:wrap; margin:4px 0 3px; font-size:.8rem; color:#374151; }
       .ha-legend i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
       .ha-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; transition:opacity .15s; }
       .ha-wrap.loading { opacity:.5; pointer-events:none; }
@@ -266,10 +263,6 @@
     html += `</tbody></table>`;
 
     panel.innerHTML = `
-      <div class="ha-head">
-        <div class="ha-dept">${esc(data.department)}</div>
-        <div class="ha-muted">${people.length} ${people.length === 1 ? "person" : "personer"}</div>
-      </div>
       ${navHtml()}
       <div class="ha-legend">
         <span><i class="free"></i>Ledig</span>
