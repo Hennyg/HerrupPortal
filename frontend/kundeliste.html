@@ -9,6 +9,16 @@
     #tbody tr.clickable-row {
       cursor: pointer;
     }
+    /* Filterfelt under hver kolonneoverskrift */
+    .dataTable thead th .colLabel { display:block; margin-bottom:6px; }
+    .dataTable thead th .colFilter {
+      width:100%; min-width:70px; box-sizing:border-box; height:30px;
+      border:1px solid #d1d5db; border-radius:6px; padding:0 8px;
+      font:inherit; font-size:13px; font-weight:400; background:#fff; cursor:text;
+    }
+    .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
+    /* Kunde med produkter, hvor installationsdato er "xx" */
+    .dataTable a.link.harXX { color:#b91c1c; font-weight:700; }
     @media (max-width: 640px) {
       .navExtra { display: none !important; }
     }
@@ -43,12 +53,12 @@
     <section class="tableWrap">
       <table class="dataTable">
         <thead><tr>
-          <th class="sortable" data-sort="kundenr">Kundenr.</th>
-          <th class="sortable" data-sort="navn">Navn</th>
-          <th class="sortable" data-sort="omraade">Område</th>
-          <th class="sortable" data-sort="kundestatus">Kundestatus</th>
-          <th class="sortable" data-sort="sidstImporteret">Sidst opdateret</th>
-          <th></th>
+          <th class="sortable" data-sort="kundenr"><span class="colLabel">Kundenr.</span><input class="colFilter" type="search" data-col="kundenr" placeholder="Filtrér…" autocomplete="off"></th>
+          <th class="sortable" data-sort="navn"><span class="colLabel">Navn</span><input class="colFilter" type="search" data-col="navn" placeholder="Filtrér…" autocomplete="off"></th>
+          <th class="sortable" data-sort="omraade"><span class="colLabel">Område</span><input class="colFilter" type="search" data-col="omraade" placeholder="Filtrér…" autocomplete="off"></th>
+          <th class="sortable" data-sort="kundestatus"><span class="colLabel">Kundestatus</span><input class="colFilter" type="search" data-col="kundestatus" placeholder="Filtrér…" autocomplete="off"></th>
+          <th class="sortable" data-sort="sidstImporteret"><span class="colLabel">Sidst opdateret</span><input class="colFilter" type="search" data-col="sidstImporteret" placeholder="Filtrér…" autocomplete="off"></th>
+          <th style="vertical-align:bottom;"><button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button></th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -57,11 +67,23 @@
   <script src="/assets/kundeliste/common.js"></script>
   <script>
     let rows = [], filtered = [], sortKey = 'navn', sortDir = 1;
+    const FILTER_COLS = ['kundenr', 'navn', 'omraade', 'kundestatus', 'sidstImporteret'];
+    const colFilters = {}; // kolonne -> filtertekst (gemmes i URL'en som f_<kolonne>)
     restoreStateFromUrl();
     initUser();
     document.getElementById('btnRefresh').onclick = load;
     document.getElementById('q').oninput = () => { syncUrlState(); render(); };
     document.getElementById('aktiv').onchange = () => { syncUrlState(); load(); };
+    document.querySelectorAll('.colFilter').forEach(inp => {
+      inp.value = colFilters[inp.dataset.col] || '';
+      inp.addEventListener('click', e => e.stopPropagation()); // klik i feltet må ikke sortere
+      inp.addEventListener('input', () => { colFilters[inp.dataset.col] = inp.value; syncUrlState(); render(); });
+    });
+    document.getElementById('btnClearFilters').onclick = () => {
+      FILTER_COLS.forEach(c => { delete colFilters[c]; });
+      document.querySelectorAll('.colFilter').forEach(i => { i.value = ''; });
+      syncUrlState(); render();
+    };
     document.querySelectorAll('th.sortable').forEach(th => th.onclick = () => {
       const nextKey = th.dataset.sort;
       if (sortKey === nextKey) sortDir *= -1;
@@ -76,6 +98,7 @@
       if (p.has('aktiv')) document.getElementById('aktiv').value = p.get('aktiv');
       if (p.has('sort')) sortKey = p.get('sort');
       if (p.has('dir')) sortDir = p.get('dir') === '-1' ? -1 : 1;
+      FILTER_COLS.forEach(c => { if (p.get('f_' + c)) colFilters[c] = p.get('f_' + c); });
     }
 
     function syncUrlState() {
@@ -86,6 +109,7 @@
       if (aktiv !== 'true') p.set('aktiv', aktiv);
       if (sortKey !== 'navn') p.set('sort', sortKey);
       if (sortDir !== 1) p.set('dir', String(sortDir));
+      FILTER_COLS.forEach(c => { if ((colFilters[c] || '').trim()) p.set('f_' + c, colFilters[c]); });
       const qs = p.toString();
       history.replaceState(null, '', qs ? `/kundeliste.html?${qs}` : '/kundeliste.html');
     }
@@ -127,19 +151,30 @@
       return row[key] || '';
     }
 
+    // Den tekst en kolonne filtreres på (samme som der vises)
+    function filterText(row, col) {
+      if (col === 'sidstImporteret') return fmtDateTime(row.sidstImporteret || row.modifiedon) || '';
+      return String(row[col] || '');
+    }
+
     function openKunde(kundenr) {
       location.href = `/kunde.html?kundenr=${encodeURIComponent(kundenr)}`;
     }
 
     function render() {
       const q = document.getElementById('q').value.trim().toLowerCase();
-      filtered = q ? rows.filter(k => [k.kundenr,k.navn,k.omraade,k.kundestatus,k.aktiv?'aktiv':'inaktiv'].join(' ').toLowerCase().includes(q)) : [...rows];
+      const active = FILTER_COLS.filter(c => (colFilters[c] || '').trim());
+      filtered = rows.filter(k =>
+        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.aktiv?'aktiv':'inaktiv'].join(' ').toLowerCase().includes(q)) &&
+        active.every(c => filterText(k, c).toLowerCase().includes(colFilters[c].trim().toLowerCase()))
+      );
+      document.getElementById('btnClearFilters').style.display = active.length ? '' : 'none';
       filtered.sort((a,b)=>String(sortValue(a, sortKey)).localeCompare(String(sortValue(b, sortKey)),'da',{numeric:true})*sortDir);
       document.querySelectorAll('th.sortable').forEach(th => th.classList.toggle('sort-active', th.dataset.sort === sortKey));
       document.getElementById('countText').textContent = `${filtered.length} af ${rows.length} kunder`;
       document.getElementById('tbody').innerHTML = filtered.map(k => `<tr class="clickable-row" onclick="openKunde('${esc(k.kundenr)}')">
         <td class="small muted">${esc(k.kundenr)}</td>
-        <td><a class="link" href="/kunde.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">${esc(k.navn)}</a></td>
+        <td><a class="link${k.harXX ? ' harXX' : ''}" href="/kunde.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()"${k.harXX ? ' title="Har produkter med xx i installationsdato (ikke aktive)"' : ''}>${esc(k.navn)}</a></td>
         <td>${esc(k.omraade)}</td>
         <td>${esc(k.kundestatus)}</td>
         <td class="small muted">${fmtDateTime(k.sidstImporteret || k.modifiedon)}</td>
