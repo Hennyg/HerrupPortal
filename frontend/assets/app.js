@@ -315,6 +315,13 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 }
 
+// Kategorier hvor tiles sorteres alfabetisk på titel i stedet for sort-værdien
+const ALPHA_CATEGORIES = ["andet"];
+
+function sortLinksAlpha(arr) {
+  return (arr || []).slice().sort((a, b) => (a.title || "").localeCompare(b.title || "", "da", { sensitivity: "base" }));
+}
+
 function sortLinks(arr) {
   return (arr || []).slice().sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
 }
@@ -839,7 +846,7 @@ function renderCategorySectionHTML(categoryName, links, sectionIndex) {
     <section class="section">
       <div class="accent-bar" style="margin-bottom:10px;">${esc(cat)}</div>
       <div class="sectionBody">
-        <div class="grid">${sortLinks(links).map(renderTileHTML).join("")}</div>
+        <div class="grid">${(ALPHA_CATEGORIES.includes(cat.toLowerCase()) ? sortLinksAlpha(links) : sortLinks(links)).map(renderTileHTML).join("")}</div>
       </div>
     </section>
   `;
