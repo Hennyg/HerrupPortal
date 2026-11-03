@@ -11,9 +11,29 @@
     .productCountTable { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
     .productCountTable td { border-bottom:1px solid #eee; padding:6px 0; }
     .productCountTable td:last-child { text-align:right; font-weight:700; }
+    .productCountTable tr.inactiveXX td { color:#b91c1c; }
+    .productCountTable tr.inactiveXX td:first-child::after { content:" (ikke aktiv)"; font-weight:400; font-size:12px; }
     .panelTitleLine { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:10px; }
     .panelTitleLine h2 { margin:0; }
     .panelTitleLine .toolbarSpacer { flex:1; }
+
+    /* Visninger af produkttabellen */
+    .viewTabs { display:flex; gap:8px; flex-wrap:wrap; }
+    .viewTabs .btn.active { background:#fdf2f2; border-color:var(--red); color:var(--red); }
+    .tableInfo { font-size:13px; }
+
+    /* Filterfelt under hver kolonneoverskrift (i samme sticky header-celle) */
+    .dataTable thead th .colLabel { display:block; margin-bottom:6px; }
+    .dataTable thead th .colFilter {
+      width:100%; min-width:70px; box-sizing:border-box; height:30px;
+      border:1px solid #d1d5db; border-radius:6px; padding:0 8px;
+      font:inherit; font-size:13px; font-weight:400; background:#fff;
+    }
+    .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
+
+    /* Produkter med "xx" i installationsdato = ikke aktive */
+    .dataTable tr.inactiveXX td { color:#b91c1c; background:#fef2f2; }
+    .dataTable tr.inactiveXX:hover td { background:#fde8e8; }
   </style>
 </head>
 <body>
@@ -41,9 +61,18 @@
       <div class="panel"><h2>Adresser</h2><div id="adresseInfo"></div></div>
       <div class="panel"><div class="panelTitleLine"><h2>Produkter</h2><span id="produktTopCounts" class="muted small"></span></div><div id="produktInfo"></div></div>
     </div>
+    <div class="panelTitleLine" style="margin:4px 0 8px;">
+      <div class="viewTabs" id="viewTabs">
+        <button type="button" class="btn" data-view="adresse">Produkter pr. adresse</button>
+        <button type="button" class="btn" data-view="produkt">Produkter pr. produkt</button>
+        <button type="button" class="btn" data-view="kontrakt">Produkter pr. kontrakt</button>
+      </div>
+      <span class="toolbarSpacer"></span>
+      <span id="tableInfo" class="muted tableInfo"></span>
+      <button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button>
+    </div>
     <div class="panel">
-      <div class="panelTitleLine"><h2>Produkter pr. adresse</h2></div>
-      <div class="tableWrap" style="max-height:55vh"><table class="dataTable"><thead><tr><th>Produkt</th><th>Produktnr.</th><th>Serienr.</th><th>Kontrakt</th><th>Datoer</th><th>Aktiv</th><th>Adresse</th></tr></thead><tbody id="tbody"></tbody></table></div>
+      <div class="tableWrap" style="max-height:55vh"><table class="dataTable"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
     </div>
   </section>
 </main>
@@ -52,6 +81,36 @@
 initUser();
 const params = new URLSearchParams(location.search); const kundenr = params.get('kundenr') || ''; const id = params.get('id') || '';
 let state = { kunde:null, adresser:[], produkter:[], selectedAdresseKey:'' };
+
+// ── Produkttabellens visninger ──────────────────────────────────────────────
+// Hver kolonne har en tekst til filtrering/sortering (text) og evt. egen HTML.
+let addrMap = {};
+const COLS = {
+  adresse:  { label:'Adresse',  text:p => addrMap[p.adressekey] || p.adressekey || '' },
+  produkt:  { label:'Produkt',  text:p => p.produkt || p.navn || '' },
+  produktnr:{ label:'Prod. nr', text:p => p.produktnr || '' },
+  serienr:  { label:'SN',       text:p => p.serienr || '' },
+  datoer:   { label:'Datoer',
+              text:p => `Inst: ${dateText(p.installationsdato)} Garanti: ${dateText(p.garantistart)} - ${dateText(p.garantiudloeb)}`,
+              html:p => `<span class="small">Inst: ${fmtDate(p.installationsdato)}<br>Garanti: ${fmtDate(p.garantistart)} - ${fmtDate(p.garantiudloeb)}</span>` },
+  kontrakt: { label:'Kontrakt', text:p => p.kontrakt || '' },
+  aktiv:    { label:'Aktiv',
+              text:p => isXX(p) ? 'Ikke aktiv' : 'Aktiv',
+              html:p => isXX(p) ? '<span class="badge err">Ikke aktiv</span>' : '<span class="badge ok">Aktiv</span>' },
+  note:     { label:'Note',     text:p => p.note || '' }
+};
+const VIEWS = {
+  adresse:  ['adresse', 'produkt', 'produktnr', 'serienr', 'datoer', 'kontrakt', 'note'],
+  produkt:  ['produkt', 'produktnr', 'serienr', 'kontrakt', 'datoer', 'aktiv', 'adresse', 'note'],
+  kontrakt: ['kontrakt', 'produkt', 'produktnr', 'serienr', 'datoer', 'adresse', 'note']
+};
+let currentView = 'adresse';
+try { const v = localStorage.getItem('kundeProduktView'); if (VIEWS[v]) currentView = v; } catch {}
+const filters = {}; // kolonne-nøgle -> filtertekst (huskes på tværs af visninger)
+
+// "xx" i installationsdato betyder, at produktet ikke er aktivt
+function isXX(p){ return String(p.installationsdato || '').trim().toLowerCase() === 'xx'; }
+function dateText(s){ const d = s ? new Date(s) : null; return !s ? '' : isNaN(d) ? String(s) : d.toLocaleDateString('da-DK'); }
 
 async function load(){
  const r = await fetch('/api/kunde?' + new URLSearchParams({ kundenr, id }).toString()); const j = await r.json();
@@ -62,27 +121,35 @@ async function load(){
 function setStatus(cls, html){ const el=document.getElementById('status'); el.className='status '+cls; el.innerHTML=html; el.style.display=html?'flex':'none'; }
 function addressText(a){ return [a.adresse, [a.postnr,a.by].filter(Boolean).join(' ')].filter(Boolean).join(', '); }
 function selectedProducts(){ return state.selectedAdresseKey ? state.produkter.filter(p=>p.adressekey===state.selectedAdresseKey) : state.produkter; }
+
+// Antal pr. produkt - aktive og "xx" (ikke aktive) tælles hver for sig
 function countByProduct(products){
   const map = new Map();
   for (const p of products) {
-    const key = p.produkt || p.navn || 'Ukendt produkt';
-    map.set(key, (map.get(key)||0)+1);
+    const name = p.produkt || p.navn || 'Ukendt produkt';
+    const key = `${name}|${isXX(p) ? 1 : 0}`;
+    if (!map.has(key)) map.set(key, { name, xx:isXX(p), count:0 });
+    map.get(key).count++;
   }
-  return [...map.entries()].sort((a,b)=>a[0].localeCompare(b[0],'da'));
+  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'da') || (a.xx - b.xx));
 }
 function setAddress(key){ state.selectedAdresseKey = key || ''; render(); }
 
 function render(){
- const k=state.kunde, adresser=state.adresser, produkter=state.produkter;
- const visibleProducts = selectedProducts();
- const activeVisible = visibleProducts.filter(p=>p.aktiv).length;
+ const k=state.kunde, adresser=state.adresser;
+ // Som før vises kun produkter, der er aktive i Dataverse. Af dem er
+ // "xx"-produkterne ikke aktive og tælles ikke med i de aktive.
+ const visibleProducts = selectedProducts().filter(p=>p.aktiv);
+ const activeCount = visibleProducts.filter(p=>!isXX(p)).length;
+ const xxCount = visibleProducts.length - activeCount;
  document.getElementById('brandTitle').textContent = `${k.navn} (${k.kundenr})`; document.title = `Kunde – ${k.navn}`;
- document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresser.length}</div></div><div class="card"><div class="label">Produkter</div><div class="value">${visibleProducts.filter(p=>p.aktiv).length}</div></div><div class="card"><div class="label">Område</div><div class="value">${esc(k.omraade)}</div></div>`;
+ document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresser.length}</div></div><div class="card"><div class="label">Produkter</div><div class="value">${activeCount}</div></div><div class="card"><div class="label">Område</div><div class="value">${esc(k.omraade)}</div></div>`;
  document.getElementById('kundeInfo').innerHTML = `<p><b>${esc(k.navn)}</b></p><p>Kundestatus: ${esc(k.kundestatus)}</p><p>Aktiv: ${k.aktiv?'Ja':'Nej'}</p><p>Sidst opdateret: ${fmtDateTime(k.sidstImporteret || k.modifiedon)}</p>`;
  document.getElementById('adresseInfo').innerHTML = renderAdresser(adresser);
- document.getElementById('produktTopCounts').textContent = `Aktive: ${activeVisible}`;
- document.getElementById('produktInfo').innerHTML = renderProduktCounts(visibleProducts.filter(p=>p.aktiv));
- renderProductTable(visibleProducts.filter(p=>p.aktiv), adresser);
+ document.getElementById('produktTopCounts').innerHTML = `Aktive: ${activeCount}${xxCount ? ` · <span style="color:#b91c1c">Ikke aktive: ${xxCount}</span>` : ''}`;
+ document.getElementById('produktInfo').innerHTML = renderProduktCounts(visibleProducts);
+ addrMap = Object.fromEntries(adresser.map(a=>[a.adressekey, addressText(a)]));
+ renderProductTable(visibleProducts);
 }
 
 function renderAdresser(adresser){
@@ -96,13 +163,66 @@ function renderAdresser(adresser){
 function renderProduktCounts(products){
   const counts = countByProduct(products);
   if (!counts.length) return '<p class="muted">Ingen produkter</p>';
-  return `<table class="productCountTable">${counts.map(([name,count])=>`<tr><td>${esc(name)}</td><td>${count}</td></tr>`).join('')}</table>`;
+  return `<table class="productCountTable">${counts.map(c=>`<tr class="${c.xx?'inactiveXX':''}"><td>${esc(c.name)}</td><td>${c.count}</td></tr>`).join('')}</table>`;
 }
 
-function renderProductTable(products, adresser){
- const addrMap = Object.fromEntries(adresser.map(a=>[a.adressekey, addressText(a)]));
- document.getElementById('tbody').innerHTML = products.map(p=>`<tr><td>${esc(p.produkt)}</td><td>${esc(p.produktnr)}</td><td>${esc(p.serienr)}</td><td>${esc(p.kontrakt)}</td><td class="small">Inst: ${fmtDate(p.installationsdato)}<br>Garanti: ${fmtDate(p.garantistart)} - ${fmtDate(p.garantiudloeb)}</td><td>${p.aktiv?'<span class="badge ok">Aktiv</span>':'<span class="badge err">Inaktiv</span>'}</td><td>${esc(addrMap[p.adressekey] || p.adressekey)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Ingen produkter</td></tr>';
+// ── Produkttabel: visning, filtre og sortering ──────────────────────────────
+let tableProducts = [];
+
+function renderProductTable(products){
+  tableProducts = products;
+  const cols = VIEWS[currentView];
+
+  document.querySelectorAll('#viewTabs .btn').forEach(b => b.classList.toggle('active', b.dataset.view === currentView));
+
+  // Header med filterfelt pr. kolonne (bygges kun om, når visningen skifter)
+  const thead = document.getElementById('thead');
+  if (thead.dataset.view !== currentView) {
+    thead.dataset.view = currentView;
+    thead.innerHTML = `<tr>${cols.map(c => `<th><span class="colLabel">${esc(COLS[c].label)}</span><input class="colFilter" type="search" data-col="${c}" placeholder="Filtrér…" value="${esc(filters[c] || '')}" autocomplete="off"></th>`).join('')}</tr>`;
+  }
+  renderRows();
 }
+
+function renderRows(){
+  const cols = VIEWS[currentView];
+  const active = cols.filter(c => (filters[c] || '').trim());
+  const rows = tableProducts
+    .filter(p => active.every(c => COLS[c].text(p).toLowerCase().includes(filters[c].trim().toLowerCase())))
+    .sort((a, b) => {
+      // Sortér efter visningens kolonner i rækkefølge (fx adresse, så produkt ...)
+      for (const c of cols.slice(0, 3)) {
+        const r = COLS[c].text(a).localeCompare(COLS[c].text(b), 'da', { numeric:true, sensitivity:'base' });
+        if (r) return r;
+      }
+      return isXX(a) - isXX(b);
+    });
+
+  document.getElementById('tbody').innerHTML = rows.map(p => `<tr class="${isXX(p)?'inactiveXX':''}"${isXX(p)?' title="Ikke aktiv (xx i installationsdato)"':''}>${cols.map(c => `<td>${COLS[c].html ? COLS[c].html(p) : esc(COLS[c].text(p))}</td>`).join('')}</tr>`).join('')
+    || `<tr><td colspan="${cols.length}" class="muted">${tableProducts.length ? 'Ingen produkter matcher filtrene' : 'Ingen produkter'}</td></tr>`;
+
+  document.getElementById('tableInfo').textContent = active.length ? `${rows.length} af ${tableProducts.length} produkter` : `${tableProducts.length} produkter`;
+  document.getElementById('btnClearFilters').style.display = Object.values(filters).some(v => (v || '').trim()) ? '' : 'none';
+}
+
+document.getElementById('viewTabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-view]');
+  if (!b || b.dataset.view === currentView) return;
+  currentView = b.dataset.view;
+  try { localStorage.setItem('kundeProduktView', currentView); } catch {}
+  renderProductTable(tableProducts);
+});
+document.getElementById('thead').addEventListener('input', e => {
+  if (!e.target.matches('.colFilter')) return;
+  filters[e.target.dataset.col] = e.target.value;
+  renderRows();
+});
+document.getElementById('btnClearFilters').addEventListener('click', () => {
+  Object.keys(filters).forEach(k => delete filters[k]);
+  document.querySelectorAll('#thead .colFilter').forEach(i => { i.value = ''; });
+  renderRows();
+});
+
 function escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 (function(){
   document.getElementById('btnInfo').href = '/kundeinfo.html?kundenr=' + encodeURIComponent(kundenr);
