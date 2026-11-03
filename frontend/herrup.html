@@ -1445,16 +1445,17 @@ if (window.updateHeaderStatus) {
       container.innerHTML = "";
 
       entries.forEach(([deptName, users]) => {
-        // Sorter brugere alfabetisk inden for afdelingen
-        // Sorter ledere/chefer først, derefter alfabetisk
-users.sort((a, b) => {
-  const aLeader = isLeaderTitle(a) ? 1 : 0;
-  const bLeader = isLeaderTitle(b) ? 1 : 0;
-
-  if (aLeader !== bLeader) return bLeader - aLeader;
-
-  return (a.displayName || "").localeCompare(b.displayName || "", "da");
-});
+        // Ledere først (ud fra Manager-feltet i Entra), derefter alfabetisk
+        const leaderInfo = deptLeaderInfo(users);
+        users.sort((a, b) => {
+          const la = leaderInfo.get(a.id), lb = leaderInfo.get(b.id);
+          if (!!la !== !!lb) return la ? -1 : 1;
+          if (la && lb) {
+            if (la.depth !== lb.depth) return la.depth - lb.depth;     // øverste leder først
+            if (la.reports !== lb.reports) return lb.reports - la.reports;
+          }
+          return (a.displayName || "").localeCompare(b.displayName || "", "da");
+        });
 
         // Sektion-wrapper
         const section = document.createElement("div");
@@ -1472,7 +1473,7 @@ users.sort((a, b) => {
 
         users.forEach(u => {
 const card = document.createElement("div");
-card.className = "dept-card" + (isLeaderTitle(u) ? " leader" : "");
+card.className = "dept-card" + (leaderInfo.has(u.id) ? " leader" : "");
 card.title = u.displayName || "";
           const phone = bizPhone(u) || u.mobilePhone || "";
           card.innerHTML = `
@@ -1490,6 +1491,38 @@ card.title = u.displayName || "";
     }
 
     // ── Hjælpere ─────────────────────────────────────────────────────────────
+
+    // Ledere i en afdeling = personer som andre i SAMME afdeling har som
+    // Manager i Entra. depth = antal ledere over personen inden for afdelingen
+    // (0 = afdelingens øverste leder), reports = antal direkte rapporter i
+    // afdelingen. Er manager-data endnu ikke hentet (første hurtige indlæsning),
+    // bruges titlen ("chef"/"leder") som midlertidig reserve.
+    function deptLeaderInfo(users) {
+      const info = new Map();
+      const haveManagers = allUsers.some(u => u.managerId);
+      if (!haveManagers) {
+        users.forEach(u => { if (isLeaderTitle(u)) info.set(u.id, { depth: 0, reports: 0 }); });
+        return info;
+      }
+      const inDept = new Map(users.map(u => [u.id, u]));
+      const reports = new Map();
+      users.forEach(u => {
+        if (u.managerId && u.managerId !== u.id && inDept.has(u.managerId)) {
+          reports.set(u.managerId, (reports.get(u.managerId) || 0) + 1);
+        }
+      });
+      reports.forEach((count, id) => {
+        let depth = 0, cur = inDept.get(id);
+        const seen = new Set([id]);
+        while (cur?.managerId && inDept.has(cur.managerId) && !seen.has(cur.managerId)) {
+          seen.add(cur.managerId);
+          depth++;
+          cur = inDept.get(cur.managerId);
+        }
+        info.set(id, { depth, reports: count });
+      });
+      return info;
+    }
 
     function isLeaderTitle(u) {
   const title = String(u?.jobTitle || "").toLowerCase();
