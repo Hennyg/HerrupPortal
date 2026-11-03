@@ -108,8 +108,9 @@ let currentView = 'adresse';
 try { const v = localStorage.getItem('kundeProduktView'); if (VIEWS[v]) currentView = v; } catch {}
 const filters = {}; // kolonne-nøgle -> filtertekst (huskes på tværs af visninger)
 
-// "xx" i installationsdato betyder, at produktet ikke er aktivt
-function isXX(p){ return String(p.installationsdato || '').trim().toLowerCase() === 'xx'; }
+// "xx" i installationsdato (fx "xx-xx-xxxx" på projektprodukter) betyder,
+// at produktet ikke er aktivt endnu
+function isXX(p){ return /xx/i.test(String(p.installationsdato || '')); }
 function dateText(s){ const d = s ? new Date(s) : null; return !s ? '' : isNaN(d) ? String(s) : d.toLocaleDateString('da-DK'); }
 
 async function load(){
