@@ -411,6 +411,70 @@
       .print-person .ptitle { color:#444; font-size:calc(10pt * var(--pscale,1)); }
       .print-person .pphone { color:#444; font-size:calc(10pt * var(--pscale,1)); }
     }
+
+    /* ── Organisationsdiagram (ud fra Manager-feltet i Entra) ─────────────── */
+    #chartView { display:none; flex:1; min-height:0; overflow:auto; padding-bottom:1rem; }
+    .ocToolbar { display:flex; gap:.5rem; justify-content:flex-end; flex-wrap:wrap; margin-bottom:.75rem; position:sticky; left:0; }
+    .oc-wrap { width:max-content; min-width:100%; padding:.5rem 1rem 1.5rem; box-sizing:border-box; }
+    .oc-tree { display:flex; justify-content:center; }
+    .oc-tree ul { display:flex; justify-content:center; padding:20px 0 0; margin:0; list-style:none; position:relative; }
+    .oc-tree li { display:flex; flex-direction:column; align-items:center; position:relative; padding:20px 5px 0; }
+    /* Vandrette forbindelser mellem søskende */
+    .oc-tree li::before, .oc-tree li::after {
+      content:""; position:absolute; top:0; right:50%; width:50%; height:20px; border-top:2px solid #b8bec8;
+    }
+    .oc-tree li::after { right:auto; left:50%; border-left:2px solid #b8bec8; }
+    .oc-tree li:only-child::before, .oc-tree li:only-child::after { display:none; }
+    .oc-tree li:only-child { padding-top:0; }
+    .oc-tree li:first-child::before, .oc-tree li:last-child::after { border:0 none; }
+    .oc-tree li:last-child::before { border-right:2px solid #b8bec8; border-radius:0 6px 0 0; }
+    .oc-tree li:first-child::after { border-radius:6px 0 0 0; }
+    /* Lodret linje fra lederen ned til børnene */
+    .oc-tree ul ul::before { content:""; position:absolute; top:0; left:50%; height:20px; border-left:2px solid #b8bec8; }
+    .oc-tree > ul { padding-top:0; }
+    .oc-tree > ul > li { padding-top:0; }
+    .oc-tree > ul > li::before, .oc-tree > ul > li::after { display:none; }
+    /* Folk uden egne medarbejdere stables lodret under lederen */
+    .oc-tree ul.oc-stack { flex-direction:column; align-items:center; gap:8px;
+      background:linear-gradient(#b8bec8,#b8bec8) center top / 2px calc(100% - 20px) no-repeat; background-position:center 20px; }
+    .oc-tree ul.oc-stack > li { padding:0; }
+    .oc-tree ul.oc-stack > li::before, .oc-tree ul.oc-stack > li::after { display:none; }
+
+    .oc-node {
+      position:relative; width:150px; min-height:46px; box-sizing:border-box; padding:7px 8px;
+      background:#c30a14; color:#fff; border-radius:6px; text-align:center; cursor:pointer;
+      box-shadow:0 2px 6px rgba(0,0,0,.12); transition:transform .12s, box-shadow .12s;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .oc-node:hover { transform:translateY(-1px); box-shadow:0 5px 14px rgba(133,12,24,.28); }
+    .oc-node.me { outline:3px solid #f59e0b; outline-offset:2px; }
+    .oc-node .oc-name  { font-size:.74rem; font-weight:700; line-height:1.2; }
+    .oc-node .oc-title { font-size:.64rem; line-height:1.15; opacity:.92; margin-top:2px; }
+    .oc-group {
+      width:150px; box-sizing:border-box; padding:7px 8px; border-radius:6px; text-align:center;
+      background:#8b8f96; color:#fff; font-size:.72rem; font-weight:700; line-height:1.2;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .oc-toggle {
+      position:absolute; left:50%; bottom:-11px; transform:translateX(-50%); z-index:2;
+      width:22px; height:22px; border-radius:50%; border:2px solid #c30a14; background:#fff; color:#c30a14;
+      font-size:11px; font-weight:700; line-height:1; padding:0; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .oc-toggle:hover { background:#fdecee; }
+    .oc-count { font-size:.6rem; font-weight:600; opacity:.85; margin-top:3px; }
+    li.oc-collapsed > ul { display:none; }
+    li.oc-has-children { padding-bottom:12px; }
+    .oc-tree ul.oc-stack > li.oc-has-children { padding-bottom:12px; }
+
+    @media print {
+      #printArea.oc-mode { display:block !important; }
+      .oc-print { width:297mm; height:210mm; box-sizing:border-box; padding:8mm; overflow:hidden; page-break-after:avoid; }
+      .oc-print-title { font-size:14pt; font-weight:700; color:#111; margin:0 0 4mm; padding-bottom:2mm; border-bottom:1pt solid #b91c1c; }
+      .oc-print .oc-toggle { display:none !important; }
+      .oc-print .oc-node { box-shadow:none; transform:none; }
+      .oc-print .oc-node.me { outline:none; }
+    }
   </style>
 </head>
 <body class="herrupPage">
@@ -437,6 +501,7 @@
     <div class="tabs">
       <button class="tab active" id="tabList" onclick="switchTab('list')">👥 Liste</button>
       <button class="tab"        id="tabOrg"  onclick="switchTab('org')">🏢 Afdelingsoversigt</button>
+      <button class="tab"        id="tabChart" onclick="switchTab('chart')">🧭 Organisationsdiagram</button>
     </div>
 
     <!-- Liste -->
@@ -482,6 +547,16 @@
       <div id="orgTree" style="padding:1rem 0;min-height:200px;">
         <div class="org-placeholder">Indlæser…</div>
       </div>
+    </div>
+
+    <!-- Organisationsdiagram -->
+    <div class="panel" id="chartView">
+      <div class="ocToolbar">
+        <button type="button" class="tab" onclick="ocExpandAll()">⊞ Udvid alle</button>
+        <button type="button" class="tab" onclick="ocCollapseAll()">⊟ Saml alle</button>
+        <button type="button" class="tab" title="Udskriv diagrammet som det ser ud nu" onclick="printOrgChart()">🖨️ Udskriv</button>
+      </div>
+      <div class="oc-wrap" id="ocWrap"><div class="org-placeholder">Indlæser…</div></div>
     </div>
   </div>
 
@@ -628,6 +703,7 @@
       buildDeptFilter(allUsers);
       renderTable();
       renderOrg();
+      renderOrgChartIfVisible();
       refreshDagensStatusWhenReady();
     }
 
@@ -737,6 +813,7 @@
 
             renderTable();
             renderOrg();
+            renderOrgChartIfVisible();
 
             // Opdater et evt. åbent personkort løbende, når personen selv
             // netop er beriget (foto + manager-kæde/rapporter).
@@ -854,11 +931,159 @@
       setTimeout(() => window.print(), 50);
     }
 
+    // ── Organisationsdiagram ───────────────────────────────────────────────────
+    // Bygges ud fra Manager-feltet i Entra. Toppen er dem uden (kendt) manager.
+    // Klik på et felt åbner personkortet; pilen udvider/samler alt nedenunder.
+    // Har en leder folk fra flere afdelinger under sig (og mindst én afdeling
+    // med flere personer), grupperes de under grå afdelingsfelter.
+    // Folk uden egne medarbejdere stables lodret under lederen.
+    const ocCollapsed = new Set();   // id'er på samlede ledere (huskes mens siden er åben)
+    let ocReports = new Map();
+
+    function renderOrgChartIfVisible() {
+      if (document.getElementById("chartView")?.style.display === "block") renderOrgChart();
+    }
+
+    function renderOrgChart() {
+      const wrap = document.getElementById("ocWrap");
+      if (!wrap) return;
+      if (!allUsers.length) { wrap.innerHTML = `<div class="org-placeholder">Ingen medarbejdere</div>`; return; }
+      if (!allUsers.some(u => u.managerId)) {
+        wrap.innerHTML = `<div class="stateMsg"><div class="spinner"></div><div>Henter lederoplysninger…</div></div>`;
+        return;
+      }
+
+      const byName = (a, b) => (a.displayName || "").localeCompare(b.displayName || "", "da");
+      ocReports = new Map();
+      allUsers.forEach(u => {
+        if (!u.managerId || u.managerId === u.id || !byId.has(u.managerId)) return;
+        if (!ocReports.has(u.managerId)) ocReports.set(u.managerId, []);
+        ocReports.get(u.managerId).push(u);
+      });
+      ocReports.forEach(list => list.sort(byName));
+
+      // Toppen: ingen manager, eller manager uden for listen.
+      // Personer uden manager og uden medarbejdere sættes ikke som egne toppe.
+      const roots = allUsers.filter(u => !u.managerId || u.managerId === u.id || !byId.has(u.managerId));
+      const tops = roots.filter(u => ocReports.has(u.id)).sort((a, b) => countBelow(b.id) - countBelow(a.id) || byName(a, b));
+      const loose = roots.filter(u => !ocReports.has(u.id)).sort(byName);
+
+      const visited = new Set();
+      const me = (typeof myEmail === "string" ? myEmail : "").toLowerCase();
+
+      const nodeHtml = (u) => {
+        if (visited.has(u.id)) return "";
+        visited.add(u.id);
+        const kids = ocReports.get(u.id) || [];
+        const has = kids.length > 0;
+        const collapsed = has && ocCollapsed.has(u.id);
+        const isMe = me && (u.mail || u.userPrincipalName || "").toLowerCase() === me;
+        const box = `
+          <div class="oc-node${isMe ? " me" : ""}" data-id="${esc(u.id)}" title="${esc(u.displayName || "")}${u.department ? ` – ${esc(u.department)}` : ""}">
+            <div class="oc-name">${esc(u.displayName || "")}</div>
+            ${u.jobTitle ? `<div class="oc-title">${esc(u.jobTitle)}</div>` : ""}
+            ${collapsed ? `<div class="oc-count">${countBelow(u.id)} under</div>` : ""}
+            ${has ? `<button type="button" class="oc-toggle" data-toggle="${esc(u.id)}" title="${collapsed ? "Udvid" : "Saml"}">${collapsed ? "▸" : "▾"}</button>` : ""}
+          </div>`;
+        return `<li class="${has ? "oc-has-children" : ""}${collapsed ? " oc-collapsed" : ""}">${box}${has ? childrenHtml(u, kids) : ""}</li>`;
+      };
+
+      // Liste af personer: lodret stak hvis ingen af dem har medarbejdere
+      const listHtml = (people) => {
+        const stack = people.every(p => !ocReports.has(p.id));
+        return `<ul class="${stack ? "oc-stack" : ""}">${people.map(nodeHtml).join("")}</ul>`;
+      };
+
+      const childrenHtml = (leader, kids) => {
+        const groups = new Map();
+        kids.forEach(k => {
+          const d = (k.department || "").trim() || "Uden afdeling";
+          if (!groups.has(d)) groups.set(d, []);
+          groups.get(d).push(k);
+        });
+        const useGroups = groups.size > 1 && [...groups.values()].some(g => g.length > 1);
+        if (!useGroups) return listHtml(kids);
+        const sorted = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "da"));
+        return `<ul>${sorted.map(([d, people]) => `
+          <li><div class="oc-group">${esc(d)}</div>${listHtml(people)}</li>`).join("")}</ul>`;
+      };
+
+      let html = `<div class="oc-tree"><ul>${tops.map(nodeHtml).join("")}</ul></div>`;
+      // Evt. personer, som ikke hænger sammen med resten (ingen manager og ingen medarbejdere)
+      const rest = loose.filter(u => !visited.has(u.id));
+      if (rest.length) {
+        html += `<div style="margin-top:28px;text-align:center;font-size:.8rem;color:#6b7280;font-weight:600;">Uden leder i Entra</div>
+                 <div class="oc-tree"><ul class="oc-stack" style="flex-direction:row;flex-wrap:wrap;justify-content:center;background:none;gap:8px;max-width:960px;">${rest.map(nodeHtml).join("")}</ul></div>`;
+      }
+      wrap.innerHTML = html;
+    }
+
+    function countBelow(id, seen = new Set()) {
+      if (seen.has(id)) return 0;
+      seen.add(id);
+      return (ocReports.get(id) || []).reduce((n, k) => n + 1 + countBelow(k.id, seen), 0);
+    }
+
+    function ocExpandAll()   { ocCollapsed.clear(); renderOrgChart(); }
+    function ocCollapseAll() {
+      // Saml alle ledere under toppen, så første niveau stadig ses
+      ocCollapsed.clear();
+      ocReports.forEach((_, id) => {
+        const u = byId.get(id);
+        if (u && u.managerId && byId.has(u.managerId)) ocCollapsed.add(id);
+      });
+      renderOrgChart();
+    }
+
+    document.addEventListener("click", (e) => {
+      const wrap = document.getElementById("ocWrap");
+      if (!wrap || !wrap.contains(e.target)) return;
+      const t = e.target.closest(".oc-toggle[data-toggle]");
+      if (t) {
+        e.stopPropagation();
+        const id = t.dataset.toggle;
+        ocCollapsed.has(id) ? ocCollapsed.delete(id) : ocCollapsed.add(id);
+        renderOrgChart();
+        return;
+      }
+      const node = e.target.closest(".oc-node[data-id]");
+      if (node) openModal(node.dataset.id);
+    });
+
+    // Udskriv diagrammet som det står nu (samlet/udvidet), skaleret til én A4 på langs
+    function printOrgChart() {
+      const tree = document.querySelector("#ocWrap");
+      if (!tree || !tree.querySelector(".oc-tree")) return;
+      const w = tree.scrollWidth, h = tree.scrollHeight;
+      const PX_PER_MM = 96 / 25.4;
+      const availW = (297 - 16) * PX_PER_MM;
+      const availH = (210 - 16 - 12) * PX_PER_MM;
+      const zoom = Math.min(1, availW / w, availH / h);
+
+      const printArea = document.getElementById("printArea");
+      printArea.classList.add("oc-mode");
+      printArea.innerHTML = `
+        <div class="oc-print">
+          <div class="oc-print-title">Organisationsdiagram – Lely Center Herrup · ${new Date().toLocaleDateString("da-DK")}</div>
+          <div style="zoom:${zoom.toFixed(3)}; width:${w}px;">${tree.innerHTML}</div>
+        </div>`;
+      const cleanup = () => {
+        printArea.classList.remove("oc-mode");
+        printArea.innerHTML = "";
+        window.removeEventListener("afterprint", cleanup);
+      };
+      window.addEventListener("afterprint", cleanup);
+      setTimeout(() => window.print(), 50);
+    }
+
     function switchTab(tab) {
-      document.getElementById("listView").style.display = tab === "list" ? "" : "none";
-      document.getElementById("orgView").style.display  = tab === "org"  ? "block" : "none";
-      document.getElementById("tabList").classList.toggle("active", tab === "list");
-      document.getElementById("tabOrg").classList.toggle("active",  tab === "org");
+      document.getElementById("listView").style.display  = tab === "list"  ? "" : "none";
+      document.getElementById("orgView").style.display   = tab === "org"   ? "block" : "none";
+      document.getElementById("chartView").style.display = tab === "chart" ? "block" : "none";
+      document.getElementById("tabList").classList.toggle("active",  tab === "list");
+      document.getElementById("tabOrg").classList.toggle("active",   tab === "org");
+      document.getElementById("tabChart").classList.toggle("active", tab === "chart");
+      if (tab === "chart") renderOrgChart();
     }
 
     // ── businessPhone hjælper ─────────────────────────────────────────────────
