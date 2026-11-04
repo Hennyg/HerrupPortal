@@ -467,6 +467,26 @@
     li.oc-has-children { padding-bottom:12px; }
     .oc-tree ul.oc-stack > li.oc-has-children { padding-bottom:12px; }
 
+    /* Stabsfunktioner: hænger ud til højre fra stammen under toppen */
+    .oc-staff { display:grid; grid-template-columns:1fr 1fr; width:100%; position:relative; padding:16px 0 4px; }
+    .oc-staff::before { content:""; position:absolute; left:50%; top:0; bottom:0; border-left:2px solid #b8bec8; }
+    .oc-staff-list { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding-left:28px; }
+    .oc-staff-label { font-size:.66rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; }
+    .oc-node.oc-staff-node { background:#fff; color:#850c18; border:2px solid #c30a14; }
+    .oc-staff-list .oc-node.oc-staff-node::before {
+      content:""; position:absolute; top:50%; left:-30px; width:28px; border-top:2px solid #b8bec8;
+    }
+    .oc-staff-loose { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:24px; }
+    .oc-staff-loose .oc-staff-label { width:100%; text-align:center; }
+
+    /* Højreklik-menu */
+    .oc-menu { position:fixed; z-index:3000; display:none; min-width:210px; background:#fff;
+               border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:6px; }
+    .oc-menu-head { font-size:.75rem; font-weight:700; color:#6b7280; padding:6px 10px 4px; border-bottom:1px solid #f1f1f1; margin-bottom:4px; }
+    .oc-menu button { display:block; width:100%; text-align:left; border:0; background:none; font:inherit;
+                      font-size:.86rem; padding:8px 10px; border-radius:6px; cursor:pointer; color:#111827; }
+    .oc-menu button:hover { background:#fdecee; color:#850c18; }
+
     @media print {
       #printArea.oc-mode { display:block !important; }
       .oc-print { width:297mm; height:210mm; box-sizing:border-box; padding:8mm; overflow:hidden; page-break-after:avoid; }
@@ -474,6 +494,7 @@
       .oc-print .oc-toggle { display:none !important; }
       .oc-print .oc-node { box-shadow:none; transform:none; }
       .oc-print .oc-node.me { outline:none; }
+      .oc-menu { display:none !important; }
     }
   </style>
 </head>
@@ -932,69 +953,82 @@
     }
 
     // ── Organisationsdiagram ───────────────────────────────────────────────────
-    // Bygges ud fra Manager-feltet i Entra. Toppen er dem uden (kendt) manager.
+    // Bygges ud fra Manager-feltet i Entra. Toppen er dem uden (kendt) manager,
+    // som har medarbejdere under sig. Personer uden manager OG uden medarbejdere
+    // vises som stabsfunktioner ud fra toppen.
     // Klik på et felt åbner personkortet; pilen udvider/samler alt nedenunder.
+    // Højreklik: "Udskriv herfra" udskriver personen + alt under (helt udvidet).
     // Har en leder folk fra flere afdelinger under sig (og mindst én afdeling
     // med flere personer), grupperes de under grå afdelingsfelter.
     // Folk uden egne medarbejdere stables lodret under lederen.
     const ocCollapsed = new Set();   // id'er på samlede ledere (huskes mens siden er åben)
     let ocReports = new Map();
+    let ocTops = [], ocStaff = [];
 
     function renderOrgChartIfVisible() {
       if (document.getElementById("chartView")?.style.display === "block") renderOrgChart();
     }
 
-    function renderOrgChart() {
-      const wrap = document.getElementById("ocWrap");
-      if (!wrap) return;
-      if (!allUsers.length) { wrap.innerHTML = `<div class="org-placeholder">Ingen medarbejdere</div>`; return; }
-      if (!allUsers.some(u => u.managerId)) {
-        wrap.innerHTML = `<div class="stateMsg"><div class="spinner"></div><div>Henter lederoplysninger…</div></div>`;
-        return;
-      }
+    function ocByName(a, b) { return (a.displayName || "").localeCompare(b.displayName || "", "da"); }
 
-      const byName = (a, b) => (a.displayName || "").localeCompare(b.displayName || "", "da");
+    // Hvem er under hvem + top og stab
+    function ocBuildModel() {
       ocReports = new Map();
       allUsers.forEach(u => {
         if (!u.managerId || u.managerId === u.id || !byId.has(u.managerId)) return;
         if (!ocReports.has(u.managerId)) ocReports.set(u.managerId, []);
         ocReports.get(u.managerId).push(u);
       });
-      ocReports.forEach(list => list.sort(byName));
-
-      // Toppen: ingen manager, eller manager uden for listen.
-      // Personer uden manager og uden medarbejdere sættes ikke som egne toppe.
+      ocReports.forEach(list => list.sort(ocByName));
       const roots = allUsers.filter(u => !u.managerId || u.managerId === u.id || !byId.has(u.managerId));
-      const tops = roots.filter(u => ocReports.has(u.id)).sort((a, b) => countBelow(b.id) - countBelow(a.id) || byName(a, b));
-      const loose = roots.filter(u => !ocReports.has(u.id)).sort(byName);
+      ocTops  = roots.filter(u => ocReports.has(u.id)).sort((a, b) => countBelow(b.id) - countBelow(a.id) || ocByName(a, b));
+      ocStaff = roots.filter(u => !ocReports.has(u.id)).sort(ocByName);
+    }
 
+    // HTML for et (del)træ. opts.expandAll ignorerer samlede grene (bruges til udskrift).
+    function ocTreeHtml(rootUsers, opts = {}) {
       const visited = new Set();
       const me = (typeof myEmail === "string" ? myEmail : "").toLowerCase();
+      const isCollapsed = id => !opts.expandAll && ocCollapsed.has(id);
 
-      const nodeHtml = (u) => {
-        if (visited.has(u.id)) return "";
-        visited.add(u.id);
+      const boxHtml = (u, extraClass = "", withToggle = true) => {
         const kids = ocReports.get(u.id) || [];
-        const has = kids.length > 0;
-        const collapsed = has && ocCollapsed.has(u.id);
+        const has = withToggle && kids.length > 0;
+        const collapsed = has && isCollapsed(u.id);
         const isMe = me && (u.mail || u.userPrincipalName || "").toLowerCase() === me;
-        const box = `
-          <div class="oc-node${isMe ? " me" : ""}" data-id="${esc(u.id)}" title="${esc(u.displayName || "")}${u.department ? ` – ${esc(u.department)}` : ""}">
+        return `
+          <div class="oc-node${extraClass}${isMe ? " me" : ""}" data-id="${esc(u.id)}" title="${esc(u.displayName || "")}${u.department ? ` – ${esc(u.department)}` : ""}">
             <div class="oc-name">${esc(u.displayName || "")}</div>
             ${u.jobTitle ? `<div class="oc-title">${esc(u.jobTitle)}</div>` : ""}
             ${collapsed ? `<div class="oc-count">${countBelow(u.id)} under</div>` : ""}
             ${has ? `<button type="button" class="oc-toggle" data-toggle="${esc(u.id)}" title="${collapsed ? "Udvid" : "Saml"}">${collapsed ? "▸" : "▾"}</button>` : ""}
           </div>`;
-        return `<li class="${has ? "oc-has-children" : ""}${collapsed ? " oc-collapsed" : ""}">${box}${has ? childrenHtml(u, kids) : ""}</li>`;
       };
 
-      // Liste af personer: lodret stak hvis ingen af dem har medarbejdere
+      const nodeHtml = (u, staff = []) => {
+        if (visited.has(u.id)) return "";
+        visited.add(u.id);
+        const kids = ocReports.get(u.id) || [];
+        const has = kids.length > 0;
+        const collapsed = has && isCollapsed(u.id);
+        const staffHtml = staff.length && !collapsed ? `
+          <div class="oc-staff">
+            <div></div>
+            <div class="oc-staff-list">
+              <div class="oc-staff-label">Stabsfunktioner</div>
+              ${staff.map(p => { visited.add(p.id); return boxHtml(p, " oc-staff-node", false); }).join("")}
+            </div>
+          </div>` : "";
+        return `<li class="${has ? "oc-has-children" : ""}${collapsed ? " oc-collapsed" : ""}">${boxHtml(u)}${staffHtml}${has ? childrenHtml(kids) : ""}</li>`;
+      };
+
+      // Lodret stak hvis ingen af personerne har medarbejdere
       const listHtml = (people) => {
         const stack = people.every(p => !ocReports.has(p.id));
-        return `<ul class="${stack ? "oc-stack" : ""}">${people.map(nodeHtml).join("")}</ul>`;
+        return `<ul class="${stack ? "oc-stack" : ""}">${people.map(p => nodeHtml(p)).join("")}</ul>`;
       };
 
-      const childrenHtml = (leader, kids) => {
+      const childrenHtml = (kids) => {
         const groups = new Map();
         kids.forEach(k => {
           const d = (k.department || "").trim() || "Uden afdeling";
@@ -1008,14 +1042,27 @@
           <li><div class="oc-group">${esc(d)}</div>${listHtml(people)}</li>`).join("")}</ul>`;
       };
 
-      let html = `<div class="oc-tree"><ul>${tops.map(nodeHtml).join("")}</ul></div>`;
-      // Evt. personer, som ikke hænger sammen med resten (ingen manager og ingen medarbejdere)
-      const rest = loose.filter(u => !visited.has(u.id));
-      if (rest.length) {
-        html += `<div style="margin-top:28px;text-align:center;font-size:.8rem;color:#6b7280;font-weight:600;">Uden leder i Entra</div>
-                 <div class="oc-tree"><ul class="oc-stack" style="flex-direction:row;flex-wrap:wrap;justify-content:center;background:none;gap:8px;max-width:960px;">${rest.map(nodeHtml).join("")}</ul></div>`;
+      // Stab hænger på den øverste top (hvis den er med i dette træ)
+      const staffFor = (u) => (opts.withStaff && ocTops[0] && u.id === ocTops[0].id) ? ocStaff : [];
+      let html = `<div class="oc-tree"><ul>${rootUsers.map(u => nodeHtml(u, staffFor(u))).join("")}</ul></div>`;
+
+      // Er der ingen top at hænge stabsfunktionerne på, vises de for sig
+      if (opts.withStaff && !ocTops.length && ocStaff.length) {
+        html += `<div class="oc-staff-loose"><div class="oc-staff-label">Stabsfunktioner</div>${ocStaff.map(p => boxHtml(p, " oc-staff-node", false)).join("")}</div>`;
       }
-      wrap.innerHTML = html;
+      return html;
+    }
+
+    function renderOrgChart() {
+      const wrap = document.getElementById("ocWrap");
+      if (!wrap) return;
+      if (!allUsers.length) { wrap.innerHTML = `<div class="org-placeholder">Ingen medarbejdere</div>`; return; }
+      if (!allUsers.some(u => u.managerId)) {
+        wrap.innerHTML = `<div class="stateMsg"><div class="spinner"></div><div>Henter lederoplysninger…</div></div>`;
+        return;
+      }
+      ocBuildModel();
+      wrap.innerHTML = ocTreeHtml(ocTops, { withStaff: true });
     }
 
     function countBelow(id, seen = new Set()) {
@@ -1036,6 +1083,7 @@
     }
 
     document.addEventListener("click", (e) => {
+      ocCloseMenu();
       const wrap = document.getElementById("ocWrap");
       if (!wrap || !wrap.contains(e.target)) return;
       const t = e.target.closest(".oc-toggle[data-toggle]");
@@ -1050,22 +1098,82 @@
       if (node) openModal(node.dataset.id);
     });
 
-    // Udskriv diagrammet som det står nu (samlet/udvidet), skaleret til én A4 på langs
-    function printOrgChart() {
-      const tree = document.querySelector("#ocWrap");
-      if (!tree || !tree.querySelector(".oc-tree")) return;
-      const w = tree.scrollWidth, h = tree.scrollHeight;
+    // ── Højreklik-menu ────────────────────────────────────────────────────────
+    document.addEventListener("contextmenu", (e) => {
+      const wrap = document.getElementById("ocWrap");
+      const node = wrap && wrap.contains(e.target) ? e.target.closest(".oc-node[data-id]") : null;
+      if (!node) { ocCloseMenu(); return; }
+      e.preventDefault();
+      const u = byId.get(node.dataset.id);
+      if (!u) return;
+      const below = countBelow(u.id);
+      let menu = document.getElementById("ocMenu");
+      if (!menu) {
+        menu = document.createElement("div");
+        menu.id = "ocMenu";
+        menu.className = "oc-menu";
+        document.body.appendChild(menu);
+        menu.addEventListener("click", (ev) => {
+          const item = ev.target.closest("button[data-act]");
+          if (!item) return;
+          ev.stopPropagation();
+          const id = menu.dataset.id;
+          ocCloseMenu();
+          if (item.dataset.act === "print") printOrgChart(id);
+          if (item.dataset.act === "open") openModal(id);
+        });
+      }
+      menu.dataset.id = u.id;
+      menu.innerHTML = `
+        <div class="oc-menu-head">${esc(u.displayName || "")}</div>
+        <button type="button" data-act="print">🖨️ Udskriv herfra${below ? ` <span class="muted">(${below + 1} personer)</span>` : ""}</button>
+        <button type="button" data-act="open">👤 Åbn personkort</button>`;
+      menu.style.display = "block";
+      const mw = menu.offsetWidth, mh = menu.offsetHeight;
+      menu.style.left = Math.min(e.clientX, window.innerWidth - mw - 8) + "px";
+      menu.style.top  = Math.min(e.clientY, window.innerHeight - mh - 8) + "px";
+    });
+    function ocCloseMenu() { const m = document.getElementById("ocMenu"); if (m) m.style.display = "none"; }
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") ocCloseMenu(); });
+    window.addEventListener("scroll", ocCloseMenu, true);
+    window.addEventListener("resize", ocCloseMenu);
+
+    // ── Udskrift ──────────────────────────────────────────────────────────────
+    // Uden fromId: diagrammet som det står nu (samlet/udvidet).
+    // Med fromId:  personen øverst og alt under den, helt udvidet.
+    // Skaleres til én A4-side på langs.
+    function printOrgChart(fromId) {
+      ocBuildModel();
+      let html, title;
+      if (fromId && byId.has(fromId)) {
+        const u = byId.get(fromId);
+        html = ocTreeHtml([u], { expandAll: true, withStaff: ocTops[0]?.id === u.id });
+        title = `Organisationsdiagram – ${u.displayName}${u.jobTitle ? `, ${u.jobTitle}` : ""}`;
+      } else {
+        html = ocTreeHtml(ocTops, { withStaff: true });
+        title = "Organisationsdiagram – Lely Center Herrup";
+      }
+
+      // Mål størrelsen uden for skærmen
+      const probe = document.createElement("div");
+      probe.className = "oc-wrap";
+      probe.style.cssText = "position:absolute;left:-100000px;top:0;visibility:hidden;width:max-content;min-width:0;";
+      probe.innerHTML = html;
+      document.body.appendChild(probe);
+      const w = probe.scrollWidth, h = probe.scrollHeight;
+      probe.remove();
+
       const PX_PER_MM = 96 / 25.4;
       const availW = (297 - 16) * PX_PER_MM;
       const availH = (210 - 16 - 12) * PX_PER_MM;
-      const zoom = Math.min(1, availW / w, availH / h);
+      const zoom = Math.min(1.4, availW / w, availH / h);
 
       const printArea = document.getElementById("printArea");
       printArea.classList.add("oc-mode");
       printArea.innerHTML = `
         <div class="oc-print">
-          <div class="oc-print-title">Organisationsdiagram – Lely Center Herrup · ${new Date().toLocaleDateString("da-DK")}</div>
-          <div style="zoom:${zoom.toFixed(3)}; width:${w}px;">${tree.innerHTML}</div>
+          <div class="oc-print-title">${esc(title)} · ${new Date().toLocaleDateString("da-DK")}</div>
+          <div class="oc-wrap" style="zoom:${zoom.toFixed(3)}; width:${w}px; min-width:0;">${html}</div>
         </div>`;
       const cleanup = () => {
         printArea.classList.remove("oc-mode");
