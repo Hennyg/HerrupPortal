@@ -467,17 +467,22 @@
     li.oc-has-children { padding-bottom:12px; }
     .oc-tree ul.oc-stack > li.oc-has-children { padding-bottom:12px; }
 
-    /* Stabsfunktioner: hænger ud til højre fra stammen under toppen */
-    .oc-staff { display:grid; grid-template-columns:1fr 1fr; width:100%; position:relative; padding:16px 0 4px; }
+    /* Stabsfunktioner: hvide felter på begge sider af stammen under toppen */
+    .oc-staff { display:grid; grid-template-columns:1fr 1fr; row-gap:8px; width:100%; position:relative; padding:14px 0 4px; }
     .oc-staff::before { content:""; position:absolute; left:50%; top:0; bottom:0; border-left:2px solid #b8bec8; }
-    .oc-staff-list { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding-left:28px; }
-    .oc-staff-label { font-size:.66rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; }
+    .oc-staff-l { display:flex; justify-content:flex-end; padding-right:26px; }
+    .oc-staff-r { display:flex; justify-content:flex-start; padding-left:26px; }
     .oc-node.oc-staff-node { background:#fff; color:#850c18; border:2px solid #c30a14; }
-    .oc-staff-list .oc-node.oc-staff-node::before {
-      content:""; position:absolute; top:50%; left:-30px; width:28px; border-top:2px solid #b8bec8;
-    }
+    .oc-staff-l .oc-node::after { content:""; position:absolute; top:50%; right:-28px; width:26px; border-top:2px solid #b8bec8; }
+    .oc-staff-r .oc-node::before { content:""; position:absolute; top:50%; left:-28px; width:26px; border-top:2px solid #b8bec8; }
     .oc-staff-loose { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:24px; }
-    .oc-staff-loose .oc-staff-label { width:100%; text-align:center; }
+
+    /* Træk rundt med musen */
+    #chartView { cursor:grab; user-select:none; }
+    #chartView.oc-panning, #chartView.oc-panning .oc-node { cursor:grabbing; }
+    #chartView .ocToolbar { cursor:default; }
+    .oc-loading { padding:3rem 0; }
+    #ocTimer { font-variant-numeric:tabular-nums; font-weight:700; }
 
     /* Højreklik-menu */
     .oc-menu { position:fixed; z-index:3000; display:none; min-width:210px; background:#fff;
@@ -698,6 +703,7 @@
       // Cache fra før employeeType blev hentet regnes som forældet
       if (entraCacheIsFresh(entry) && entry.data.some(u => "employeeType" in u)) {
         // Browser-cachen er varm — render med det samme, intet netværkskald for listen.
+        ocDataReady = true;
         applyUserList(entry.data);
         if (directOpenId) {
           if (byId.has(directOpenId)) {
@@ -796,6 +802,8 @@
     async function loadFullUserList(isBackground) {
       let shownSomething = false;
       let baseData = null;
+      ocDataReady = false;          // organisationsdiagrammet venter, til alt er hentet
+      ocLoadStart = Date.now();
 
       // Fase 1: hurtigt hent uden foto/manager — springes kun over hvis den
       // fejler (fx offline); i så fald går vi direkte til det fulde hent.
@@ -853,6 +861,8 @@
       } catch (e) {
         if (!isBackground && !shownSomething) renderError("Kunne ikke hente medarbejdere: " + e.message);
       } finally {
+        ocDataReady = true;
+        renderOrgChartIfVisible();
         if (window.__herrupOnUsersRendered) window.__herrupOnUsersRendered();
       }
     }
@@ -954,81 +964,101 @@
 
     // ── Organisationsdiagram ───────────────────────────────────────────────────
     // Bygges ud fra Manager-feltet i Entra. Toppen er dem uden (kendt) manager,
-    // som har medarbejdere under sig. Personer uden manager OG uden medarbejdere
-    // vises som stabsfunktioner ud fra toppen.
-    // Klik på et felt åbner personkortet; pilen udvider/samler alt nedenunder.
-    // Højreklik: "Udskriv herfra" udskriver personen + alt under (helt udvidet).
+    // som har medarbejdere under sig.
+    // Stabsfunktioner (hvide felter ud fra stammen under toppen, på begge sider):
+    //   - personer uden manager OG uden medarbejdere
+    //   - alle i afdelingerne i OC_STAFF_DEPTS (fx HR), uanset manager
+    // Starter med alle afdelinger samlet. Klik åbner personkortet; pilen
+    // udvider/samler. Hold venstre musetast nede for at trække diagrammet rundt.
+    // Højreklik: "Udskriv herfra" / "Udskriv niveau".
     // Har en leder folk fra flere afdelinger under sig (og mindst én afdeling
     // med flere personer), grupperes de under grå afdelingsfelter.
-    // Folk uden egne medarbejdere stables lodret under lederen.
+    // Folk uden egne medarbejdere stables lodret under lederen på skærmen.
+    const OC_STAFF_DEPTS = ["hr"];   // afdelinger der altid vises som stab (små bogstaver)
     const ocCollapsed = new Set();   // id'er på samlede ledere (huskes mens siden er åben)
     let ocReports = new Map();
     let ocTops = [], ocStaff = [];
+    let ocDataReady = false;         // sættes når foto + manager er hentet for alle
+    let ocInitialCollapseDone = false;
+    let ocLoadStart = Date.now();
+    let ocTimer = null;
 
     function renderOrgChartIfVisible() {
       if (document.getElementById("chartView")?.style.display === "block") renderOrgChart();
     }
 
     function ocByName(a, b) { return (a.displayName || "").localeCompare(b.displayName || "", "da"); }
+    function ocIsStaffDept(u) { return OC_STAFF_DEPTS.includes(String(u.department || "").trim().toLowerCase()); }
 
     // Hvem er under hvem + top og stab
     function ocBuildModel() {
       ocReports = new Map();
       allUsers.forEach(u => {
+        if (ocIsStaffDept(u)) return;  // stab hænger ikke under nogen leder
         if (!u.managerId || u.managerId === u.id || !byId.has(u.managerId)) return;
         if (!ocReports.has(u.managerId)) ocReports.set(u.managerId, []);
         ocReports.get(u.managerId).push(u);
       });
       ocReports.forEach(list => list.sort(ocByName));
-      const roots = allUsers.filter(u => !u.managerId || u.managerId === u.id || !byId.has(u.managerId));
+      const roots = allUsers.filter(u => !ocIsStaffDept(u) && (!u.managerId || u.managerId === u.id || !byId.has(u.managerId)));
       ocTops  = roots.filter(u => ocReports.has(u.id)).sort((a, b) => countBelow(b.id) - countBelow(a.id) || ocByName(a, b));
-      ocStaff = roots.filter(u => !ocReports.has(u.id)).sort(ocByName);
+      ocStaff = [...roots.filter(u => !ocReports.has(u.id)), ...allUsers.filter(ocIsStaffDept)].sort(ocByName);
     }
 
-    // HTML for et (del)træ. opts.expandAll ignorerer samlede grene (bruges til udskrift).
+    // HTML for et (del)træ.
+    //   opts.expandAll  ignorér samlede grene
+    //   opts.withStaff  vis stabsfunktioner under den øverste top
+    //   opts.leafRow    personer uden medarbejdere på en række i stedet for en kolonne
+    //   opts.maxDepth   antal niveauer under roden (fx 1)
     function ocTreeHtml(rootUsers, opts = {}) {
       const visited = new Set();
       const me = (typeof myEmail === "string" ? myEmail : "").toLowerCase();
       const isCollapsed = id => !opts.expandAll && ocCollapsed.has(id);
 
-      const boxHtml = (u, extraClass = "", withToggle = true) => {
+      const boxHtml = (u, { extraClass = "", toggle = true, cut = false } = {}) => {
         const kids = ocReports.get(u.id) || [];
-        const has = withToggle && kids.length > 0;
+        const has = toggle && !cut && kids.length > 0;
         const collapsed = has && isCollapsed(u.id);
         const isMe = me && (u.mail || u.userPrincipalName || "").toLowerCase() === me;
+        const showCount = (collapsed || cut) && kids.length > 0;
         return `
           <div class="oc-node${extraClass}${isMe ? " me" : ""}" data-id="${esc(u.id)}" title="${esc(u.displayName || "")}${u.department ? ` – ${esc(u.department)}` : ""}">
             <div class="oc-name">${esc(u.displayName || "")}</div>
             ${u.jobTitle ? `<div class="oc-title">${esc(u.jobTitle)}</div>` : ""}
-            ${collapsed ? `<div class="oc-count">${countBelow(u.id)} under</div>` : ""}
+            ${showCount ? `<div class="oc-count">${countBelow(u.id)} under</div>` : ""}
             ${has ? `<button type="button" class="oc-toggle" data-toggle="${esc(u.id)}" title="${collapsed ? "Udvid" : "Saml"}">${collapsed ? "▸" : "▾"}</button>` : ""}
           </div>`;
       };
 
-      const nodeHtml = (u, staff = []) => {
+      const staffHtml = (staff) => {
+        if (!staff.length) return "";
+        const rows = [];
+        for (let i = 0; i < staff.length; i += 2) rows.push([staff[i], staff[i + 1]]);
+        return `<div class="oc-staff">${rows.map(([l, r]) => `
+          <div class="oc-staff-l">${l ? boxHtml(l, { extraClass: " oc-staff-node", toggle: false }) : ""}</div>
+          <div class="oc-staff-r">${r ? boxHtml(r, { extraClass: " oc-staff-node", toggle: false }) : ""}</div>`).join("")}
+        </div>`;
+      };
+
+      const nodeHtml = (u, depth, staff = []) => {
         if (visited.has(u.id)) return "";
         visited.add(u.id);
+        staff.forEach(p => visited.add(p.id));
         const kids = ocReports.get(u.id) || [];
-        const has = kids.length > 0;
+        const cut = opts.maxDepth != null && depth >= opts.maxDepth;
+        const has = kids.length > 0 && !cut;
         const collapsed = has && isCollapsed(u.id);
-        const staffHtml = staff.length && !collapsed ? `
-          <div class="oc-staff">
-            <div></div>
-            <div class="oc-staff-list">
-              <div class="oc-staff-label">Stabsfunktioner</div>
-              ${staff.map(p => { visited.add(p.id); return boxHtml(p, " oc-staff-node", false); }).join("")}
-            </div>
-          </div>` : "";
-        return `<li class="${has ? "oc-has-children" : ""}${collapsed ? " oc-collapsed" : ""}">${boxHtml(u)}${staffHtml}${has ? childrenHtml(kids) : ""}</li>`;
+        return `<li class="${has ? "oc-has-children" : ""}${collapsed ? " oc-collapsed" : ""}">${boxHtml(u, { cut })}${collapsed ? "" : staffHtml(staff)}${has ? childrenHtml(kids, depth + 1) : ""}</li>`;
       };
 
-      // Lodret stak hvis ingen af personerne har medarbejdere
-      const listHtml = (people) => {
-        const stack = people.every(p => !ocReports.has(p.id));
-        return `<ul class="${stack ? "oc-stack" : ""}">${people.map(p => nodeHtml(p)).join("")}</ul>`;
+      // Lodret stak hvis ingen af personerne har (viste) medarbejdere
+      const listHtml = (people, depth) => {
+        const leaves = people.every(p => !ocReports.has(p.id) || (opts.maxDepth != null && depth >= opts.maxDepth));
+        const stack = leaves && !opts.leafRow;
+        return `<ul class="${stack ? "oc-stack" : ""}">${people.map(p => nodeHtml(p, depth)).join("")}</ul>`;
       };
 
-      const childrenHtml = (kids) => {
+      const childrenHtml = (kids, depth) => {
         const groups = new Map();
         kids.forEach(k => {
           const d = (k.department || "").trim() || "Uden afdeling";
@@ -1036,32 +1066,45 @@
           groups.get(d).push(k);
         });
         const useGroups = groups.size > 1 && [...groups.values()].some(g => g.length > 1);
-        if (!useGroups) return listHtml(kids);
+        if (!useGroups) return listHtml(kids, depth);
         const sorted = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "da"));
         return `<ul>${sorted.map(([d, people]) => `
-          <li><div class="oc-group">${esc(d)}</div>${listHtml(people)}</li>`).join("")}</ul>`;
+          <li><div class="oc-group">${esc(d)}</div>${listHtml(people, depth)}</li>`).join("")}</ul>`;
       };
 
       // Stab hænger på den øverste top (hvis den er med i dette træ)
       const staffFor = (u) => (opts.withStaff && ocTops[0] && u.id === ocTops[0].id) ? ocStaff : [];
-      let html = `<div class="oc-tree"><ul>${rootUsers.map(u => nodeHtml(u, staffFor(u))).join("")}</ul></div>`;
+      let html = `<div class="oc-tree"><ul>${rootUsers.map(u => nodeHtml(u, 0, staffFor(u))).join("")}</ul></div>`;
 
       // Er der ingen top at hænge stabsfunktionerne på, vises de for sig
       if (opts.withStaff && !ocTops.length && ocStaff.length) {
-        html += `<div class="oc-staff-loose"><div class="oc-staff-label">Stabsfunktioner</div>${ocStaff.map(p => boxHtml(p, " oc-staff-node", false)).join("")}</div>`;
+        html += `<div class="oc-staff-loose">${ocStaff.map(p => boxHtml(p, { extraClass: " oc-staff-node", toggle: false })).join("")}</div>`;
       }
       return html;
+    }
+
+    function ocShowLoader(wrap) {
+      if (!wrap.querySelector("#ocTimer")) {
+        wrap.innerHTML = `<div class="stateMsg oc-loading"><div class="spinner"></div>
+          <div>Bygger organisationsdiagram… <span id="ocTimer">0</span> s</div>
+          <div class="muted" style="font-size:.8rem">Henter ledere og billeder for alle medarbejdere</div></div>`;
+      }
+      const tick = () => {
+        const el = document.getElementById("ocTimer");
+        if (el) el.textContent = Math.floor((Date.now() - ocLoadStart) / 1000);
+      };
+      tick();
+      if (!ocTimer) ocTimer = setInterval(tick, 250);
     }
 
     function renderOrgChart() {
       const wrap = document.getElementById("ocWrap");
       if (!wrap) return;
+      if (!ocDataReady) { ocShowLoader(wrap); return; }
+      clearInterval(ocTimer); ocTimer = null;
       if (!allUsers.length) { wrap.innerHTML = `<div class="org-placeholder">Ingen medarbejdere</div>`; return; }
-      if (!allUsers.some(u => u.managerId)) {
-        wrap.innerHTML = `<div class="stateMsg"><div class="spinner"></div><div>Henter lederoplysninger…</div></div>`;
-        return;
-      }
       ocBuildModel();
+      if (!ocInitialCollapseDone) { ocInitialCollapseDone = true; ocCollapseBelowTop(); }
       wrap.innerHTML = ocTreeHtml(ocTops, { withStaff: true });
     }
 
@@ -1071,21 +1114,20 @@
       return (ocReports.get(id) || []).reduce((n, k) => n + 1 + countBelow(k.id, seen), 0);
     }
 
-    function ocExpandAll()   { ocCollapsed.clear(); renderOrgChart(); }
-    function ocCollapseAll() {
-      // Saml alle ledere under toppen, så første niveau stadig ses
+    // Saml alle ledere under toppen, så toppen og første niveau ses
+    function ocCollapseBelowTop() {
       ocCollapsed.clear();
-      ocReports.forEach((_, id) => {
-        const u = byId.get(id);
-        if (u && u.managerId && byId.has(u.managerId)) ocCollapsed.add(id);
-      });
-      renderOrgChart();
+      const tops = new Set(ocTops.map(u => u.id));
+      ocReports.forEach((_, id) => { if (!tops.has(id)) ocCollapsed.add(id); });
     }
+    function ocExpandAll()   { ocCollapsed.clear(); renderOrgChart(); }
+    function ocCollapseAll() { ocCollapseBelowTop(); renderOrgChart(); }
 
     document.addEventListener("click", (e) => {
       ocCloseMenu();
       const wrap = document.getElementById("ocWrap");
       if (!wrap || !wrap.contains(e.target)) return;
+      if (ocPan.moved) { ocPan.moved = false; return; } // det var et træk, ikke et klik
       const t = e.target.closest(".oc-toggle[data-toggle]");
       if (t) {
         e.stopPropagation();
@@ -1097,6 +1139,34 @@
       const node = e.target.closest(".oc-node[data-id]");
       if (node) openModal(node.dataset.id);
     });
+
+    // ── Træk diagrammet rundt med venstre musetast ────────────────────────────
+    const ocPan = { active: false, moved: false, x: 0, y: 0, left: 0, top: 0 };
+    (function setupOcPan() {
+      const view = document.getElementById("chartView");
+      if (!view) return;
+      view.addEventListener("mousedown", (e) => {
+        if (e.button !== 0 || e.target.closest(".ocToolbar, .oc-toggle")) return;
+        Object.assign(ocPan, { active: true, moved: false, x: e.clientX, y: e.clientY, left: view.scrollLeft, top: view.scrollTop });
+        e.preventDefault(); // undgå tekstmarkering
+      });
+      window.addEventListener("mousemove", (e) => {
+        if (!ocPan.active) return;
+        const dx = e.clientX - ocPan.x, dy = e.clientY - ocPan.y;
+        if (!ocPan.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+        ocPan.moved = true;
+        view.classList.add("oc-panning");
+        view.scrollLeft = ocPan.left - dx;
+        view.scrollTop  = ocPan.top  - dy;
+      });
+      window.addEventListener("mouseup", () => {
+        if (!ocPan.active) return;
+        ocPan.active = false;
+        view.classList.remove("oc-panning");
+        // ocPan.moved nulstilles af det efterfølgende click (eller her, hvis musen slippes uden for)
+        setTimeout(() => { ocPan.moved = false; }, 0);
+      });
+    })();
 
     // ── Højreklik-menu ────────────────────────────────────────────────────────
     document.addEventListener("contextmenu", (e) => {
@@ -1120,6 +1190,7 @@
           const id = menu.dataset.id;
           ocCloseMenu();
           if (item.dataset.act === "print") printOrgChart(id);
+          if (item.dataset.act === "level") printOrgChart(id, 1);
           if (item.dataset.act === "open") openModal(id);
         });
       }
@@ -1127,6 +1198,7 @@
       menu.innerHTML = `
         <div class="oc-menu-head">${esc(u.displayName || "")}</div>
         <button type="button" data-act="print">🖨️ Udskriv herfra${below ? ` <span class="muted">(${below + 1} personer)</span>` : ""}</button>
+        ${below ? `<button type="button" data-act="level">🖨️ Udskriv niveau <span class="muted">(${(ocReports.get(u.id) || []).length + 1} personer)</span></button>` : ""}
         <button type="button" data-act="open">👤 Åbn personkort</button>`;
       menu.style.display = "block";
       const mw = menu.offsetWidth, mh = menu.offsetHeight;
@@ -1140,14 +1212,17 @@
 
     // ── Udskrift ──────────────────────────────────────────────────────────────
     // Uden fromId: diagrammet som det står nu (samlet/udvidet).
-    // Med fromId:  personen øverst og alt under den, helt udvidet.
+    // Med fromId:  personen øverst og alt under den, helt udvidet, med
+    //              personerne på nederste niveau på en række.
     // Skaleres til én A4-side på langs.
-    function printOrgChart(fromId) {
+    // levels = 1: kun personen og niveauet lige under ("Udskriv niveau").
+    function printOrgChart(fromId, levels) {
+      if (!ocDataReady) return;
       ocBuildModel();
       let html, title;
       if (fromId && byId.has(fromId)) {
         const u = byId.get(fromId);
-        html = ocTreeHtml([u], { expandAll: true, withStaff: ocTops[0]?.id === u.id });
+        html = ocTreeHtml([u], { expandAll: true, leafRow: true, maxDepth: levels, withStaff: ocTops[0]?.id === u.id });
         title = `Organisationsdiagram – ${u.displayName}${u.jobTitle ? `, ${u.jobTitle}` : ""}`;
       } else {
         html = ocTreeHtml(ocTops, { withStaff: true });
