@@ -467,6 +467,15 @@
     li.oc-has-children { padding-bottom:12px; }
     .oc-tree ul.oc-stack > li.oc-has-children { padding-bottom:12px; }
 
+    /* Kolonne med folk uden medarbejdere ved siden af ledere */
+    .oc-tree li.oc-col > ul.oc-stack { padding-top:20px; }
+    /* Udskrift: sidste niveau i et gitter med højst 4 pr. række, samlet i en ramme */
+    .oc-tree ul.oc-grid { display:grid; gap:10px; justify-content:center; margin-top:20px; padding:12px;
+                          border:2px solid #b8bec8; border-radius:10px; }
+    .oc-tree ul.oc-grid::before { top:-22px !important; height:20px !important; }
+    .oc-tree ul.oc-grid > li { padding:0; }
+    .oc-tree ul.oc-grid > li::before, .oc-tree ul.oc-grid > li::after { display:none; }
+
     /* Stabsfunktioner: hvide felter på begge sider af stammen under toppen */
     .oc-staff { display:grid; grid-template-columns:1fr 1fr; row-gap:8px; width:100%; position:relative; padding:14px 0 4px; }
     .oc-staff::before { content:""; position:absolute; left:50%; top:0; bottom:0; border-left:2px solid #b8bec8; }
@@ -1054,14 +1063,35 @@
         return `<li class="${has ? "oc-has-children" : ""}${collapsed ? " oc-collapsed" : ""}">${boxHtml(u, { cut })}${collapsed ? "" : staffHtml(staff)}${has ? childrenHtml(kids, depth + 1) : ""}</li>`;
       };
 
-      // Lodret stak hvis ingen af personerne har (viste) medarbejdere
+      // Har personen (viste) medarbejdere under sig?
+      const showsKids = (p, depth) => ocReports.has(p.id) && !(opts.maxDepth != null && depth >= opts.maxDepth);
+
+      // Liste af personer på samme niveau:
+      //  - kun folk uden medarbejdere: lodret kolonne på skærmen; på udskrift
+      //    (leafRow) et gitter med højst 4 pr. række
+      //  - blandet ledere og folk uden medarbejdere: folk uden medarbejdere i én
+      //    kolonne yderst til venstre, lederne ved siden af på rækken
+      //  - kun ledere: på en række
       const listHtml = (people, depth) => {
-        const leaves = people.every(p => !ocReports.has(p.id) || (opts.maxDepth != null && depth >= opts.maxDepth));
-        const stack = leaves && !opts.leafRow;
-        return `<ul class="${stack ? "oc-stack" : ""}">${people.map(p => nodeHtml(p, depth)).join("")}</ul>`;
+        const leaders = people.filter(p => showsKids(p, depth));
+        const leaves  = people.filter(p => !showsKids(p, depth));
+        if (!leaders.length) {
+          if (opts.leafRow && leaves.length > 1) {
+            const cols = Math.min(4, leaves.length);
+            return `<ul class="oc-grid" style="grid-template-columns:repeat(${cols}, 150px)">${leaves.map(p => nodeHtml(p, depth)).join("")}</ul>`;
+          }
+          return `<ul class="${opts.leafRow ? "" : "oc-stack"}">${leaves.map(p => nodeHtml(p, depth)).join("")}</ul>`;
+        }
+        const col = leaves.length
+          ? `<li class="oc-col"><ul class="oc-stack">${leaves.map(p => nodeHtml(p, depth)).join("")}</ul></li>`
+          : "";
+        return `<ul>${col}${leaders.map(p => nodeHtml(p, depth)).join("")}</ul>`;
       };
 
       const childrenHtml = (kids, depth) => {
+        // Blandet ledere og folk uden medarbejdere: ingen afdelingsgrupper
+        const mixed = kids.some(k => showsKids(k, depth)) && kids.some(k => !showsKids(k, depth));
+        if (mixed) return listHtml(kids, depth);
         const groups = new Map();
         kids.forEach(k => {
           const d = (k.department || "").trim() || "Uden afdeling";
