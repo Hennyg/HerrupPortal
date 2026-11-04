@@ -1063,8 +1063,9 @@
         return `<li class="${has ? "oc-has-children" : ""}${collapsed ? " oc-collapsed" : ""}">${boxHtml(u, { cut })}${collapsed ? "" : staffHtml(staff)}${has ? childrenHtml(kids, depth + 1) : ""}</li>`;
       };
 
-      // Har personen (viste) medarbejdere under sig?
-      const showsKids = (p, depth) => ocReports.has(p.id) && !(opts.maxDepth != null && depth >= opts.maxDepth);
+      // Har personen lederansvar (medarbejdere under sig)? Afgør opstillingen,
+      // også når niveauet under ikke vises (fx "Udskriv niveau").
+      const isLeader = (p) => ocReports.has(p.id);
 
       // Liste af personer på samme niveau:
       //  - kun folk uden medarbejdere: lodret kolonne på skærmen; på udskrift
@@ -1073,8 +1074,8 @@
       //    kolonne yderst til venstre, lederne ved siden af på rækken
       //  - kun ledere: på en række
       const listHtml = (people, depth) => {
-        const leaders = people.filter(p => showsKids(p, depth));
-        const leaves  = people.filter(p => !showsKids(p, depth));
+        const leaders = people.filter(isLeader);
+        const leaves  = people.filter(p => !isLeader(p));
         if (!leaders.length) {
           if (opts.leafRow && leaves.length > 1) {
             const cols = Math.min(4, leaves.length);
@@ -1090,7 +1091,7 @@
 
       const childrenHtml = (kids, depth) => {
         // Blandet ledere og folk uden medarbejdere: ingen afdelingsgrupper
-        const mixed = kids.some(k => showsKids(k, depth)) && kids.some(k => !showsKids(k, depth));
+        const mixed = kids.some(isLeader) && kids.some(k => !isLeader(k));
         if (mixed) return listHtml(kids, depth);
         const groups = new Map();
         kids.forEach(k => {
@@ -1224,6 +1225,7 @@
           ocCloseMenu();
           if (item.dataset.act === "print") printOrgChart(id);
           if (item.dataset.act === "level") printOrgChart(id, 1);
+          if (item.dataset.act === "expanded") printOrgChart(id, null, true);
           if (item.dataset.act === "open") openModal(id);
         });
       }
@@ -1232,6 +1234,7 @@
         <div class="oc-menu-head">${esc(u.displayName || "")}</div>
         <button type="button" data-act="print">🖨️ Udskriv herfra${below ? ` <span class="muted">(${below + 1} personer)</span>` : ""}</button>
         ${below ? `<button type="button" data-act="level">🖨️ Udskriv niveau <span class="muted">(${(ocReports.get(u.id) || []).length + 1} personer)</span></button>` : ""}
+        ${below ? `<button type="button" data-act="expanded">🖨️ Udskriv niveau udpakket <span class="muted">(${below + 1} personer)</span></button>` : ""}
         <button type="button" data-act="open">👤 Åbn personkort</button>`;
       menu.style.display = "block";
       const mw = menu.offsetWidth, mh = menu.offsetHeight;
@@ -1248,14 +1251,16 @@
     // Med fromId:  personen øverst og alt under den, helt udvidet, med
     //              personerne på nederste niveau på en række.
     // Skaleres til én A4-side på langs.
-    // levels = 1: kun personen og niveauet lige under ("Udskriv niveau").
-    function printOrgChart(fromId, levels) {
+    // levels = 1:        kun personen og niveauet lige under ("Udskriv niveau").
+    // screenLayout = true: alt under personen, opstillet som på skærmen når alt
+    //                     er udvidet - teams i kolonner ("Udskriv niveau udpakket").
+    function printOrgChart(fromId, levels, screenLayout) {
       if (!ocDataReady) return;
       ocBuildModel();
       let html, title;
       if (fromId && byId.has(fromId)) {
         const u = byId.get(fromId);
-        html = ocTreeHtml([u], { expandAll: true, leafRow: true, maxDepth: levels, withStaff: ocTops[0]?.id === u.id });
+        html = ocTreeHtml([u], { expandAll: true, leafRow: !screenLayout, maxDepth: levels ?? undefined, withStaff: ocTops[0]?.id === u.id });
         title = `Organisationsdiagram – ${u.displayName}${u.jobTitle ? `, ${u.jobTitle}` : ""}`;
       } else {
         html = ocTreeHtml(ocTops, { withStaff: true });
