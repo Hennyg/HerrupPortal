@@ -494,7 +494,10 @@
 
     @media print {
       #printArea.oc-mode { display:block !important; }
-      .oc-print { width:297mm; height:210mm; box-sizing:border-box; padding:8mm; overflow:hidden; page-break-after:avoid; }
+      .oc-print { width:297mm; height:210mm; box-sizing:border-box; padding:8mm; overflow:hidden; page-break-after:avoid;
+                  display:flex; flex-direction:column; }
+      /* Diagrammet centreres vandret og lodret på resten af siden */
+      .oc-print-body { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
       .oc-print-title { font-size:14pt; font-weight:700; color:#111; margin:0 0 4mm; padding-bottom:2mm; border-bottom:1pt solid #b91c1c; }
       .oc-print .oc-toggle { display:none !important; }
       .oc-print .oc-node { box-shadow:none; transform:none; }
@@ -1248,7 +1251,9 @@
       printArea.innerHTML = `
         <div class="oc-print">
           <div class="oc-print-title">${esc(title)} · ${new Date().toLocaleDateString("da-DK")}</div>
-          <div class="oc-wrap" style="zoom:${zoom.toFixed(3)}; width:${w}px; min-width:0;">${html}</div>
+          <div class="oc-print-body">
+            <div class="oc-wrap" style="zoom:${zoom.toFixed(3)}; width:${w}px; min-width:0; flex-shrink:0;">${html}</div>
+          </div>
         </div>`;
       const cleanup = () => {
         printArea.classList.remove("oc-mode");
