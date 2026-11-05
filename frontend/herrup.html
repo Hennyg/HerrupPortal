@@ -709,7 +709,14 @@
       myRoles = roles;
       myEmail = (me?.userDetails || "").toLowerCase();
 
-      const directOpenId = new URLSearchParams(location.search).get("person");
+      // Direkte links:
+      //   herrup.html?person=<entra-id>            åbner personens kort
+      //   herrup.html?person=me                    åbner den indloggedes eget kort
+      //   ...&tab=privat|arbejde|kalender|afdeling åbner kortet på den fane
+      const urlParams = new URLSearchParams(location.search);
+      let directOpenId = urlParams.get("person");
+      directTab = (urlParams.get("tab") || "").trim().toLowerCase();
+      if (directOpenId && directOpenId.toLowerCase() === "me") directOpenId = myEmail || null;
       const entry = await entraCacheRead();
 
       // Cache fra før employeeType blev hentet regnes som forældet
@@ -717,9 +724,11 @@
         // Browser-cachen er varm — render med det samme, intet netværkskald for listen.
         ocDataReady = true;
         applyUserList(entry.data);
+        if (directOpenId) directOpenId = resolveUserId(directOpenId);
         if (directOpenId) {
           if (byId.has(directOpenId)) {
             openModal(directOpenId);
+            openDirectTab();
           } else {
             // Findes ikke i det cachede snapshot (fx en helt ny medarbejder) — slå op direkte.
             openSinglePersonThenLoadRest(directOpenId, false);
@@ -735,6 +744,35 @@
         loadFullUserList(false);
       }
     })();
+
+    // Fane fra direkte link (?tab=...), bruges kun ved første åbning
+    let directTab = "";
+    function openDirectTab() {
+      const tab = directTab;
+      directTab = "";
+      if (!tab || tab === "arbejde") return;
+      if (tab === "privat") { switchModalTab("privat"); return; }
+      // Faner der tilføjes af andre scripts (kalender/afdeling) - klik på knappen,
+      // når den findes
+      const btnId = { kalender: "mtKalender", afdeling: "mtAfdeling" }[tab];
+      if (!btnId) return;
+      let tries = 0;
+      const tryClick = () => {
+        const b = document.getElementById(btnId);
+        if (b) b.click();
+        else if (++tries < 20) setTimeout(tryClick, 100);
+      };
+      tryClick();
+    }
+
+    // Entra-id eller mail -> Entra-id (mail slås op i listen; findes den ikke,
+    // returneres mailen, som /api/entra-user også kan slå op)
+    function resolveUserId(idOrMail) {
+      if (!idOrMail || !idOrMail.includes("@")) return idOrMail;
+      const m = idOrMail.toLowerCase();
+      const hit = allUsers.find(u => (u.mail || "").toLowerCase() === m || (u.userPrincipalName || "").toLowerCase() === m);
+      return hit ? hit.id : idOrMail;
+    }
 
     function applyUserList(data) {
       allUsers = data;
@@ -797,6 +835,7 @@
         const u = await r.json();
         byId.set(u.id, u);
         openModal(u.id);
+        openDirectTab();
       } catch (e) {
         renderError("Kunne ikke hente medarbejder: " + e.message);
       }
