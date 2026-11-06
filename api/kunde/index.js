@@ -14,6 +14,7 @@ function mapKunde(r) {
     id: r.cr1eb_lch_kundeid,
     kundenr: r.cr1eb_lch_kundenr || "",
     navn: r.cr1eb_lch_navn || "",
+    chr: String(r.cr1eb_lch_chr || "").trim(),
     omraade: r.cr1eb_lch_omraade || "",
     kundestatus: r.cr1eb_lch_kundestatus || "",
     aktiv: r.cr1eb_lch_aktiv ?? true,
@@ -63,7 +64,7 @@ module.exports = async function (context, req) {
       ? `cr1eb_lch_kundeid eq ${id}`
       : `cr1eb_lch_kundenr eq '${esc(kundenr)}'`;
 
-    const kundeData = await dvFetch(`${KUNDE_TABLE}?$select=cr1eb_lch_kundeid,cr1eb_lch_kundenr,cr1eb_lch_navn,cr1eb_lch_omraade,cr1eb_lch_kundestatus,cr1eb_lch_aktiv,cr1eb_lch_sidst_importeret,modifiedon&$filter=${encodeURIComponent(kundeFilter)}&$top=1`);
+    const kundeData = await dvFetch(`${KUNDE_TABLE}?$select=cr1eb_lch_kundeid,cr1eb_lch_kundenr,cr1eb_lch_navn,cr1eb_lch_chr,cr1eb_lch_omraade,cr1eb_lch_kundestatus,cr1eb_lch_aktiv,cr1eb_lch_sidst_importeret,modifiedon&$filter=${encodeURIComponent(kundeFilter)}&$top=1`);
     const kunde = (kundeData.value || [])[0];
     if (!kunde) return json(context, 404, { error: "Kunde ikke fundet" });
 
