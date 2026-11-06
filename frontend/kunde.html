@@ -39,6 +39,11 @@
     .salLine .chrNr { font-size:11px; color:#6b7280; }
     .salDate { font-size:11px; color:#6b7280; margin-top:4px; }
 
+    /* Stor "Se produkter"-knap */
+    .btn.btnBig { font-size:1.25rem; font-weight:700; padding:14px 28px; border-radius:10px;
+                  border:2px solid var(--red); color:var(--red); background:#fff; }
+    .btn.btnBig:hover { background:#fdf2f2; }
+
     /* Popup med produktlisten */
     .prodModalBackdrop { position:fixed; inset:0; background:rgba(17,24,39,.45); z-index:1000; display:none;
                          align-items:center; justify-content:center; padding:20px; }
@@ -75,7 +80,7 @@
 <main class="pageWrap">
   <div id="status" class="status loading"><div class="spinner"></div> Henter kunde...</div>
   <section id="content" style="display:none; overflow:auto;">
-    <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;"><a id="btnBack" class="btn" href="/kundeliste.html">← Tilbage til kundeliste</a><div style="display:flex;gap:8px;"><button type="button" class="btn" id="btnProdukter">📋 Se produkter</button><a id="btnInfo" class="btn" href="/kundeinfo.html">Kundeinfo</a></div></div>
+    <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;"><a id="btnBack" class="btn" href="/kundeliste.html">← Tilbage til kundeliste</a><button type="button" class="btn btnBig" id="btnProdukter">📋 Se produkter</button></div><a id="btnInfo" class="btn" href="/kundeinfo.html">Kundeinfo</a></div>
     <div class="cards" id="summary"></div>
     <div class="detailGrid">
       <div class="panel"><h2>Kunde</h2><div id="kundeInfo"></div></div>
@@ -168,8 +173,18 @@ async function load(){
 let sal = { state:'loading', list:[] };
 function salBadge(text){
   const s = String(text || '').toLowerCase();
-  const cls = /niveau\s*1\b/.test(s) ? 'ok' : /niveau\s*2\b/.test(s) ? 'warn' : /niveau\s*3\b/.test(s) ? 'err' : '';
+  const cls = /niveau\s*1\b|\bfri\b/.test(s) ? 'ok'
+            : /niveau\s*2\b/.test(s) ? 'warn'
+            : /niveau\s*3\b|smitte|positiv/.test(s) ? 'err' : '';
   return `<span class="badge ${cls}">${esc(text || 'Ukendt')}</span>`;
+}
+// Salmonellastatus for en besætning: veterinærstatus på sygdommen SAL
+// (cr406_salveterinrstatustekst/-dato). Findes den ikke, bruges det generelle
+// sygdomsniveau-felt som før.
+function salOf(h){
+  const sal = (h.sygdomme || []).find(x => String(x.kode).toUpperCase() === 'SAL');
+  if (sal && (sal.status || sal.dato)) return { status: sal.status || sal.sygdom, dato: sal.dato };
+  return { status: h.salmonellaStatus, dato: h.salmonellaDato };
 }
 function salTileHtml(){
   if (sal.state === 'loading') return '<div class="muted small">Henter…</div>';
@@ -177,9 +192,9 @@ function salTileHtml(){
   if (sal.state === 'error')   return '<div class="muted small">Kunne ikke hentes</div>';
   if (!sal.list.length)        return '<div class="muted small">Ingen data</div>';
   const multi = sal.list.length > 1;
-  return sal.list.map(h => `
-    <div class="salLine">${salBadge(h.salmonellaStatus)}${multi ? `<span class="chrNr">CHR ${esc(h.chr)}</span>` : ''}</div>
-    ${h.salmonellaDato ? `<div class="salDate">${esc(dateText(h.salmonellaDato))}</div>` : ''}`).join('');
+  return sal.list.map(h => { const x = salOf(h); return `
+    <div class="salLine">${salBadge(x.status)}${multi ? `<span class="chrNr">CHR ${esc(h.chr)}</span>` : ''}</div>
+    ${x.dato ? `<div class="salDate">${esc(dateText(x.dato))}</div>` : ''}`; }).join('');
 }
 async function loadSalmonella(chr){
   const value = String(chr || '').trim();
