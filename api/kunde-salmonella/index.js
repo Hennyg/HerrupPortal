@@ -62,7 +62,12 @@ function parseChrList(value) {
   return [...new Set(
     String(value || "")
       .split(/[,;/\s]+/)                 // flere CHR-numre adskilt af , ; / eller mellemrum
-      .map(s => s.split("-")[0])          // "54028-53864" = CHR-besætningsnr. -> kun CHR
+      .flatMap(s => {
+        const parts = s.split("-").filter(Boolean);
+        // "54028-53864" (2 dele) = CHR-besætningsnr. -> kun CHR.
+        // "42261-40522-41197-61479-82873" (3+ dele) = flere CHR-numre.
+        return parts.length >= 3 ? parts : parts.slice(0, 1);
+      })
       .map(s => s.replace(/[^0-9]/g, ""))
       .filter(Boolean)
   )].slice(0, 25);

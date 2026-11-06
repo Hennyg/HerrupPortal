@@ -37,7 +37,12 @@
     .salLine { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px; }
     .salLine .badge { font-size:13px; padding:4px 10px; }
     .salLine .chrNr { font-size:11px; color:#6b7280; }
-    .salDate { font-size:11px; color:#6b7280; margin-top:4px; }
+    .salDate { font-size:11px; color:#6b7280; }
+    .salDate.sal-date-7   { background:#dc2626; color:#fff; padding:1px 6px; border-radius:4px; font-weight:600; }
+    .salDate.sal-date-14  { background:#f97316; color:#fff; padding:1px 6px; border-radius:4px; font-weight:600; }
+    .salDate.sal-date-30  { background:#facc15; color:#333; padding:1px 6px; border-radius:4px; font-weight:600; }
+    .salDate.sal-date-old { background:#fef08a; color:#333; padding:1px 6px; border-radius:4px; }
+    #salTile { max-height:110px; overflow-y:auto; }
 
     /* Stor "Se produkter"-knap */
     .btn.btnBig { font-size:1.25rem; font-weight:700; padding:14px 28px; border-radius:10px;
@@ -171,20 +176,29 @@ async function load(){
 
 // ── Salmonella-status (samme kilde som kundeinfo: Salmonella-appens Dataverse via CHR) ──
 let sal = { state:'loading', list:[] };
+// Samme regler som Salmonella-appen (CHR-external):
+//  - status = cr406_uisygdomsniveautekst: "Fri" = grøn, alt andet (fx "Salmonella") = rød
+//  - dato   = cr406_sdudatoveterinrstatus; ved Salmonella farves datoen efter alder:
+//    ≤ 7 dage rød, 8–14 orange, 15–30 gul, > 30 lysegul
 function salBadge(text){
-  const s = String(text || '').toLowerCase();
-  const cls = /niveau\s*1\b|\bfri\b/.test(s) ? 'ok'
-            : /niveau\s*2\b/.test(s) ? 'warn'
-            : /niveau\s*3\b|smitte|positiv/.test(s) ? 'err' : '';
+  const s = String(text || '').trim().toLowerCase();
+  const cls = !s ? '' : s === 'fri' ? 'ok' : 'err';
   return `<span class="badge ${cls}">${esc(text || 'Ukendt')}</span>`;
 }
-// Salmonellastatus for en besætning: veterinærstatus på sygdommen SAL
-// (cr406_salveterinrstatustekst/-dato). Findes den ikke, bruges det generelle
-// sygdomsniveau-felt som før.
-function salOf(h){
-  const sal = (h.sygdomme || []).find(x => String(x.kode).toUpperCase() === 'SAL');
-  if (sal && (sal.status || sal.dato)) return { status: sal.status || sal.sygdom, dato: sal.dato };
-  return { status: h.salmonellaStatus, dato: h.salmonellaDato };
+function salDateClass(status, iso){
+  if (String(status || '').trim().toLowerCase() !== 'salmonella' || !iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  return days <= 7 ? 'sal-date-7' : days <= 14 ? 'sal-date-14' : days <= 30 ? 'sal-date-30' : 'sal-date-old';
+}
+// Smittede besætninger først, nyeste dato først
+function salSort(list){
+  return [...list].sort((a, b) => {
+    const fa = String(a.salmonellaStatus || '').trim().toLowerCase() === 'fri' ? 1 : 0;
+    const fb = String(b.salmonellaStatus || '').trim().toLowerCase() === 'fri' ? 1 : 0;
+    return fa - fb || String(b.salmonellaDato || '').localeCompare(String(a.salmonellaDato || ''));
+  });
 }
 function salTileHtml(){
   if (sal.state === 'loading') return '<div class="muted small">Henter…</div>';
@@ -192,9 +206,8 @@ function salTileHtml(){
   if (sal.state === 'error')   return '<div class="muted small">Kunne ikke hentes</div>';
   if (!sal.list.length)        return '<div class="muted small">Ingen data</div>';
   const multi = sal.list.length > 1;
-  return sal.list.map(h => { const x = salOf(h); return `
-    <div class="salLine">${salBadge(x.status)}${multi ? `<span class="chrNr">CHR ${esc(h.chr)}</span>` : ''}</div>
-    ${x.dato ? `<div class="salDate">${esc(dateText(x.dato))}</div>` : ''}`; }).join('');
+  return salSort(sal.list).map(h => { const dc = salDateClass(h.salmonellaStatus, h.salmonellaDato); return `
+    <div class="salLine">${salBadge(h.salmonellaStatus)}${h.salmonellaDato ? `<span class="salDate ${dc}">${esc(dateText(h.salmonellaDato))}</span>` : ''}${multi ? `<span class="chrNr">CHR ${esc(h.chr)}</span>` : ''}</div>`; }).join('');
 }
 async function loadSalmonella(chr){
   const value = String(chr || '').trim();

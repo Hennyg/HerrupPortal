@@ -133,11 +133,41 @@
 
   /* ---------- Salmonella (CHR-external) ---------- */
 
+  // Samme regler som Salmonella-appen (CHR-external):
+  //  - status (cr406_uisygdomsniveautekst): "Fri" = grøn, alt andet (fx "Salmonella") = rød
+  //  - dato (cr406_sdudatoveterinrstatus): ved Salmonella farvet efter alder:
+  //    ≤ 7 dage rød, 8–14 orange, 15–30 gul, > 30 lysegul
   function salBadge(text) {
-    const s = String(text || "").toLowerCase();
-    const cls = /niveau\s*1\b/.test(s) ? "ok" : /niveau\s*2\b/.test(s) ? "warn" : /niveau\s*3\b/.test(s) ? "err" : "";
+    const s = String(text || "").trim().toLowerCase();
+    const cls = !s ? "" : s === "fri" ? "ok" : "err";
     return `<span class="badge ${cls}">${esc(text || "Ukendt")}</span>`;
   }
+  function salDateClass(status, iso) {
+    if (String(status || "").trim().toLowerCase() !== "salmonella" || !iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    return days <= 7 ? "sal-date-7" : days <= 14 ? "sal-date-14" : days <= 30 ? "sal-date-30" : "sal-date-old";
+  }
+  // Smittede besætninger først, nyeste dato først
+  function salSort(list) {
+    return [...list].sort((a, b) => {
+      const fa = String(a.salmonellaStatus || "").trim().toLowerCase() === "fri" ? 1 : 0;
+      const fb = String(b.salmonellaStatus || "").trim().toLowerCase() === "fri" ? 1 : 0;
+      return fa - fb || String(b.salmonellaDato || "").localeCompare(String(a.salmonellaDato || ""));
+    });
+  }
+  (function injectSalCss() {
+    if (document.getElementById("salDateCss")) return;
+    const st = document.createElement("style");
+    st.id = "salDateCss";
+    st.textContent = `
+      .sal-date-7   { background:#dc2626; color:#fff; padding:1px 6px; border-radius:4px; font-weight:600; }
+      .sal-date-14  { background:#f97316; color:#fff; padding:1px 6px; border-radius:4px; font-weight:600; }
+      .sal-date-30  { background:#facc15; color:#333; padding:1px 6px; border-radius:4px; font-weight:600; }
+      .sal-date-old { background:#fef08a; color:#333; padding:1px 6px; border-radius:4px; }`;
+    document.head.appendChild(st);
+  })();
 
   function herdHtml(h) {
     const adr = [h.adresse, [h.postnr, h.by].filter(Boolean).join(" ")].filter(Boolean).join(", ");
@@ -152,7 +182,7 @@
           <div class="herdSal">
             <div class="muted small">Salmonella</div>
             ${salBadge(h.salmonellaStatus)}
-            ${h.salmonellaDato ? `<div class="muted small" style="margin-top:4px;">${fmtDate(h.salmonellaDato)}</div>` : ""}
+            ${h.salmonellaDato ? `<div class="small" style="margin-top:4px;"><span class="${salDateClass(h.salmonellaStatus, h.salmonellaDato) || "muted"}">${fmtDate(h.salmonellaDato)}</span></div>` : ""}
           </div>
         </div>
         ${sygdomme.length ? `
@@ -182,7 +212,7 @@
       const data = await fetchJson(`/api/kunde-salmonella?chr=${encodeURIComponent(value)}`);
       const list = Array.isArray(data?.besaetninger) ? data.besaetninger : [];
       if (!list.length) { setStatus("salmonellaStatus", `Ingen besætningsdata fundet for CHR ${value}.`); return false; }
-      show("salmonellaStatus", "salmonellaData", `<div class="herdList">${list.map(herdHtml).join("")}</div>`);
+      show("salmonellaStatus", "salmonellaData", `<div class="herdList">${salSort(list).map(herdHtml).join("")}</div>`);
       return true;
     } catch (e) {
       setStatus("salmonellaStatus", `Kunne ikke hente salmonelladata: ${e.message}`);
@@ -267,3 +297,6 @@
 
   init();
 })();
+
+
+
