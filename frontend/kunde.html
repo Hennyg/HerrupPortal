@@ -36,7 +36,19 @@
     @media (max-width: 900px) { #summary.cards { grid-template-columns: 1fr; } }
     .salLine { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px; }
     .salLine .badge { font-size:13px; padding:4px 10px; }
-    .salLine .chrNr { font-size:11px; color:#6b7280; }
+    .salLine .chrNr { font-size:11px; color:#6b7280; min-width:62px; }
+
+    /* Adresser markeret efter salmonellastatus på besætningen (CHR) */
+    .adrBox { border:2px solid transparent; border-radius:8px; padding:8px 10px; margin:0 0 10px; }
+    .adrBox.salRed   { border-color:#dc2626; background:#fef2f2; }
+    .adrBox.salGreen { border-color:#16a34a; background:#f0fdf4; }
+    .adrChr { font-size:12px; color:#4b5563; margin-top:4px; }
+    .adrLegend { border-top:1px solid #eee; margin-top:12px; padding-top:8px; font-size:12px; color:#374151; display:grid; gap:4px; }
+    .adrLegend .lg { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-2px; border:2px solid; }
+    .adrLegend .lgRed   { border-color:#dc2626; background:#fef2f2; }
+    .adrLegend .lgGreen { border-color:#16a34a; background:#f0fdf4; }
+    .adrUnmatched { margin-top:4px; color:#4b5563; }
+    .txtRed { color:#b91c1c; font-weight:600; } .txtGreen { color:#15803d; font-weight:600; }
     .salDate { font-size:11px; color:#6b7280; }
     .salDate.sal-date-7   { background:#dc2626; color:#fff; padding:1px 6px; border-radius:4px; font-weight:600; }
     .salDate.sal-date-14  { background:#f97316; color:#fff; padding:1px 6px; border-radius:4px; font-weight:600; }
@@ -207,7 +219,7 @@ function salTileHtml(){
   if (!sal.list.length)        return '<div class="muted small">Ingen data</div>';
   const multi = sal.list.length > 1;
   return salSort(sal.list).map(h => { const dc = salDateClass(h.salmonellaStatus, h.salmonellaDato); return `
-    <div class="salLine">${salBadge(h.salmonellaStatus)}${h.salmonellaDato ? `<span class="salDate ${dc}">${esc(dateText(h.salmonellaDato))}</span>` : ''}${multi ? `<span class="chrNr">CHR ${esc(h.chr)}</span>` : ''}</div>`; }).join('');
+    <div class="salLine">${multi ? `<span class="chrNr">CHR ${esc(h.chr)}</span>` : ''}${salBadge(h.salmonellaStatus)}${h.salmonellaDato ? `<span class="salDate ${dc}">${esc(dateText(h.salmonellaDato))}</span>` : ''}</div>`; }).join('');
 }
 async function loadSalmonella(chr){
   const value = String(chr || '').trim();
@@ -223,7 +235,10 @@ async function loadSalmonella(chr){
   }
   updateSalTile();
 }
-function updateSalTile(){ const el = document.getElementById('salTile'); if (el) el.innerHTML = salTileHtml(); }
+function updateSalTile(){
+  const el = document.getElementById('salTile'); if (el) el.innerHTML = salTileHtml();
+  const ad = document.getElementById('adresseInfo'); if (ad && state.kunde) ad.innerHTML = renderAdresser(state.adresser);
+}
 
 // ── Popup med produktlisten ──
 function openProdukter(){
@@ -274,12 +289,48 @@ function render(){
  renderProductTable(visibleProducts);
 }
 
+// ── Kobling mellem kundens adresser og besætningerne (CHR) ──
+// En besætning kobles til en adresse, når postnr er ens (hvis begge har et)
+// og vejnavn + husnummer er ens (store/små bogstaver, mellemrum og
+// tegnsætning ignoreres; "Asfergvej 28, Asferg" matcher "Asfergvej 28").
+function normAdr(s){ return String(s || '').toLowerCase().split(',')[0].replace(/[^a-z0-9æøå]+/g, ''); }
+function herdMatchesAddress(h, a){
+  const ha = normAdr(h.adresse), aa = normAdr(a.adresse);
+  if (!ha || !aa || ha !== aa) return false;
+  const hp = String(h.postnr || '').trim(), ap = String(a.postnr || '').trim();
+  return !hp || !ap || hp === ap;
+}
+const isFri = h => String(h.salmonellaStatus || '').trim().toLowerCase() === 'fri';
+function herdsFor(a){ return sal.state === 'ok' ? sal.list.filter(h => herdMatchesAddress(h, a)) : []; }
+
 function renderAdresser(adresser){
   if (!adresser.length) return '<p class="muted">Ingen adresser</p>';
   const buttons = adresser.length > 1 ? `<div class="addressChoice"><button class="btn ${state.selectedAdresseKey===''?'active':''}" onclick="setAddress('')">Alle adresser</button>${adresser.map(a=>`<button class="btn ${state.selectedAdresseKey===a.adressekey?'active':''}" onclick="setAddress('${escAttr(a.adressekey)}')">${esc(a.adresse)}</button>`).join('')}</div>` : '';
   const selected = state.selectedAdresseKey ? adresser.filter(a=>a.adressekey===state.selectedAdresseKey) : adresser;
-  const list = selected.map(a=>`<p><b>${esc(a.adresse)}</b><br>${esc(a.postnr)} ${esc(a.by)}</p>`).join('');
-  return buttons + list;
+  const list = selected.map(a => {
+    const herds = herdsFor(a);
+    const cls = !herds.length ? '' : herds.some(h => !isFri(h)) ? ' salRed' : ' salGreen';
+    const chrInfo = herds.length
+      ? `<div class="adrChr">${salSort(herds).map(h => `CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}${h.salmonellaDato ? ` ${esc(dateText(h.salmonellaDato))}` : ''}`).join('<br>')}</div>`
+      : '';
+    return `<div class="adrBox${cls}"><b>${esc(a.adresse)}</b><br>${esc(a.postnr)} ${esc(a.by)}${chrInfo}</div>`;
+  }).join('');
+  return buttons + list + salAdrLegend(adresser);
+}
+
+// Forklaring nederst i Adresser-tile'n (+ besætninger der ikke kunne kobles)
+function salAdrLegend(adresser){
+  if (sal.state !== 'ok' || !sal.list.length) return '';
+  const unmatched = salSort(sal.list.filter(h => !adresser.some(a => herdMatchesAddress(h, a))));
+  return `<div class="adrLegend">
+    <div><span class="lg lgRed"></span>Rød ramme: salmonella på en besætning (CHR) på adressen</div>
+    <div><span class="lg lgGreen"></span>Grøn ramme: besætningen på adressen er fri</div>
+    <div class="muted">Uden ramme: ingen besætning fundet på adressen</div>
+    ${unmatched.length ? `<div class="adrUnmatched">Kunne ikke kobles til en adresse:<br>${unmatched.map(h => {
+      const adr = [h.adresse, [h.postnr, h.by].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+      return `<span class="${isFri(h) ? 'txtGreen' : 'txtRed'}">CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}</span>${adr ? ` – ${esc(adr)}` : ''}`;
+    }).join('<br>')}</div>` : ''}
+  </div>`;
 }
 
 function renderProduktCounts(products){
