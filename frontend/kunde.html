@@ -92,7 +92,7 @@ const COLS = {
   serienr:  { label:'SN',       text:p => p.serienr || '' },
   datoer:   { label:'Datoer',
               text:p => `Inst: ${dateText(p.installationsdato)} Garanti: ${dateText(p.garantistart)} - ${dateText(p.garantiudloeb)}`,
-              html:p => `<span class="small">Inst: ${fmtDate(p.installationsdato)}<br>Garanti: ${fmtDate(p.garantistart)} - ${fmtDate(p.garantiudloeb)}</span>` },
+              html:p => `<span class="small">Inst: ${esc(dateText(p.installationsdato))}<br>Garanti: ${esc(dateText(p.garantistart))} - ${esc(dateText(p.garantiudloeb))}</span>` },
   kontrakt: { label:'Kontrakt', text:p => p.kontrakt || '' },
   aktiv:    { label:'Aktiv',
               text:p => isXX(p) ? 'Ikke aktiv' : 'Aktiv',
@@ -111,7 +111,19 @@ const filters = {}; // kolonne-nøgle -> filtertekst (huskes på tværs af visni
 // "xx" i installationsdato (fx "xx-xx-xxxx" på projektprodukter) betyder,
 // at produktet ikke er aktivt endnu
 function isXX(p){ return /xx/i.test(String(p.installationsdato || '')); }
-function dateText(s){ const d = s ? new Date(s) : null; return !s ? '' : isNaN(d) ? String(s) : d.toLocaleDateString('da-DK'); }
+// Datoerne ligger som tekst i Dataverse i dansk format (dd-mm-åååå), som i Excel.
+// De må IKKE sendes gennem new Date(): browseren læser "10-12-2025" som
+// amerikansk måned-dag (12. oktober), og "28-01-2019" som ugyldig.
+// Vises altid som dd-mm-åååå. Tekst som "ingen" eller "xx-xx-xxxx" vises som den er.
+function dateText(s){
+  const v = String(s || '').trim();
+  if (!v) return '';
+  let m = /^(\d{1,2})[-./](\d{1,2})[-./](\d{4})$/.exec(v);           // dd-mm-åååå / dd.mm.åååå / dd/mm/åååå
+  if (m) return `${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}-${m[3]}`;
+  m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/.exec(v);                // ISO (åååå-mm-dd)
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return v;
+}
 
 async function load(){
  const r = await fetch('/api/kunde?' + new URLSearchParams({ kundenr, id }).toString()); const j = await r.json();
