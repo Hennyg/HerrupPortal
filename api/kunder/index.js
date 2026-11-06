@@ -30,21 +30,41 @@ function mapRow(r) {
   };
 }
 
-// Kundenumre med mindst ét aktivt produkt, hvor installationsdato indeholder
-// "xx", fx "xx-xx-xxxx" (= ikke aktivt endnu - samme regel som på kunde.html).
+// Én gennemgang af alle aktive produkter:
+//  - xx:         kundenumre med mindst ét produkt, hvor installationsdato
+//                indeholder "xx", fx "xx-xx-xxxx" (= ikke aktivt endnu,
+//                samme regel som på kunde.html)
+//  - kontrakter: kundenr -> { kontrakttype: antal produkter }
 // Fejler stille, så kundelisten altid kan vises.
-async function kundenrMedXX(context) {
+async function produktInfo(context) {
+  const xx = new Set();
+  const kontrakter = new Map();
   try {
-    const filter = "cr1eb_lch_aktiv eq true and contains(cr1eb_lch_installationsdato,'xx')";
-    const rows = await fetchAll(`${PRODUKT_TABLE}?$select=cr1eb_lch_kundenr,cr1eb_lch_installationsdato&$filter=${encodeURIComponent(filter)}&$top=5000`);
-    return new Set(rows
-      .filter(r => /xx/i.test(String(r.cr1eb_lch_installationsdato || "")))
-      .map(r => String(r.cr1eb_lch_kundenr || "").trim())
-      .filter(Boolean));
+    const filter = "cr1eb_lch_aktiv eq true";
+    const rows = await fetchAll(`${PRODUKT_TABLE}?$select=cr1eb_lch_kundenr,cr1eb_lch_kontrakt,cr1eb_lch_installationsdato&$filter=${encodeURIComponent(filter)}&$top=5000`);
+    for (const r of rows) {
+      const nr = String(r.cr1eb_lch_kundenr || "").trim();
+      if (!nr) continue;
+      if (/xx/i.test(String(r.cr1eb_lch_installationsdato || ""))) xx.add(nr);
+      const k = String(r.cr1eb_lch_kontrakt || "").trim();
+      if (!k) continue;
+      if (!kontrakter.has(nr)) kontrakter.set(nr, {});
+      const m = kontrakter.get(nr);
+      m[k] = (m[k] || 0) + 1;
+    }
   } catch (e) {
-    context.log("kunder: kunne ikke hente xx-produkter", e.message);
-    return new Set();
+    context.log("kunder: kunne ikke hente produkter", e.message);
   }
+  return { xx, kontrakter };
+}
+
+// { "Master A5": 3, "Garanti A5": 1 } -> "Master A5+Garanti A5" (flest først)
+function kontraktTekst(m) {
+  if (!m) return "";
+  return Object.entries(m)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "da"))
+    .map(([k]) => k)
+    .join("+");
 }
 
 module.exports = async function (context, req) {
@@ -57,11 +77,15 @@ module.exports = async function (context, req) {
     if (aktiv === "false") filter = "cr1eb_lch_aktiv eq false";
 
     const path = `${TABLE}?$select=${SELECT}${filter ? `&$filter=${encodeURIComponent(filter)}` : ""}&$orderby=cr1eb_lch_navn asc&$top=5000`;
-    const [raw, xx] = await Promise.all([fetchAll(path), kundenrMedXX(context)]);
-    let rows = raw.map(mapRow).map(k => ({ ...k, harXX: xx.has(String(k.kundenr).trim()) }));
+    const [raw, info] = await Promise.all([fetchAll(path), produktInfo(context)]);
+    let rows = raw.map(mapRow).map(k => {
+      const nr = String(k.kundenr).trim();
+      const m = info.kontrakter.get(nr) || null;
+      return { ...k, harXX: info.xx.has(nr), kontrakt: kontraktTekst(m), kontraktAntal: m || {} };
+    });
 
     if (q.length >= 2) {
-      rows = rows.filter(k => [k.kundenr, k.navn, k.omraade, k.kundestatus].join(" ").toLowerCase().includes(q));
+      rows = rows.filter(k => [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt].join(" ").toLowerCase().includes(q));
     }
 
     json(context, 200, { kunder: rows, total: rows.length });
