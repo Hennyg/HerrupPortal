@@ -19,6 +19,8 @@
     .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
     /* Kunde med produkter, hvor installationsdato er "xx" */
     .dataTable a.link.harXX { color:#b91c1c; font-weight:700; }
+    .xxNote { font-size:13px; color:#6b7280; margin:-4px 0 10px; display:flex; align-items:center; gap:6px; }
+    .xxNote b { color:#b91c1c; }
     @media (max-width: 640px) {
       .navExtra { display: none !important; }
     }
@@ -42,13 +44,14 @@
 </div>
   <main class="pageWrap">
     <section class="toolbar">
-      <input id="q" type="search" placeholder="Søg kundenr, navn, område, status..." style="min-width:320px" autocomplete="off" />
+      <input id="q" type="search" placeholder="Søg kundenr, navn, område, status, kontrakt..." style="min-width:320px" autocomplete="off" />
       <select id="aktiv"><option value="true">Aktive</option><option value="">Alle</option><option value="false">Inaktive</option></select>
       <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
       <div class="toolbarSpacer"></div>
       <div id="countText" class="muted small"></div>
       <button id="btnRefresh">Opdater</button>
     </section>
+    <div class="xxNote">Kundenavne med <b>rød skrift</b> har produkter, hvor installationsdatoen er <b>xx-xx-xxxx</b> (fx planlagte projekter, der ikke er aktive endnu).</div>
     <div id="status" class="status loading"><div class="spinner"></div> Henter kunder...</div>
     <section class="tableWrap">
       <table class="dataTable">
@@ -57,7 +60,7 @@
           <th class="sortable" data-sort="navn"><span class="colLabel">Navn</span><input class="colFilter" type="search" data-col="navn" placeholder="Filtrér…" autocomplete="off"></th>
           <th class="sortable" data-sort="omraade"><span class="colLabel">Område</span><input class="colFilter" type="search" data-col="omraade" placeholder="Filtrér…" autocomplete="off"></th>
           <th class="sortable" data-sort="kundestatus"><span class="colLabel">Kundestatus</span><input class="colFilter" type="search" data-col="kundestatus" placeholder="Filtrér…" autocomplete="off"></th>
-          <th class="sortable" data-sort="sidstImporteret"><span class="colLabel">Sidst opdateret</span><input class="colFilter" type="search" data-col="sidstImporteret" placeholder="Filtrér…" autocomplete="off"></th>
+          <th class="sortable" data-sort="kontrakt"><span class="colLabel">Kontrakt</span><input class="colFilter" type="search" data-col="kontrakt" placeholder="Filtrér…" autocomplete="off"></th>
           <th style="vertical-align:bottom;"><button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button></th>
         </tr></thead>
         <tbody id="tbody"></tbody>
@@ -67,7 +70,7 @@
   <script src="/assets/kundeliste/common.js"></script>
   <script>
     let rows = [], filtered = [], sortKey = 'navn', sortDir = 1;
-    const FILTER_COLS = ['kundenr', 'navn', 'omraade', 'kundestatus', 'sidstImporteret'];
+    const FILTER_COLS = ['kundenr', 'navn', 'omraade', 'kundestatus', 'kontrakt'];
     const colFilters = {}; // kolonne -> filtertekst (gemmes i URL'en som f_<kolonne>)
     restoreStateFromUrl();
     initUser();
@@ -146,15 +149,21 @@
     function setStatus(cls, html) { const el=document.getElementById('status'); el.className='status '+cls; el.innerHTML=html; el.style.display=html?'flex':'none'; }
 
     function sortValue(row, key) {
-      if (key === 'sidstImporteret') return row.sidstImporteret || row.modifiedon || '';
       if (key === 'aktiv') return row.aktiv ? '1' : '0';
       return row[key] || '';
     }
 
     // Den tekst en kolonne filtreres på (samme som der vises)
     function filterText(row, col) {
-      if (col === 'sidstImporteret') return fmtDateTime(row.sidstImporteret || row.modifiedon) || '';
       return String(row[col] || '');
+    }
+
+    // Tooltip: antal produkter pr. kontrakttype
+    function kontraktTitle(k) {
+      return Object.entries(k.kontraktAntal || {})
+        .sort((a, b) => b[1] - a[1])
+        .map(([n, c]) => `${n}: ${c} produkt${c === 1 ? '' : 'er'}`)
+        .join('\n');
     }
 
     function openKunde(kundenr) {
@@ -165,7 +174,7 @@
       const q = document.getElementById('q').value.trim().toLowerCase();
       const active = FILTER_COLS.filter(c => (colFilters[c] || '').trim());
       filtered = rows.filter(k =>
-        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.aktiv?'aktiv':'inaktiv'].join(' ').toLowerCase().includes(q)) &&
+        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv'].join(' ').toLowerCase().includes(q)) &&
         active.every(c => filterText(k, c).toLowerCase().includes(colFilters[c].trim().toLowerCase()))
       );
       document.getElementById('btnClearFilters').style.display = active.length ? '' : 'none';
@@ -177,7 +186,7 @@
         <td><a class="link${k.harXX ? ' harXX' : ''}" href="/kunde.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()"${k.harXX ? ' title="Har produkter med xx i installationsdato (ikke aktive)"' : ''}>${esc(k.navn)}</a></td>
         <td>${esc(k.omraade)}</td>
         <td>${esc(k.kundestatus)}</td>
-        <td class="small muted">${fmtDateTime(k.sidstImporteret || k.modifiedon)}</td>
+        <td class="small" title="${esc(kontraktTitle(k))}">${esc(k.kontrakt || '')}</td>
         <td style="white-space:nowrap;"><a class="btn" href="/kundeinfo.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Info</a> <a class="btn" href="/kunde.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Åbn</a></td>
       </tr>`).join('') || '<tr><td colspan="6" class="muted">Ingen kunder</td></tr>';
     }
