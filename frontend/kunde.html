@@ -31,6 +31,27 @@
     }
     .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
 
+    /* 5 tiles i toppen (kundenr, adresser, produkter, område, salmonella) */
+    #summary.cards { grid-template-columns: repeat(5, minmax(150px, 1fr)); }
+    @media (max-width: 900px) { #summary.cards { grid-template-columns: 1fr; } }
+    .salLine { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px; }
+    .salLine .badge { font-size:13px; padding:4px 10px; }
+    .salLine .chrNr { font-size:11px; color:#6b7280; }
+    .salDate { font-size:11px; color:#6b7280; margin-top:4px; }
+
+    /* Popup med produktlisten */
+    .prodModalBackdrop { position:fixed; inset:0; background:rgba(17,24,39,.45); z-index:1000; display:none;
+                         align-items:center; justify-content:center; padding:20px; }
+    .prodModalBackdrop.open { display:flex; }
+    .prodModal { background:#fff; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+                 width:min(1400px, 100%); height:min(90vh, 100%); display:flex; flex-direction:column; overflow:hidden; }
+    .prodModalHead { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid #eee; }
+    .prodModalHead h2 { margin:0; font-size:18px; }
+    .prodModalHead .closeX { margin-left:auto; border:0; background:none; font-size:26px; line-height:1; cursor:pointer; color:#6b7280; padding:0 4px; }
+    .prodModalHead .closeX:hover { color:var(--red); }
+    .prodModalBody { flex:1; min-height:0; display:flex; flex-direction:column; padding:12px 18px 16px; }
+    .prodModalBody .tableWrap { flex:1; min-height:0; max-height:none !important; }
+
     /* Produkter med "xx" i installationsdato = ikke aktive */
     .dataTable tr.inactiveXX td { color:#b91c1c; background:#fef2f2; }
     .dataTable tr.inactiveXX:hover td { background:#fde8e8; }
@@ -54,28 +75,38 @@
 <main class="pageWrap">
   <div id="status" class="status loading"><div class="spinner"></div> Henter kunde...</div>
   <section id="content" style="display:none; overflow:auto;">
-    <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;"><a id="btnBack" class="btn" href="/kundeliste.html">← Tilbage til kundeliste</a><a id="btnInfo" class="btn" href="/kundeinfo.html">Kundeinfo</a></div>
+    <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;"><a id="btnBack" class="btn" href="/kundeliste.html">← Tilbage til kundeliste</a><div style="display:flex;gap:8px;"><button type="button" class="btn" id="btnProdukter">📋 Se produkter</button><a id="btnInfo" class="btn" href="/kundeinfo.html">Kundeinfo</a></div></div>
     <div class="cards" id="summary"></div>
     <div class="detailGrid">
       <div class="panel"><h2>Kunde</h2><div id="kundeInfo"></div></div>
       <div class="panel"><h2>Adresser</h2><div id="adresseInfo"></div></div>
       <div class="panel"><div class="panelTitleLine"><h2>Produkter</h2><span id="produktTopCounts" class="muted small"></span></div><div id="produktInfo"></div></div>
     </div>
-    <div class="panelTitleLine" style="margin:4px 0 8px;">
+  </section>
+</main>
+
+<!-- Popup med produktlisten -->
+<div class="prodModalBackdrop" id="prodModal" aria-hidden="true">
+  <div class="prodModal" role="dialog" aria-modal="true" aria-labelledby="prodModalTitle">
+    <div class="prodModalHead">
+      <h2 id="prodModalTitle">Produkter</h2>
       <div class="viewTabs" id="viewTabs">
         <button type="button" class="btn" data-view="adresse">Produkter pr. adresse</button>
         <button type="button" class="btn" data-view="produkt">Produkter pr. produkt</button>
         <button type="button" class="btn" data-view="kontrakt">Produkter pr. kontrakt</button>
       </div>
-      <span class="toolbarSpacer"></span>
-      <span id="tableInfo" class="muted tableInfo"></span>
-      <button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button>
+      <button type="button" class="closeX" id="btnCloseProdukter" title="Luk (Esc)">×</button>
     </div>
-    <div class="panel">
-      <div class="tableWrap" style="max-height:55vh"><table class="dataTable"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+    <div class="prodModalBody">
+      <div class="panelTitleLine" style="margin:0 0 8px;">
+        <span id="tableInfo" class="muted tableInfo"></span>
+        <span class="toolbarSpacer"></span>
+        <button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button>
+      </div>
+      <div class="tableWrap"><table class="dataTable"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
     </div>
-  </section>
-</main>
+  </div>
+</div>
 <script src="/assets/kundeliste/common.js"></script>
 <script>
 initUser();
@@ -130,7 +161,57 @@ async function load(){
  if(!r.ok || j.error) return setStatus('error','Fejl: '+esc(j.error || r.status));
  state = { kunde:j.kunde, adresser:j.adresser||[], produkter:j.produkter||[], selectedAdresseKey:'' };
  setStatus('',''); document.getElementById('content').style.display='block'; render();
+ loadSalmonella(j.kunde?.chr);
 }
+
+// ── Salmonella-status (samme kilde som kundeinfo: Salmonella-appens Dataverse via CHR) ──
+let sal = { state:'loading', list:[] };
+function salBadge(text){
+  const s = String(text || '').toLowerCase();
+  const cls = /niveau\s*1\b/.test(s) ? 'ok' : /niveau\s*2\b/.test(s) ? 'warn' : /niveau\s*3\b/.test(s) ? 'err' : '';
+  return `<span class="badge ${cls}">${esc(text || 'Ukendt')}</span>`;
+}
+function salTileHtml(){
+  if (sal.state === 'loading') return '<div class="muted small">Henter…</div>';
+  if (sal.state === 'nochr')   return '<div class="muted small">Intet CHR-nr.</div>';
+  if (sal.state === 'error')   return '<div class="muted small">Kunne ikke hentes</div>';
+  if (!sal.list.length)        return '<div class="muted small">Ingen data</div>';
+  const multi = sal.list.length > 1;
+  return sal.list.map(h => `
+    <div class="salLine">${salBadge(h.salmonellaStatus)}${multi ? `<span class="chrNr">CHR ${esc(h.chr)}</span>` : ''}</div>
+    ${h.salmonellaDato ? `<div class="salDate">${esc(dateText(h.salmonellaDato))}</div>` : ''}`).join('');
+}
+async function loadSalmonella(chr){
+  const value = String(chr || '').trim();
+  if (!value) { sal = { state:'nochr', list:[] }; return updateSalTile(); }
+  try {
+    const r = await fetch('/api/kunde-salmonella?chr=' + encodeURIComponent(value));
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.status);
+    sal = { state:'ok', list: Array.isArray(j.besaetninger) ? j.besaetninger : [] };
+  } catch (e) {
+    console.warn('Salmonella:', e);
+    sal = { state:'error', list:[] };
+  }
+  updateSalTile();
+}
+function updateSalTile(){ const el = document.getElementById('salTile'); if (el) el.innerHTML = salTileHtml(); }
+
+// ── Popup med produktlisten ──
+function openProdukter(){
+  const m = document.getElementById('prodModal');
+  m.classList.add('open'); m.setAttribute('aria-hidden','false');
+  document.body.style.overflow = 'hidden';
+}
+function closeProdukter(){
+  const m = document.getElementById('prodModal');
+  m.classList.remove('open'); m.setAttribute('aria-hidden','true');
+  document.body.style.overflow = '';
+}
+document.getElementById('btnProdukter').addEventListener('click', openProdukter);
+document.getElementById('btnCloseProdukter').addEventListener('click', closeProdukter);
+document.getElementById('prodModal').addEventListener('click', e => { if (e.target.id === 'prodModal') closeProdukter(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('prodModal').classList.contains('open')) closeProdukter(); });
 function setStatus(cls, html){ const el=document.getElementById('status'); el.className='status '+cls; el.innerHTML=html; el.style.display=html?'flex':'none'; }
 function addressText(a){ return [a.adresse, [a.postnr,a.by].filter(Boolean).join(' ')].filter(Boolean).join(', '); }
 function selectedProducts(){ return state.selectedAdresseKey ? state.produkter.filter(p=>p.adressekey===state.selectedAdresseKey) : state.produkter; }
@@ -156,7 +237,7 @@ function render(){
  const activeCount = visibleProducts.filter(p=>!isXX(p)).length;
  const xxCount = visibleProducts.length - activeCount;
  document.getElementById('brandTitle').textContent = `${k.navn} (${k.kundenr})`; document.title = `Kunde – ${k.navn}`;
- document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresser.length}</div></div><div class="card"><div class="label">Produkter</div><div class="value">${activeCount}</div></div><div class="card"><div class="label">Område</div><div class="value">${esc(k.omraade)}</div></div>`;
+ document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresser.length}</div></div><div class="card"><div class="label">Produkter</div><div class="value">${activeCount}</div></div><div class="card"><div class="label">Område</div><div class="value">${esc(k.omraade)}</div></div><div class="card"><div class="label">Salmonella${k.chr ? ` <span class="muted" style="font-weight:400">· CHR ${esc(k.chr)}</span>` : ''}</div><div id="salTile">${salTileHtml()}</div></div>`;
  document.getElementById('kundeInfo').innerHTML = `<p><b>${esc(k.navn)}</b></p><p>Kundestatus: ${esc(k.kundestatus)}</p><p>Aktiv: ${k.aktiv?'Ja':'Nej'}</p><p>Sidst opdateret: ${fmtDateTime(k.sidstImporteret || k.modifiedon)}</p>`;
  document.getElementById('adresseInfo').innerHTML = renderAdresser(adresser);
  document.getElementById('produktTopCounts').innerHTML = `Aktive: ${activeCount}${xxCount ? ` · <span style="color:#b91c1c">Ikke aktive: ${xxCount}</span>` : ''}`;
