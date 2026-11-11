@@ -713,7 +713,10 @@
           <input type="text" id="plTitle" value="Personaleliste" />
         </div>
         <div>
-          <div style="font-weight:600;font-size:.88rem;margin-bottom:.5rem;">Kolonner</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.5rem;">
+            <div style="font-weight:600;font-size:.88rem;">Kolonner</div>
+            <button type="button" class="btn-edit" id="plToggleAll" onclick="plToggleAll()">Markér alle</button>
+          </div>
           <div id="plCols"></div>
         </div>
         <label class="plOpt"><input type="checkbox" id="plOnlyHelbred" />
@@ -2010,10 +2013,25 @@ if (window.updateHeaderStatus) {
       document.getElementById("plMsg").textContent = "";
       document.getElementById("plAccessNote").textContent = "";
       document.getElementById("plCopyPop").hidden = true;
+      document.querySelectorAll(".plColCheck").forEach(cb => cb.addEventListener("change", plSyncToggleAll));
+      plSyncToggleAll();
       plLoadData(true).catch(() => {});   // hent i baggrunden, så Kopiér kan ske med det samme
       document.getElementById("plModalBackdrop").classList.add("open");
       document.body.style.overflow = "hidden";
     }
+    // "Markér alle" / "Fjern alle" – teksten følger, om alle er markeret
+    function plSyncToggleAll() {
+      const boxes = [...document.querySelectorAll(".plColCheck")];
+      const all = boxes.length && boxes.every(cb => cb.checked);
+      document.getElementById("plToggleAll").textContent = all ? "Fjern alle" : "Markér alle";
+    }
+    function plToggleAll() {
+      const boxes = [...document.querySelectorAll(".plColCheck")];
+      const markAll = !boxes.every(cb => cb.checked);
+      boxes.forEach(cb => { cb.checked = markAll; });
+      plSyncToggleAll();
+    }
+
     function closePlModal() {
       document.getElementById("plModalBackdrop").classList.remove("open");
       document.body.style.overflow = "";
