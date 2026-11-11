@@ -449,6 +449,14 @@
     .oc-node:hover { transform:translateY(-1px); box-shadow:0 5px 14px rgba(133,12,24,.28); }
     .oc-node.me { outline:3px solid #f59e0b; outline-offset:2px; }
     .oc-node .oc-name  { font-size:.74rem; font-weight:700; line-height:1.2; }
+    /* Afdelingsnavn over hver leder */
+    .oc-dept {
+      width:150px; box-sizing:border-box; padding:3px 6px; border-radius:6px 6px 0 0;
+      background:#850c18; color:#fff; font-size:.62rem; font-weight:700; line-height:1.2;
+      text-align:center; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .oc-dept + .oc-node { border-top-left-radius:0; border-top-right-radius:0; }
     .oc-node .oc-title { font-size:.64rem; line-height:1.15; opacity:.92; margin-top:2px; }
     .oc-group {
       width:150px; box-sizing:border-box; padding:7px 8px; border-radius:6px; text-align:center;
@@ -1091,7 +1099,16 @@
         </div>`;
       };
 
-      const nodeHtml = (u, depth, staff = []) => {
+      // Afdelingsnavn over ledere (folk med medarbejdere). Udelades, hvis
+      // lederen allerede står under et gråt afdelingsfelt med samme navn.
+      const deptHtml = (u, groupDept) => {
+        if (!ocReports.has(u.id)) return "";
+        const d = (u.department || "").trim();
+        if (!d || d === groupDept) return "";
+        return `<div class="oc-dept" title="${esc(d)}">${esc(d)}</div>`;
+      };
+
+      const nodeHtml = (u, depth, staff = [], groupDept = "") => {
         if (visited.has(u.id)) return "";
         visited.add(u.id);
         staff.forEach(p => visited.add(p.id));
@@ -1099,7 +1116,7 @@
         const cut = opts.maxDepth != null && depth >= opts.maxDepth;
         const has = kids.length > 0 && !cut;
         const collapsed = has && isCollapsed(u.id);
-        return `<li class="${has ? "oc-has-children" : ""}${collapsed ? " oc-collapsed" : ""}">${boxHtml(u, { cut })}${collapsed ? "" : staffHtml(staff)}${has ? childrenHtml(kids, depth + 1) : ""}</li>`;
+        return `<li class="${has ? "oc-has-children" : ""}${collapsed ? " oc-collapsed" : ""}">${deptHtml(u, groupDept)}${boxHtml(u, { cut })}${collapsed ? "" : staffHtml(staff)}${has ? childrenHtml(kids, depth + 1) : ""}</li>`;
       };
 
       // Har personen lederansvar (medarbejdere under sig)? Afgør opstillingen,
@@ -1112,7 +1129,7 @@
       //  - blandet ledere og folk uden medarbejdere: folk uden medarbejdere i én
       //    kolonne yderst til venstre, lederne ved siden af på rækken
       //  - kun ledere: på en række
-      const listHtml = (people, depth) => {
+      const listHtml = (people, depth, groupDept = "") => {
         const leaders = people.filter(isLeader);
         const leaves  = people.filter(p => !isLeader(p));
         if (!leaders.length) {
@@ -1125,7 +1142,7 @@
         const col = leaves.length
           ? `<li class="oc-col"><ul class="oc-stack">${leaves.map(p => nodeHtml(p, depth)).join("")}</ul></li>`
           : "";
-        return `<ul>${col}${leaders.map(p => nodeHtml(p, depth)).join("")}</ul>`;
+        return `<ul>${col}${leaders.map(p => nodeHtml(p, depth, [], groupDept)).join("")}</ul>`;
       };
 
       const childrenHtml = (kids, depth) => {
@@ -1142,7 +1159,7 @@
         if (!useGroups) return listHtml(kids, depth);
         const sorted = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "da"));
         return `<ul>${sorted.map(([d, people]) => `
-          <li><div class="oc-group">${esc(d)}</div>${listHtml(people, depth)}</li>`).join("")}</ul>`;
+          <li><div class="oc-group">${esc(d)}</div>${listHtml(people, depth, d)}</li>`).join("")}</ul>`;
       };
 
       // Stab hænger på den øverste top (hvis den er med i dette træ)
@@ -2129,3 +2146,6 @@ if (window.updateHeaderStatus) {
 
 </body>
 </html>
+
+
+

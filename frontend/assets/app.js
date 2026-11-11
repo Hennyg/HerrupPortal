@@ -1225,3 +1225,6 @@ function renderSections(items, myFavItems) {
   syncClearBtn();
   render();
 })();
+
+
+
