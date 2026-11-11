@@ -219,10 +219,17 @@
     .plField input { padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:7px; font-size:.88rem; }
     .plCopyPop { position:absolute; right:0; bottom:calc(100% + 8px); z-index:5; background:#fff;
                  border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18);
-                 padding:.7rem .85rem; display:flex; flex-direction:column; gap:.55rem; min-width:190px; }
+                 padding:.7rem .85rem; display:flex; flex-direction:column; gap:.55rem; min-width:270px; }
     .plCopyPop[hidden] { display:none; }
     .plCopyQ { font-size:.88rem; font-weight:600; color:#111827; }
-    .plCopyBtns { display:flex; gap:.5rem; justify-content:flex-end; }
+    .plCopyBtns { display:flex; gap:.5rem; justify-content:flex-end; margin-top:.2rem; }
+    .plSeg { display:flex; border:1px solid #d1d5db; border-radius:8px; overflow:hidden; }
+    .plSeg label { flex:1; cursor:pointer; }
+    .plSeg input { position:absolute; opacity:0; pointer-events:none; }
+    .plSeg span { display:block; text-align:center; padding:.35rem .7rem; font-size:.84rem; font-weight:600; color:#374151; white-space:nowrap; }
+    .plSeg label + label span { border-left:1px solid #d1d5db; }
+    .plSeg input:checked + span { background:var(--nav-bg, #850c18); color:#fff; }
+    .plSeg input:focus-visible + span { outline:2px solid #850c18; outline-offset:-2px; }
 
     .visToggles { display:flex; flex-direction:column; gap:.5rem; margin-top:.9rem; }
     .visToggleRow { display:flex; align-items:center; gap:.55rem; }
@@ -729,9 +736,19 @@
           <button class="btn-save-inline" id="plPrintBtn" onclick="runPrintPersonaleliste()">Udskriv</button>
           <div class="plCopyPop" id="plCopyPop" hidden>
             <div class="plCopyQ">Skal navn med?</div>
+            <div class="plSeg">
+              <label><input type="radio" name="plCopyName" value="nej" checked /><span>Nej</span></label>
+              <label><input type="radio" name="plCopyName" value="ja" /><span>Ja</span></label>
+            </div>
+            <div class="plCopyQ">Adskil med</div>
+            <div class="plSeg">
+              <label><input type="radio" name="plCopySep" value="komma" /><span>Komma</span></label>
+              <label><input type="radio" name="plCopySep" value="semikolon" /><span>Semikolon</span></label>
+              <label><input type="radio" name="plCopySep" value="kolonne" checked /><span>Kolonne</span></label>
+            </div>
             <div class="plCopyBtns">
-              <button type="button" class="btn-edit" onclick="runCopyPersonaleliste(false)">Nej</button>
-              <button type="button" class="btn-save-inline" onclick="runCopyPersonaleliste(true)">Ja</button>
+              <button type="button" class="btn-edit" onclick="document.getElementById('plCopyPop').hidden = true">Annuller</button>
+              <button type="button" class="btn-save-inline" onclick="runCopyPersonaleliste()">Kopiér</button>
             </div>
           </div>
         </div>
@@ -2096,9 +2113,18 @@ if (window.updateHeaderStatus) {
     // svarer ja. Én kolonne → én værdi pr. linje; er det kun mails, adskilles de
     // med "; ", så de kan sættes direkte ind i Til-feltet i Outlook. Flere
     // kolonner → tabulator-adskilt med overskrifter, klar til Excel.
+    let plCopyChoice = null;   // sidste valg (navn/adskillelse), huskes mens siden er åben
     function plAskCopy() {
       const pop = document.getElementById("plCopyPop");
       pop.hidden = !pop.hidden;
+      if (pop.hidden) return;
+      const keys = [...document.querySelectorAll(".plColCheck:checked")].map(cb => cb.value)
+        .filter(k => !PL_COLS.find(c => c.key === k)?.blank);
+      // Forvalg: sidste valg – ellers semikolon, hvis der kun er valgt én mail-kolonne
+      const sep = plCopyChoice?.sep || (keys.length === 1 && ["mail", "altMail"].includes(keys[0]) ? "semikolon" : "kolonne");
+      const name = plCopyChoice?.name || "nej";
+      document.querySelector(`input[name="plCopySep"][value="${sep}"]`).checked = true;
+      document.querySelector(`input[name="plCopyName"][value="${name}"]`).checked = true;
     }
 
     function copyFallback(text) {
@@ -2118,7 +2144,13 @@ if (window.updateHeaderStatus) {
     }
 
     // Bygger teksten ud fra valgte kolonner (og navn, hvis valgt)
-    async function plCopyText(withName) {
+    // Adskillelse:
+    //   komma / semikolon: alle personer på én linje ("a, b" / "a; b").
+    //     Navn + én mail bliver til "Navn <mail>", som Outlook forstår.
+    //     Øvrige kombinationer: personens felter adskilles med " - ".
+    //   kolonne: én person pr. linje. Flere felter → tabulator-adskilt med
+    //     overskrifter, klar til Excel.
+    async function plCopyText(withName, sep) {
       const built = await plBuild(document.getElementById("plCopyBtn"));
       if (!built) return null;
       const { users, priv } = built;
@@ -2134,19 +2166,38 @@ if (window.updateHeaderStatus) {
       ];
       if (!fields.length) throw new Error("Vælg mindst én kolonne (eller svar ja til navn).");
 
-      if (fields.length === 1) {
-        const vals = users.map(u => value(fields[0], u, priv(u))).filter(Boolean);
-        const onlyMail = ["mail", "altMail"].includes(fields[0].key);
-        return { text: vals.join(onlyMail ? "; " : "\n"), count: vals.length };
+      if (sep === "kolonne") {
+        if (fields.length === 1) {
+          const vals = users.map(u => value(fields[0], u, priv(u))).filter(Boolean);
+          return { text: vals.join("\n"), count: vals.length };
+        }
+        const lines = users.map(u => { const p = priv(u); return fields.map(f => value(f, u, p)).join("\t"); });
+        return { text: [fields.map(f => f.label).join("\t"), ...lines].join("\n"), count: users.length };
       }
-      const lines = users.map(u => { const p = priv(u); return fields.map(f => value(f, u, p)).join("\t"); });
-      return { text: [fields.map(f => f.label).join("\t"), ...lines].join("\n"), count: users.length };
+
+      const joiner = sep === "komma" ? ", " : "; ";
+      const nameMail = withName && cols.length === 1 && ["mail", "altMail"].includes(cols[0].key);
+      const vals = users.map(u => {
+        const p = priv(u);
+        if (nameMail) {
+          const mail = value(cols[0], u, p);
+          if (!mail) return "";
+          // Komma i navnet ville bryde en komma-adskilt liste
+          const name = String(u.displayName || "").replace(/[,;<>"]/g, " ").trim();
+          return name ? `${name} <${mail}>` : mail;
+        }
+        return fields.map(f => value(f, u, p)).filter(Boolean).join(" - ");
+      }).filter(Boolean);
+      return { text: vals.join(joiner), count: vals.length };
     }
 
-    async function runCopyPersonaleliste(withName) {
+    async function runCopyPersonaleliste() {
+      const name = document.querySelector('input[name="plCopyName"]:checked')?.value || "nej";
+      const sep = document.querySelector('input[name="plCopySep"]:checked')?.value || "kolonne";
+      plCopyChoice = { name, sep };
       document.getElementById("plCopyPop").hidden = true;
       const msg = document.getElementById("plMsg");
-      const resultPromise = plCopyText(withName);
+      const resultPromise = plCopyText(name === "ja", sep);
       let result = null;
 
       try {
@@ -2180,7 +2231,7 @@ if (window.updateHeaderStatus) {
 
       if (!result) return;
       msg.className = "saveMsg ok";
-      msg.textContent = `Kopieret ✓ (${result.count} ${result.count === 1 ? "linje" : "linjer"})`;
+      msg.textContent = `Kopieret ✓ (${result.count} ${result.count === 1 ? "person" : "personer"})`;
     }
 
     async function runPrintPersonaleliste() {
