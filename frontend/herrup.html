@@ -2010,12 +2010,30 @@ if (window.updateHeaderStatus) {
       document.getElementById("plMsg").textContent = "";
       document.getElementById("plAccessNote").textContent = "";
       document.getElementById("plCopyPop").hidden = true;
+      plLoadData(true).catch(() => {});   // hent i baggrunden, så Kopiér kan ske med det samme
       document.getElementById("plModalBackdrop").classList.add("open");
       document.body.style.overflow = "hidden";
     }
     function closePlModal() {
       document.getElementById("plModalBackdrop").classList.remove("open");
       document.body.style.overflow = "";
+    }
+
+    // Ekstra-oplysninger fra /api/employee-private-list. Hentes, når popuppen
+    // åbnes, og genbruges af Kopiér/Udskriv. Browseren tillader kun kopiering
+    // kort efter klikket, så data skal helst være hentet på forhånd.
+    let plDataPromise = null;
+    function plLoadData(refresh = false) {
+      if (!plDataPromise || refresh) {
+        plDataPromise = (async () => {
+          const r = await fetch("/api/employee-private-list", { cache: "no-store" });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+          return data;
+        })();
+        plDataPromise.catch(() => { plDataPromise = null; });
+      }
+      return plDataPromise;
     }
 
     // Henter ekstra-oplysninger og finder de personer + kolonner, der er valgt.
@@ -2031,9 +2049,7 @@ if (window.updateHeaderStatus) {
       msg.textContent = "Henter oplysninger…";
       let data;
       try {
-        const r = await fetch("/api/employee-private-list", { cache: "no-store" });
-        data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        data = await plLoadData();
       } catch (e) {
         msg.textContent = "Fejl: " + e.message;
         msg.classList.add("err");
@@ -2067,26 +2083,26 @@ if (window.updateHeaderStatus) {
       pop.hidden = !pop.hidden;
     }
 
-    async function copyText(text) {
-      try {
-        await navigator.clipboard.writeText(text);
-        return;
-      } catch { /* fx ikke-sikker kontekst – brug fallback */ }
+    function copyFallback(text) {
+      // Textarea'en lægges i popuppen (ikke body), så fokus bliver i modalen
+      const host = document.getElementById("plModalBackdrop") || document.body;
       const ta = document.createElement("textarea");
       ta.value = text;
-      ta.style.cssText = "position:fixed;left:-9999px;top:0;";
-      document.body.appendChild(ta);
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+      host.appendChild(ta);
+      ta.focus();
       ta.select();
-      const ok = document.execCommand("copy");
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { ok = false; }
       ta.remove();
-      if (!ok) throw new Error("Browseren tillod ikke kopiering");
+      return ok;
     }
 
-    async function runCopyPersonaleliste(withName) {
-      document.getElementById("plCopyPop").hidden = true;
-      const msg = document.getElementById("plMsg");
+    // Bygger teksten ud fra valgte kolonner (og navn, hvis valgt)
+    async function plCopyText(withName) {
       const built = await plBuild(document.getElementById("plCopyBtn"));
-      if (!built) return;
+      if (!built) return null;
       const { users, priv } = built;
       const cols = built.cols.filter(c => !c.blank);
 
@@ -2098,32 +2114,55 @@ if (window.updateHeaderStatus) {
         ...(withName ? [{ label: "Navn", get: (u) => u.displayName }] : []),
         ...cols
       ];
-      if (!fields.length) {
-        msg.className = "saveMsg err";
-        msg.textContent = "Vælg mindst én kolonne (eller svar ja til navn).";
-        return;
-      }
+      if (!fields.length) throw new Error("Vælg mindst én kolonne (eller svar ja til navn).");
 
-      let text, count;
       if (fields.length === 1) {
         const vals = users.map(u => value(fields[0], u, priv(u))).filter(Boolean);
         const onlyMail = ["mail", "altMail"].includes(fields[0].key);
-        text = vals.join(onlyMail ? "; " : "\n");
-        count = vals.length;
-      } else {
-        const lines = users.map(u => { const p = priv(u); return fields.map(f => value(f, u, p)).join("\t"); });
-        text = [fields.map(f => f.label).join("\t"), ...lines].join("\n");
-        count = users.length;
+        return { text: vals.join(onlyMail ? "; " : "\n"), count: vals.length };
       }
+      const lines = users.map(u => { const p = priv(u); return fields.map(f => value(f, u, p)).join("\t"); });
+      return { text: [fields.map(f => f.label).join("\t"), ...lines].join("\n"), count: users.length };
+    }
+
+    async function runCopyPersonaleliste(withName) {
+      document.getElementById("plCopyPop").hidden = true;
+      const msg = document.getElementById("plMsg");
+      const resultPromise = plCopyText(withName);
+      let result = null;
 
       try {
-        await copyText(text);
-        msg.className = "saveMsg ok";
-        msg.textContent = `Kopieret ✓ (${count} ${count === 1 ? "linje" : "linjer"})`;
+        if (window.ClipboardItem && navigator.clipboard?.write) {
+          // Kaldes med det samme i klikket; teksten leveres, når den er klar
+          const blob = resultPromise.then(r => {
+            if (!r) throw new Error("Intet at kopiere");
+            return new Blob([r.text], { type: "text/plain" });
+          });
+          await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
+          result = await resultPromise;
+        } else {
+          result = await resultPromise;
+          if (!result) return;
+          await navigator.clipboard.writeText(result.text);
+        }
       } catch (e) {
-        msg.className = "saveMsg err";
-        msg.textContent = "Kunne ikke kopiere: " + e.message;
+        // Sidste udvej: den gammeldags metode
+        try { result = await resultPromise; } catch (err) {
+          msg.className = "saveMsg err";
+          msg.textContent = err.message;
+          return;
+        }
+        if (!result) return;   // plBuild har allerede vist fejlen
+        if (!copyFallback(result.text)) {
+          msg.className = "saveMsg err";
+          msg.textContent = "Kunne ikke kopiere: browseren tillod det ikke. Prøv igen.";
+          return;
+        }
       }
+
+      if (!result) return;
+      msg.className = "saveMsg ok";
+      msg.textContent = `Kopieret ✓ (${result.count} ${result.count === 1 ? "linje" : "linjer"})`;
     }
 
     async function runPrintPersonaleliste() {
