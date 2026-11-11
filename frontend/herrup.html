@@ -413,8 +413,14 @@
     }
 
     /* ── Organisationsdiagram (ud fra Manager-feltet i Entra) ─────────────── */
-    #chartView { display:none; flex:1; min-height:0; overflow:auto; padding-bottom:1rem; }
-    .ocToolbar { display:flex; gap:.5rem; justify-content:flex-end; flex-wrap:wrap; margin-bottom:.75rem; position:sticky; left:0; }
+    #chartView { display:none; flex:1; min-height:0; overflow:hidden; flex-direction:column; }
+    .ocToolbar { display:flex; gap:.5rem; align-items:center; justify-content:flex-end; flex-wrap:wrap; margin-bottom:.75rem; flex-shrink:0; }
+    .ocHelp { margin-right:auto; font-size:.82rem; color:#4b5563; background:#f9fafb; border:1px solid #e5e7eb;
+              border-radius:8px; padding:.4rem .75rem; line-height:1.4; }
+    .ocHelp b { color:#850c18; }
+    .ocZoom { display:flex; align-items:center; gap:.25rem; }
+    .ocZoom .tab { padding:.45rem .7rem; }
+    #ocZoomPct { min-width:3.2em; text-align:center; font-size:.82rem; font-weight:700; color:#374151; font-variant-numeric:tabular-nums; }
     .oc-wrap { width:max-content; min-width:100%; padding:.5rem 1rem 1.5rem; box-sizing:border-box; }
     .oc-tree { display:flex; justify-content:center; }
     .oc-tree ul { display:flex; justify-content:center; padding:20px 0 0; margin:0; list-style:none; position:relative; }
@@ -494,10 +500,11 @@
     .oc-staff-r .oc-node::before { content:""; position:absolute; top:50%; left:-28px; width:26px; border-top:2px solid #b8bec8; }
     .oc-staff-loose { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:24px; }
 
-    /* Træk rundt med musen */
-    #chartView { cursor:grab; user-select:none; }
-    #chartView.oc-panning, #chartView.oc-panning .oc-node { cursor:grabbing; }
-    #chartView .ocToolbar { cursor:default; }
+    /* Træk rundt med musen: diagrammet flyttes (og zoomes) i et fast vindue */
+    #ocViewport { flex:1; min-height:0; overflow:hidden; position:relative; cursor:grab; user-select:none;
+                  touch-action:none; border:1px solid #f1f1f1; border-radius:8px; background:#fcfcfd; }
+    #ocViewport.oc-panning, #ocViewport.oc-panning .oc-node { cursor:grabbing; }
+    #ocWrap { transform-origin:0 0; }
     .oc-loading { padding:3rem 0; }
     #ocTimer { font-variant-numeric:tabular-nums; font-weight:700; }
 
@@ -598,11 +605,25 @@
     <!-- Organisationsdiagram -->
     <div class="panel" id="chartView">
       <div class="ocToolbar">
+        <div class="ocHelp">
+          💡 <b>Klik</b> på en person for at se personkortet ·
+          <b>Højreklik</b> på en person for udskrift herfra/niveau ·
+          <b>Hold musen nede og træk</b> for at flytte diagrammet ·
+          <b>Ctrl + scroll</b> zoomer · pilen ▾ under en leder udvider/samler
+        </div>
+        <div class="ocZoom">
+          <button type="button" class="tab" title="Zoom ud" onclick="ocZoomBy(1/1.2)">−</button>
+          <span id="ocZoomPct">100%</span>
+          <button type="button" class="tab" title="Zoom ind" onclick="ocZoomBy(1.2)">+</button>
+          <button type="button" class="tab" title="Tilpas diagrammet til vinduet" onclick="ocFit()">⤢ Tilpas</button>
+        </div>
         <button type="button" class="tab" onclick="ocExpandAll()">⊞ Udvid alle</button>
         <button type="button" class="tab" onclick="ocCollapseAll()">⊟ Saml alle</button>
         <button type="button" class="tab" title="Udskriv diagrammet som det ser ud nu" onclick="printOrgChart()">🖨️ Udskriv</button>
       </div>
-      <div class="oc-wrap" id="ocWrap"><div class="org-placeholder">Indlæser…</div></div>
+      <div id="ocViewport">
+        <div class="oc-wrap" id="ocWrap"><div class="org-placeholder">Indlæser…</div></div>
+      </div>
     </div>
   </div>
 
@@ -1043,7 +1064,7 @@
     let ocTimer = null;
 
     function renderOrgChartIfVisible() {
-      if (document.getElementById("chartView")?.style.display === "block") renderOrgChart();
+      if (document.getElementById("chartView")?.style.display === "flex") renderOrgChart();
     }
 
     function ocByName(a, b) { return (a.displayName || "").localeCompare(b.displayName || "", "da"); }
@@ -1196,6 +1217,9 @@
       ocBuildModel();
       if (!ocInitialCollapseDone) { ocInitialCollapseDone = true; ocCollapseBelowTop(); }
       wrap.innerHTML = ocTreeHtml(ocTops, { withStaff: true });
+      // Første gang: centrér vandret i 100 %. Derefter bevares position og zoom.
+      if (!ocView.init) { ocView.init = true; ocCenter(1); }
+      else ocApplyView();
     }
 
     function countBelow(id, seen = new Set()) {
@@ -1230,32 +1254,101 @@
       if (node) openModal(node.dataset.id);
     });
 
-    // ── Træk diagrammet rundt med venstre musetast ────────────────────────────
+    // ── Flyt og zoom diagrammet ───────────────────────────────────────────────
+    // Diagrammet ligger i et fast vindue (#ocViewport) og flyttes med transform,
+    // så det virker uanset hvor stort det er. Hold venstre musetast (eller en
+    // finger) nede og træk for at flytte. Scroll flytter, Ctrl + scroll zoomer
+    // (også knib-zoom på touchpad). Knapperne − / + / Tilpas i værktøjslinjen.
+    const ocView = { x: 0, y: 0, s: 1, init: false };
+    const OC_MIN_ZOOM = 0.2, OC_MAX_ZOOM = 2;
     const ocPan = { active: false, moved: false, x: 0, y: 0, left: 0, top: 0 };
+
+    function ocApplyView() {
+      const wrap = document.getElementById("ocWrap");
+      if (wrap) wrap.style.transform = `translate(${ocView.x}px, ${ocView.y}px) scale(${ocView.s})`;
+      const pct = document.getElementById("ocZoomPct");
+      if (pct) pct.textContent = Math.round(ocView.s * 100) + "%";
+    }
+
+    function ocCenter(scale = ocView.s) {
+      const vp = document.getElementById("ocViewport"), wrap = document.getElementById("ocWrap");
+      if (!vp || !wrap) return;
+      ocView.s = scale;
+      ocView.x = (vp.clientWidth - wrap.offsetWidth * scale) / 2;
+      ocView.y = 0;
+      ocApplyView();
+    }
+
+    // Zoom omkring et punkt i vinduet (det punkt bliver stående under musen)
+    function ocZoomAt(factor, cx, cy) {
+      const ns = Math.min(OC_MAX_ZOOM, Math.max(OC_MIN_ZOOM, ocView.s * factor));
+      if (ns === ocView.s) return;
+      ocView.x = cx - (cx - ocView.x) * (ns / ocView.s);
+      ocView.y = cy - (cy - ocView.y) * (ns / ocView.s);
+      ocView.s = ns;
+      ocApplyView();
+    }
+
+    function ocZoomBy(factor) {
+      const vp = document.getElementById("ocViewport");
+      if (!vp) return;
+      ocZoomAt(factor, vp.clientWidth / 2, vp.clientHeight / 2);
+    }
+
+    // Hele diagrammet ind i vinduet (højst 100 %)
+    function ocFit() {
+      const vp = document.getElementById("ocViewport"), wrap = document.getElementById("ocWrap");
+      if (!vp || !wrap) return;
+      const w = wrap.offsetWidth, h = wrap.offsetHeight;
+      if (!w || !h) return;
+      const s = Math.max(OC_MIN_ZOOM, Math.min(1, (vp.clientWidth - 20) / w, (vp.clientHeight - 20) / h));
+      ocView.s = s;
+      ocView.x = (vp.clientWidth - w * s) / 2;
+      ocView.y = Math.max(10, (vp.clientHeight - h * s) / 2);
+      ocApplyView();
+    }
+
     (function setupOcPan() {
-      const view = document.getElementById("chartView");
-      if (!view) return;
-      view.addEventListener("mousedown", (e) => {
-        if (e.button !== 0 || e.target.closest(".ocToolbar, .oc-toggle")) return;
-        Object.assign(ocPan, { active: true, moved: false, x: e.clientX, y: e.clientY, left: view.scrollLeft, top: view.scrollTop });
-        e.preventDefault(); // undgå tekstmarkering
+      const vp = document.getElementById("ocViewport");
+      if (!vp) return;
+
+      vp.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0 || e.target.closest(".oc-toggle")) return;
+        Object.assign(ocPan, { active: true, moved: false, x: e.clientX, y: e.clientY, left: ocView.x, top: ocView.y });
       });
-      window.addEventListener("mousemove", (e) => {
+      window.addEventListener("pointermove", (e) => {
         if (!ocPan.active) return;
         const dx = e.clientX - ocPan.x, dy = e.clientY - ocPan.y;
         if (!ocPan.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
         ocPan.moved = true;
-        view.classList.add("oc-panning");
-        view.scrollLeft = ocPan.left - dx;
-        view.scrollTop  = ocPan.top  - dy;
+        vp.classList.add("oc-panning");
+        ocView.x = ocPan.left + dx;
+        ocView.y = ocPan.top + dy;
+        ocApplyView();
       });
-      window.addEventListener("mouseup", () => {
+      const end = () => {
         if (!ocPan.active) return;
         ocPan.active = false;
-        view.classList.remove("oc-panning");
+        vp.classList.remove("oc-panning");
         // ocPan.moved nulstilles af det efterfølgende click (eller her, hvis musen slippes uden for)
         setTimeout(() => { ocPan.moved = false; }, 0);
-      });
+      };
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+
+      vp.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        if (e.ctrlKey) {
+          const r = vp.getBoundingClientRect();
+          ocZoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX - r.left, e.clientY - r.top);
+        } else {
+          const dx = e.shiftKey ? e.deltaY : e.deltaX;
+          const dy = e.shiftKey ? 0 : e.deltaY;
+          ocView.x -= dx;
+          ocView.y -= dy;
+          ocApplyView();
+        }
+      }, { passive: false });
     })();
 
     // ── Højreklik-menu ────────────────────────────────────────────────────────
@@ -1358,7 +1451,7 @@
     function switchTab(tab) {
       document.getElementById("listView").style.display  = tab === "list"  ? "" : "none";
       document.getElementById("orgView").style.display   = tab === "org"   ? "block" : "none";
-      document.getElementById("chartView").style.display = tab === "chart" ? "block" : "none";
+      document.getElementById("chartView").style.display = tab === "chart" ? "flex" : "none";
       document.getElementById("tabList").classList.toggle("active",  tab === "list");
       document.getElementById("tabOrg").classList.toggle("active",   tab === "org");
       document.getElementById("tabChart").classList.toggle("active", tab === "chart");
