@@ -131,6 +131,21 @@ async function viewerIsLeder(graphToken, userId, roles) {
   return isManager(graphToken, userId);
 }
 
+// ── Diabetes: "Type 1", "Type 2" eller tom ──────────────────────────────────
+// Gamle værdier ("Ja" fra før typen kunne vælges) vises som "Ja (type ikke angivet)".
+function diabetesValue(v) {
+  const s = String(v || "").trim().toLowerCase().replace(/\s+/g, "");
+  if (s === "type1" || s === "1") return "Type 1";
+  if (s === "type2" || s === "2") return "Type 2";
+  if (s === "ja" || s === "yes" || s === "true") return "Ja (type ikke angivet)";
+  return "";
+}
+// Det der må gemmes: kun Type 1, Type 2 eller tom
+function diabetesInput(v) {
+  const d = diabetesValue(v);
+  return d === "Type 1" || d === "Type 2" ? d : "";
+}
+
 // ── Fødselsdag (gemmes som tekst "ÅÅÅÅ-MM-DD") ────────────────────────────
 function validDate(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ""));
@@ -231,5 +246,6 @@ module.exports = {
   dvToken, dvBase, dvGetAll,
   toJaNej, fromJaNej,
   HELBRED_SYNLIGHED_VALUES, helbredSynlighed, viewerIsLeder,
+  diabetesValue, diabetesInput,
   validDate, monthDay, birthdayItems
 };

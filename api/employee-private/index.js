@@ -17,7 +17,7 @@
 //   - Fødselsdag (ÅÅÅÅ-MM-DD) + om der må vises tillykke på forsiden.
 //     Andre end personen selv/admin får kun dag og måned.
 //   - Alternativ mail og TechID (synlige for alle)
-//   - Allergier, diabetes og andet relevant, med synlighed "leder" (standard)
+//   - Allergier, diabetes (Type 1/Type 2) og andet relevant, med synlighed "leder" (standard)
 //     eller "alle". "leder" = personer med medarbejdere under sig, portal_loen
 //     og admin (se _medarbejder.js).
 //
@@ -343,7 +343,7 @@ module.exports = async function (context, req) {
           noedKontakter: [], noedSynlighed: "", noedVisibleToMe: true,
           fodselsdag: null, fodselsdagMd: null, fodselsdagVises: true,
           altMail: null, techId: null,
-          allergier: null, diabetes: false, helbredAndet: null,
+          allergier: null, diabetes: "", helbredAndet: null,
           helbredSynlighed: "leder", helbredVisibleToMe: true,
           bigPhoto, hasCustomPhoto: false
         });
@@ -403,7 +403,7 @@ module.exports = async function (context, req) {
         altMail:         emp[M.F.altMail] || null,
         techId:          emp[M.F.techId]  || null,
         allergier:       helbredVisibleToMe ? (emp[M.F.allergier] || null) : null,
-        diabetes:        helbredVisibleToMe ? M.fromJaNej(emp[M.F.diabetes]) : false,
+        diabetes:        helbredVisibleToMe ? M.diabetesValue(emp[M.F.diabetes]) : "",
         helbredAndet:    helbredVisibleToMe ? (emp[M.F.helbredAndet] || null) : null,
         helbredSynlighed,
         helbredVisibleToMe,
@@ -455,7 +455,7 @@ module.exports = async function (context, req) {
       if ("altMail" in body)         fields[M.F.altMail]         = String(body.altMail || "").trim().slice(0, 100);
       if ("techId" in body)          fields[M.F.techId]          = String(body.techId || "").trim().slice(0, 50);
       if ("allergier" in body)       fields[M.F.allergier]       = String(body.allergier || "").trim().slice(0, 2000);
-      if ("diabetes" in body)        fields[M.F.diabetes]        = M.toJaNej(!!body.diabetes);
+      if ("diabetes" in body)        fields[M.F.diabetes]        = M.diabetesInput(body.diabetes);
       if ("helbredAndet" in body)    fields[M.F.helbredAndet]    = String(body.helbredAndet || "").trim().slice(0, 2000);
       if ("helbredSynlighed" in body) fields[M.F.helbredSynlighed] = M.helbredSynlighed(body.helbredSynlighed);
 

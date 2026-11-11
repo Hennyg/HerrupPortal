@@ -1925,7 +1925,7 @@ if (window.updateHeaderStatus) {
       }
       return detailGrid([
         { label: "Allergier",      value: esc(d.allergier || "–"), multiline: true },
-        { label: "Diabetes",       value: d.diabetes ? "Ja" : "–" },
+        { label: "Diabetes",       value: esc(d.diabetes || "–") },
         { label: "Andet relevant", value: esc(d.helbredAndet || "–"), multiline: true, full: true }
       ]) + `<div class="noedVisibility"><b>Synlighed:</b> ${esc(synlighed)}</div>`;
     }
@@ -1943,10 +1943,14 @@ if (window.updateHeaderStatus) {
             <textarea id="eHelbredAndet" maxlength="2000" placeholder="fx vegetar, kører ikke i bus, særlige hensyn">${esc(d.helbredAndet || "")}</textarea>
           </div>
         </div>
-        <div class="visToggles">
-          <div class="visToggleRow">
-            <input type="checkbox" id="eDiabetes" ${d.diabetes ? "checked" : ""} />
-            <label for="eDiabetes">Har diabetes</label>
+        <div class="editFormGrid" style="margin-top:.85rem;">
+          <div class="editField">
+            <label for="eDiabetes">Diabetes</label>
+            <select id="eDiabetes" style="padding:.45rem .6rem;border:1px solid #d1d5db;border-radius:7px;font-size:.88rem;background:#fff;">
+              <option value="" ${d.diabetes === "Type 1" || d.diabetes === "Type 2" ? "" : "selected"}>Nej / ikke oplyst</option>
+              <option value="Type 1" ${d.diabetes === "Type 1" ? "selected" : ""}>Type 1</option>
+              <option value="Type 2" ${d.diabetes === "Type 2" ? "selected" : ""}>Type 2</option>
+            </select>
           </div>
         </div>
         <div class="visRadioGroup">
@@ -1976,7 +1980,7 @@ if (window.updateHeaderStatus) {
       { key: "techId",       label: "TechID",                      get: (u, p) => p?.techId },
       { key: "fodselsdag",   label: "Fødselsdag",                  get: (u, p) => p ? fmtFodselsdag(p) : "" },
       { key: "allergier",    label: "Allergier",       def: true,  health: true, get: (u, p) => p?.allergier },
-      { key: "diabetes",     label: "Diabetes",        def: true,  health: true, get: (u, p) => p?.diabetes ? "Ja" : "" },
+      { key: "diabetes",     label: "Diabetes",        def: true,  health: true, get: (u, p) => p?.diabetes || "" },
       { key: "helbredAndet", label: "Andet relevant",  def: true,  health: true, get: (u, p) => p?.helbredAndet },
       { key: "kryds",        label: "✓",               def: true,  blank: true, width: "12mm" },
       { key: "bemaerkning",  label: "Bemærkning",                  blank: true, width: "45mm" }
@@ -2228,7 +2232,7 @@ if (window.updateHeaderStatus) {
         altMail:          document.getElementById("eAltMail").value.trim(),
         techId:           document.getElementById("eTechId").value.trim(),
         allergier:        document.getElementById("eAllergier").value.trim(),
-        diabetes:         document.getElementById("eDiabetes").checked,
+        diabetes:         document.getElementById("eDiabetes").value,
         helbredAndet:     document.getElementById("eHelbredAndet").value.trim(),
         helbredSynlighed: document.querySelector('input[name="helbredSynlighed"]:checked')?.value || "leder"
       };

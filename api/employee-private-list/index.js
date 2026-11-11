@@ -49,7 +49,7 @@ module.exports = async function (context, req) {
           fodselsdagMd: fd ? M.monthDay(fd) : null,
           helbredVisible,
           allergier: helbredVisible ? (r[F.allergier] || "") : "",
-          diabetes: helbredVisible ? M.fromJaNej(r[F.diabetes]) : false,
+          diabetes: helbredVisible ? M.diabetesValue(r[F.diabetes]) : "",
           helbredAndet: helbredVisible ? (r[F.helbredAndet] || "") : ""
         };
       });
