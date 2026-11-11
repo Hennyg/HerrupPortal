@@ -48,22 +48,30 @@ function showNewsItem(item) {
   const hero = title?.closest(".hero");
   if (!title || !text || !item) return;
 
-  const icon = item.type === "tip" ? "💡" : (item.type === "olkassemode" ? "🍺" : "📢");
+  const isBirthday = item.type === "fodselsdag";
+  const icon = isBirthday ? "🎂" : (item.type === "tip" ? "💡" : (item.type === "olkassemode" ? "🍺" : "📢"));
   title.textContent = item.overskrift || (item.type === "tip" ? "Tip" : "Nyhed");
   text.textContent = `${icon} ${item.indhold || ""}`.trim();
 
   // Hele tile'n er klikbar til nyheden (se wireNewsTile)
+  // Fødselsdage har ingen nyhedsside, så tile'n er ikke klikbar for dem.
   const tile = document.getElementById("newsTile");
-  if (tile && item.id) {
+  if (tile && item.id && !isBirthday) {
     tile.dataset.href = `/nyhed.html?id=${encodeURIComponent(item.id)}`;
     tile.classList.add("clickable");
     tile.setAttribute("role", "link");
     tile.tabIndex = 0;
     tile.title = "Åbn nyheden";
+  } else if (tile) {
+    delete tile.dataset.href;
+    tile.classList.remove("clickable");
+    tile.removeAttribute("role");
+    tile.tabIndex = -1;
+    tile.title = "";
   }
 
   // "Læs mere" når nyheden har en længere tekst eller en video
-  if (item.hasBody || item.videourl) {
+  if (!isBirthday && (item.hasBody || item.videourl)) {
     const a = document.createElement("a");
     a.className = "newsReadMore";
     a.href = `/nyhed.html?id=${encodeURIComponent(item.id)}`;
@@ -144,7 +152,10 @@ async function loadNewsOrTip() {
       return;
     }
 
-    newsRotationItems = shuffleNews(items);
+    // Fødselsdage (type "fodselsdag") vises altid først, resten blandes
+    const birthdays = items.filter(i => i.type === "fodselsdag");
+    const others = items.filter(i => i.type !== "fodselsdag");
+    newsRotationItems = [...birthdays, ...shuffleNews(others)];
     newsRotationIndex = 0;
     showNewsItem(newsRotationItems[0]);
     scheduleNewsRotation();

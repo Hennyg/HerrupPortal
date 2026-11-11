@@ -13,9 +13,19 @@
 // mod login-app'en (AZURE_CLIENT_ID), med samme Graph-token som DV_CLIENT_ID
 // allerede bruger til afdeling/chef/foto-opslag.
 //
+// Ud over privat kontaktinfo og nødkontakter:
+//   - Fødselsdag (ÅÅÅÅ-MM-DD) + om der må vises tillykke på forsiden.
+//     Andre end personen selv/admin får kun dag og måned.
+//   - Alternativ mail og TechID (synlige for alle)
+//   - Allergier, diabetes og andet relevant, med synlighed "leder" (standard)
+//     eller "alle". "leder" = personer med medarbejdere under sig, portal_loen
+//     og admin (se _medarbejder.js).
+//
 // Miljøvariabler: DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_COREDATA, AZURE_CLIENT_ID
 
 const fetch = globalThis.fetch;
+const N = require("../_news");
+const M = require("../_medarbejder");
 
 const TABLE = "cr1eb_lch_medarbejderes";
 
@@ -55,46 +65,14 @@ async function getGraphToken() {
   return j.access_token;
 }
 
-// Slår login-app'ens (AZURE_CLIENT_ID) service principal op, inkl. dens App Roles.
-// Bruges til at kunne oversætte et appRoleId til det læsbare rollenavn (fx "portal_admin").
-async function getAppServicePrincipal(graphToken) {
-  const clientId = process.env.AZURE_CLIENT_ID;
-  if (!clientId) throw new Error("Manglende miljøvariabel: AZURE_CLIENT_ID");
-
-  const r = await fetch(
-    `https://graph.microsoft.com/v1.0/servicePrincipals?$filter=appId eq '${clientId}'&$select=id,appId,appRoles`,
-    { headers: { Authorization: `Bearer ${graphToken}` } }
-  );
-  const j = await r.json();
-  if (!r.ok) throw new Error(`graph_sp_error ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
-  const sp = (j.value || [])[0];
-  if (!sp) throw new Error("Service principal ikke fundet for AZURE_CLIENT_ID");
-  return sp;
-}
-
-// Henter de portal_xxx-roller den indloggede bruger reelt har, via Graph
-// (appRoleAssignments), i stedet for principal.claims (som er tom i backend).
-async function getUserPortalRoles(graphToken, userId) {
+// Brugerens portal_xxx-roller slås op i Graph (direkte og via grupper) med
+// N.lookupRoles, i stedet for principal.claims (som er tom i backend).
+async function getUserPortalRoles(userId) {
   if (!userId) return [];
   try {
-    const sp = await getAppServicePrincipal(graphToken);
-
-    const r = await fetch(
-      `https://graph.microsoft.com/v1.0/users/${userId}/appRoleAssignments`,
-      { headers: { Authorization: `Bearer ${graphToken}` } }
-    );
-    const j = await r.json();
-    if (!r.ok) throw new Error(`graph_approles_error ${r.status}: ${j.error?.message || JSON.stringify(j)}`);
-
-    const roleIdToValue = new Map((sp.appRoles || []).map(role => [role.id, String(role.value || "")]));
-
-    return (j.value || [])
-      .filter(a => a.resourceId === sp.id)
-      .map(a => (roleIdToValue.get(a.appRoleId) || "").toLowerCase())
-      .filter(Boolean);
-  } catch (e) {
-    // Fejler Graph-opslaget (rettigheder, netværk osv.), skal brugeren IKKE
-    // automatisk regnes som admin — kun isSelf-vejen er tilgængelig da.
+    return await N.lookupRoles({ userId, roles: [] });
+  } catch {
+    // Fejler Graph-opslaget, skal brugeren IKKE automatisk regnes som admin
     return [];
   }
 }
@@ -226,7 +204,15 @@ async function findEmployeeByMail(token, dvUrl, email) {
     "cr1eb_lch_adresse_vises",
     "cr1eb_lch_noedkontakter",
     "cr1eb_lch_noed_synlighed",
-    "cr1eb_lch_foto"
+    "cr1eb_lch_foto",
+    M.F.allergier,
+    M.F.diabetes,
+    M.F.helbredAndet,
+    M.F.helbredSynlighed,
+    M.F.fodselsdag,
+    M.F.fodselsdagVises,
+    M.F.altMail,
+    M.F.techId
   ].join(",");
 
   const filter = encodeURIComponent(`cr1eb_lch_mail eq '${email.replace(/'/g, "''")}'`);
@@ -334,7 +320,7 @@ module.exports = async function (context, req) {
 
     // Én Graph-token bruges til både rolleopslag, afdeling/chef og foto.
     const graphToken = await getGraphToken();
-    const roles      = await getUserPortalRoles(graphToken, principal.userId);
+    const roles      = await getUserPortalRoles(principal.userId);
     const isAdmin     = roles.includes("portal_admin") || roles.includes("portal_herrup_portal_admin");
     const myEmail     = getEmailFromPrincipal(principal);
     const isSelf       = myEmail && myEmail === email.toLowerCase();
@@ -355,6 +341,10 @@ module.exports = async function (context, req) {
           privatMail: null, privatTlf: null, privatAdresse: null, privatPostby: null,
           telefonVises: false, adresseVises: false,
           noedKontakter: [], noedSynlighed: "", noedVisibleToMe: true,
+          fodselsdag: null, fodselsdagMd: null, fodselsdagVises: true,
+          altMail: null, techId: null,
+          allergier: null, diabetes: false, helbredAndet: null,
+          helbredSynlighed: "leder", helbredVisibleToMe: true,
           bigPhoto, hasCustomPhoto: false
         });
       }
@@ -374,6 +364,15 @@ module.exports = async function (context, req) {
         targetEmail: email,
         graphToken
       });
+
+      // Helbred/kost: "alle" eller "leder" (standard)
+      const helbredSynlighed = M.helbredSynlighed(emp[M.F.helbredSynlighed]);
+      const helbredVisibleToMe = isAdmin || isSelf || helbredSynlighed === "alle"
+        || await M.viewerIsLeder(graphToken, principal.userId, roles);
+
+      // Fødselsdag: hele datoen kun for personen selv/admin, ellers dag+måned
+      const fodselsdagFull = M.validDate(emp[M.F.fodselsdag]) ? emp[M.F.fodselsdag] : null;
+      const fodselsdagVisesRaw = String(emp[M.F.fodselsdagVises] || "").trim().toLowerCase();
 
       // Skarpt billede til personkortet: brug det uploadede hvis der er et,
       // ellers hent en 240x240-udgave af Entra-billedet — kun for denne ene person.
@@ -398,6 +397,16 @@ module.exports = async function (context, req) {
         noedKontakter:   noedVisibleToMe ? noedKontakterAll : [],
         noedSynlighed,
         noedVisibleToMe,
+        fodselsdag:      (isAdmin || isSelf) ? fodselsdagFull : null,
+        fodselsdagMd:    fodselsdagFull ? M.monthDay(fodselsdagFull) : null,
+        fodselsdagVises: fodselsdagVisesRaw !== "nej",
+        altMail:         emp[M.F.altMail] || null,
+        techId:          emp[M.F.techId]  || null,
+        allergier:       helbredVisibleToMe ? (emp[M.F.allergier] || null) : null,
+        diabetes:        helbredVisibleToMe ? M.fromJaNej(emp[M.F.diabetes]) : false,
+        helbredAndet:    helbredVisibleToMe ? (emp[M.F.helbredAndet] || null) : null,
+        helbredSynlighed,
+        helbredVisibleToMe,
         bigPhoto,
         hasCustomPhoto
       });
@@ -437,6 +446,19 @@ module.exports = async function (context, req) {
         fields.cr1eb_lch_noed_synlighed = NOED_VISIBILITY_VALUES.has(body.noedSynlighed) ? body.noedSynlighed : "";
       }
 
+      if ("fodselsdag" in body) {
+        const d = String(body.fodselsdag || "").trim();
+        if (d && !M.validDate(d)) return json(context, 400, { error: "Ugyldig fødselsdag." });
+        fields[M.F.fodselsdag] = d;
+      }
+      if ("fodselsdagVises" in body) fields[M.F.fodselsdagVises] = M.toJaNej(!!body.fodselsdagVises);
+      if ("altMail" in body)         fields[M.F.altMail]         = String(body.altMail || "").trim().slice(0, 100);
+      if ("techId" in body)          fields[M.F.techId]          = String(body.techId || "").trim().slice(0, 50);
+      if ("allergier" in body)       fields[M.F.allergier]       = String(body.allergier || "").trim().slice(0, 2000);
+      if ("diabetes" in body)        fields[M.F.diabetes]        = M.toJaNej(!!body.diabetes);
+      if ("helbredAndet" in body)    fields[M.F.helbredAndet]    = String(body.helbredAndet || "").trim().slice(0, 2000);
+      if ("helbredSynlighed" in body) fields[M.F.helbredSynlighed] = M.helbredSynlighed(body.helbredSynlighed);
+
       if ("customPhoto" in body) {
         const photo = body.customPhoto;
         if (photo === null || photo === "") {
@@ -470,3 +492,6 @@ module.exports = async function (context, req) {
     return json(context, 500, { error: e.message });
   }
 };
+
+
+

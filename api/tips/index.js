@@ -2,6 +2,7 @@
 // Aktive nyheder/tips til "Velkommen"-tile'n på forsiden + aktive bannere
 // (gul bjælke i tile'n og/eller under navbaren).
 const N = require("../_news");
+const M = require("../_medarbejder");
 const { T } = N;
 
 module.exports = async function (context, req) {
@@ -23,6 +24,15 @@ module.exports = async function (context, req) {
       .filter(({ r }) => r[T.valg] === N.VALG.tip || N.frontpageActive(r, now))
       .map(({ m }) => N.publicItem(m));
 
+    // Fødselsdage (i dag – og på en fredag også weekendens) vises først.
+    // Fejl her må ikke stoppe nyhederne.
+    let birthdays = [];
+    try {
+      birthdays = await M.birthdayItems(now);
+    } catch (e) {
+      context.log("tips: fødselsdage fejlede:", e.message);
+    }
+
     const banners = visible
       .filter(({ r }) => N.bannerActive(r, now))
       .map(({ m }) => ({
@@ -30,10 +40,13 @@ module.exports = async function (context, req) {
         hasBody: m.hasBody || !!m.videourl, modifiedon: m.modifiedon, ...m.banner
       }));
 
-    return N.json(context, 200, { items, banners });
+    return N.json(context, 200, { items: [...birthdays, ...items], banners });
   } catch (e) {
     context.log("tips ERROR:", e.message);
     // Forsiden må ikke vælte pga. banneret – fejlen kan ses i Network.
     return N.json(context, 200, { items: [], banners: [], error: e.message });
   }
 };
+
+
+

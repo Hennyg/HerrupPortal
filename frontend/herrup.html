@@ -200,6 +200,23 @@
       padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:7px; font-size:.88rem;
     }
     .editField input:focus { outline:2px solid #850c18; outline-offset:-1px; border-color:#850c18; }
+    .editField textarea {
+      padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:7px; font-size:.88rem;
+      font-family:inherit; min-height:60px; resize:vertical;
+    }
+    .editField textarea:focus { outline:2px solid #850c18; outline-offset:-1px; border-color:#850c18; }
+    .editField.full { grid-column:1 / -1; }
+    .editHint { font-size:.78rem; color:#6b7280; margin-top:.5rem; }
+    .detail-row.full { grid-column:1 / -1; }
+    .detail-value.multiline { white-space:pre-line; }
+
+    /* Personaleliste (udskrift) – valg i popup */
+    #plCols { display:grid; grid-template-columns:repeat(3, 1fr); gap:.45rem .75rem; }
+    @media (max-width:560px) { #plCols { grid-template-columns:1fr 1fr; } }
+    #plCols label, .plOpt { display:flex; align-items:center; gap:8px; font-size:.86rem; color:#374151; }
+    .plField { display:flex; flex-direction:column; gap:.3rem; }
+    .plField label { font-size:.74rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; }
+    .plField input { padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:7px; font-size:.88rem; }
 
     .visToggles { display:flex; flex-direction:column; gap:.5rem; margin-top:.9rem; }
     .visToggleRow { display:flex; align-items:center; gap:.55rem; }
@@ -517,6 +534,29 @@
     .oc-menu button:hover { background:#fdecee; color:#850c18; }
 
     @media print {
+      /* Personaleliste: egen sideopsætning (stående/liggende) via navngivne sider */
+      @page plPortrait  { size: A4 portrait;  margin: 12mm 10mm; }
+      @page plLandscape { size: A4 landscape; margin: 10mm; }
+      #printArea.pl-mode { display:block !important; }
+      .pl-print.pl-portrait  { page: plPortrait; }
+      .pl-print.pl-landscape { page: plLandscape; }
+      .pl-print { font-size:9.5pt; color:#111; }
+      .pl-head { display:flex; justify-content:space-between; align-items:baseline; border-bottom:1.2pt solid #b91c1c;
+                 padding-bottom:2mm; margin-bottom:3mm; }
+      .pl-title { font-size:15pt; font-weight:700; }
+      .pl-meta { font-size:9pt; color:#444; }
+      .pl-table { width:100%; border-collapse:collapse; }
+      .pl-table thead { display:table-header-group; }
+      .pl-table th { text-align:left; font-size:8.5pt; text-transform:uppercase; letter-spacing:.03em; color:#444;
+                     border-bottom:1pt solid #999; padding:1.5mm 1.5mm; }
+      .pl-table td { border-bottom:.5pt solid #ccc; padding:1.6mm 1.5mm; vertical-align:top; white-space:pre-line; }
+      .pl-table tr { page-break-inside:avoid; }
+      .pl-table td.pl-num { color:#666; width:7mm; }
+      .pl-table td.pl-name { font-weight:700; white-space:nowrap; }
+      .pl-table td.pl-blank { border-left:.5pt solid #ccc; }
+      .pl-table .pl-hidden { color:#999; font-style:italic; }
+      .pl-foot { margin-top:4mm; font-size:8pt; color:#555; border-top:.5pt solid #ccc; padding-top:2mm; }
+
       #printArea.oc-mode { display:block !important; }
       .oc-print { width:297mm; height:210mm; box-sizing:border-box; padding:8mm; overflow:hidden; page-break-after:avoid;
                   display:flex; flex-direction:column; }
@@ -566,6 +606,7 @@
         </div>
         <select id="deptFilter"><option value="">Alle afdelinger</option></select>
         <button id="refreshDataBtn" type="button" class="tab" title="Genindlæs medarbejdere og vagt/ferie fra serveren (springer cache over)">🔄 Opdater data</button>
+        <button type="button" class="tab" title="Udskriv en liste over de viste medarbejdere, fx til bestilling af mad til et arrangement" onclick="openPlModal()">🖨️ Personaleliste</button>
         <span id="userCount" class="muted"></span>
       </div>
       <div class="tableWrap">
@@ -650,6 +691,37 @@
     </div>
   </div>
 
+  <!-- ── Personaleliste-popup ───────────────────────────────────────────────── -->
+  <div class="modal-backdrop" id="plModalBackdrop" onclick="if (event.target === this) closePlModal()">
+    <div class="modal" style="width:min(680px,95vw)">
+      <div class="modal-header">
+        <div>
+          <p class="modal-name" style="font-size:1.05rem">Udskriv personaleliste</p>
+          <div class="muted" id="plInfo" style="font-size:.84rem"></div>
+        </div>
+        <button class="modal-close" onclick="closePlModal()">✕</button>
+      </div>
+      <div class="print-modal-body">
+        <div class="plField">
+          <label for="plTitle">Overskrift</label>
+          <input type="text" id="plTitle" value="Personaleliste" />
+        </div>
+        <div>
+          <div style="font-weight:600;font-size:.88rem;margin-bottom:.5rem;">Kolonner</div>
+          <div id="plCols"></div>
+        </div>
+        <label class="plOpt"><input type="checkbox" id="plOnlyHelbred" />
+          Kun personer med allergier, diabetes eller andet relevant</label>
+        <div class="muted" id="plAccessNote" style="font-size:.8rem"></div>
+        <div class="editActions" style="justify-content:flex-end;">
+          <span class="saveMsg" id="plMsg" style="margin-right:auto"></span>
+          <button class="btn-edit cancel" onclick="closePlModal()">Annuller</button>
+          <button class="btn-save-inline" id="plPrintBtn" onclick="runPrintPersonaleliste()">Udskriv</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Skjult print-område ────────────────────────────────────────────────── -->
   <div id="printArea"></div>
 
@@ -698,6 +770,12 @@
                 <div>Henter…</div>
               </div>
             </div>
+
+            <div class="modal-section-title" style="margin-top:1.6rem;">Øvrige oplysninger</div>
+            <div id="mOvrige"></div>
+
+            <div class="modal-section-title" style="margin-top:1.6rem;">Allergier, diabetes og andet relevant</div>
+            <div id="mHelbred"></div>
 
             <div class="modal-section-title" style="margin-top:1.6rem;">Nødkontakter i forbindelse med ulykke</div>
             <div id="mNoedkontakter"></div>
@@ -1640,6 +1718,8 @@ if (window.updateHeaderStatus) {
       target.innerHTML = `<div class="stateMsg" style="padding:1.5rem 0;">
         <div class="spinner"></div><div>Henter…</div></div>`;
       noedTarget.innerHTML = "";
+      document.getElementById("mOvrige").innerHTML = "";
+      document.getElementById("mHelbred").innerHTML = "";
       document.getElementById("mPrivatEditActions").innerHTML = "";
       editBtn.style.display = "none";
 
@@ -1647,6 +1727,8 @@ if (window.updateHeaderStatus) {
       if (!lookupEmail) {
         target.innerHTML = renderPrivateView({});
         noedTarget.innerHTML = renderEmergencyView({});
+        document.getElementById("mOvrige").innerHTML = renderOvrigeView({});
+        document.getElementById("mHelbred").innerHTML = renderHelbredView({});
         return;
       }
 
@@ -1657,6 +1739,8 @@ if (window.updateHeaderStatus) {
         currentPrivateData = data;
         target.innerHTML = renderPrivateView(data);
         noedTarget.innerHTML = renderEmergencyView(data);
+        document.getElementById("mOvrige").innerHTML = renderOvrigeView(data);
+        document.getElementById("mHelbred").innerHTML = renderHelbredView(data);
 
         // Skift til det skarpe billede, hvis det er den samme person der stadig er åben
         if (data.bigPhoto && currentModalUser === u) {
@@ -1704,6 +1788,8 @@ if (window.updateHeaderStatus) {
         editBtn.textContent = "Annuller";
         editBtn.classList.add("cancel");
         renderPrivateEditForm(currentPrivateData || {});
+        renderOvrigeEditForm(currentPrivateData || {});
+        renderHelbredEditForm(currentPrivateData || {});
         renderEmergencyEditForm(currentPrivateData || {});
         document.getElementById("mPrivatEditActions").innerHTML = `
           <div class="editActions">
@@ -1717,6 +1803,8 @@ if (window.updateHeaderStatus) {
         editBtn.classList.remove("cancel");
         document.getElementById("mPrivatDetails").innerHTML = renderPrivateView(currentPrivateData || {});
         document.getElementById("mNoedkontakter").innerHTML = renderEmergencyView(currentPrivateData || {});
+        document.getElementById("mOvrige").innerHTML = renderOvrigeView(currentPrivateData || {});
+        document.getElementById("mHelbred").innerHTML = renderHelbredView(currentPrivateData || {});
         document.getElementById("mPrivatEditActions").innerHTML = "";
       }
     }
@@ -1754,6 +1842,236 @@ if (window.updateHeaderStatus) {
           </div>
         </div>
       `;
+    }
+
+    // ── Øvrige oplysninger: fødselsdag, alternativ mail, TechID ───────────────
+    const MONTHS_DA = ["januar", "februar", "marts", "april", "maj", "juni", "juli",
+                       "august", "september", "oktober", "november", "december"];
+
+    // "1980-11-13" → "13. november 1980"; kun dag+måned ("11-13") → "13. november"
+    function fmtFodselsdag(d) {
+      const full = d?.fodselsdag;
+      if (full && /^\d{4}-\d{2}-\d{2}$/.test(full)) {
+        const [y, m, dd] = full.split("-");
+        return `${+dd}. ${MONTHS_DA[+m - 1]} ${y}`;
+      }
+      const md = d?.fodselsdagMd;
+      if (md && /^\d{2}-\d{2}$/.test(md)) {
+        const [m, dd] = md.split("-");
+        return `${+dd}. ${MONTHS_DA[+m - 1]}`;
+      }
+      return "";
+    }
+
+    function detailGrid(rows) {
+      return `<div class="detail-grid">${rows.map(row =>
+        `<div class="detail-row${row.full ? " full" : ""}">
+          <div class="detail-label">${row.label}</div>
+          <div class="detail-value${row.multiline ? " multiline" : ""}">${row.value}</div>
+        </div>`
+      ).join("")}</div>`;
+    }
+
+    function renderOvrigeView(d) {
+      const fd = fmtFodselsdag(d);
+      const fdNote = fd && d.fodselsdagVises === false
+        ? ` <span class="hidden-value">(ingen tillykke på forsiden)</span>` : "";
+      return detailGrid([
+        { label: "Fødselsdag",      value: fd ? esc(fd) + fdNote : "–" },
+        { label: "Alternativ mail", value: d.altMail ? `<a href="mailto:${escAttr(d.altMail)}">${esc(d.altMail)}</a>` : "–" },
+        { label: "TechID",          value: esc(d.techId || "–") }
+      ]);
+    }
+
+    function renderOvrigeEditForm(d) {
+      document.getElementById("mOvrige").innerHTML = `
+        <div class="editFormGrid">
+          <div class="editField">
+            <label for="eFodselsdag">Fødselsdag</label>
+            <input type="date" id="eFodselsdag" value="${escAttr(d.fodselsdag || "")}" />
+          </div>
+          <div class="editField">
+            <label for="eTechId">TechID</label>
+            <input type="text" id="eTechId" maxlength="50" value="${escAttr(d.techId)}" />
+          </div>
+          <div class="editField full">
+            <label for="eAltMail">Alternativ mail</label>
+            <input type="email" id="eAltMail" maxlength="100" placeholder="fx fornavn.efternavn@lelycenter.com" value="${escAttr(d.altMail)}" />
+          </div>
+        </div>
+        <div class="visToggles">
+          <div class="visToggleRow">
+            <input type="checkbox" id="eFodselsdagVises" ${d.fodselsdagVises === false ? "" : "checked"} />
+            <label for="eFodselsdagVises">Vis tillykke på forsiden på min fødselsdag (fredag, hvis den falder i en weekend)</label>
+          </div>
+        </div>
+        <div class="editHint">Kolleger ser kun dag og måned – ikke årstallet.</div>
+      `;
+    }
+
+    // ── Allergier, diabetes og andet relevant ─────────────────────────────────
+    const HELBRED_LABELS = {
+      leder: "Kun ledere (samt løn og admin) må se det",
+      alle:  "Alle kolleger må se det"
+    };
+
+    function renderHelbredView(d) {
+      if (d.helbredVisibleToMe === false) {
+        return `<div class="stateMsg" style="padding:.6rem 0; color:#6b7280; font-size:.86rem;">Oplysningerne er kun synlige for ledere.</div>`;
+      }
+      const synlighed = HELBRED_LABELS[d.helbredSynlighed] || HELBRED_LABELS.leder;
+      if (!d.allergier && !d.diabetes && !d.helbredAndet) {
+        return `<div class="stateMsg" style="padding:.6rem 0; color:#6b7280; font-size:.86rem;">Ingen oplysninger registreret.</div>`;
+      }
+      return detailGrid([
+        { label: "Allergier",      value: esc(d.allergier || "–"), multiline: true },
+        { label: "Diabetes",       value: d.diabetes ? "Ja" : "–" },
+        { label: "Andet relevant", value: esc(d.helbredAndet || "–"), multiline: true, full: true }
+      ]) + `<div class="noedVisibility"><b>Synlighed:</b> ${esc(synlighed)}</div>`;
+    }
+
+    function renderHelbredEditForm(d) {
+      const syn = d.helbredSynlighed === "alle" ? "alle" : "leder";
+      document.getElementById("mHelbred").innerHTML = `
+        <div class="editFormGrid">
+          <div class="editField full">
+            <label for="eAllergier">Allergier</label>
+            <textarea id="eAllergier" maxlength="2000" placeholder="fx nødder, gluten, laktose">${esc(d.allergier || "")}</textarea>
+          </div>
+          <div class="editField full">
+            <label for="eHelbredAndet">Andet relevant</label>
+            <textarea id="eHelbredAndet" maxlength="2000" placeholder="fx vegetar, kører ikke i bus, særlige hensyn">${esc(d.helbredAndet || "")}</textarea>
+          </div>
+        </div>
+        <div class="visToggles">
+          <div class="visToggleRow">
+            <input type="checkbox" id="eDiabetes" ${d.diabetes ? "checked" : ""} />
+            <label for="eDiabetes">Har diabetes</label>
+          </div>
+        </div>
+        <div class="visRadioGroup">
+          <div class="visRadioRow">
+            <input type="radio" name="helbredSynlighed" id="helbredLeder" value="leder" ${syn === "leder" ? "checked" : ""} />
+            <label for="helbredLeder">${esc(HELBRED_LABELS.leder)}</label>
+          </div>
+          <div class="visRadioRow">
+            <input type="radio" name="helbredSynlighed" id="helbredAlle" value="alle" ${syn === "alle" ? "checked" : ""} />
+            <label for="helbredAlle">${esc(HELBRED_LABELS.alle)}</label>
+          </div>
+        </div>
+        <div class="editHint">Frivilligt. Bruges fx til bestilling af mad til firmaarrangementer.</div>
+      `;
+    }
+
+    // ── Personaleliste (udskrift) ─────────────────────────────────────────────
+    // Udskriver de medarbejdere, der er vist i listen lige nu (søgning og
+    // afdelingsfilter gælder). Ekstra oplysninger hentes fra
+    // /api/employee-private-list, som selv skjuler det, man ikke må se.
+    const PL_COLS = [
+      { key: "afdeling",     label: "Afdeling",        def: true,  get: (u) => u.department },
+      { key: "titel",        label: "Titel",                       get: (u) => u.jobTitle },
+      { key: "mail",         label: "Mail",                        get: (u) => u.mail || u.userPrincipalName },
+      { key: "altMail",      label: "Alternativ mail",             get: (u, p) => p?.altMail },
+      { key: "tlf",          label: "Telefon",                     get: (u) => bizPhone(u) || u.mobilePhone },
+      { key: "techId",       label: "TechID",                      get: (u, p) => p?.techId },
+      { key: "fodselsdag",   label: "Fødselsdag",                  get: (u, p) => p ? fmtFodselsdag(p) : "" },
+      { key: "allergier",    label: "Allergier",       def: true,  health: true, get: (u, p) => p?.allergier },
+      { key: "diabetes",     label: "Diabetes",        def: true,  health: true, get: (u, p) => p?.diabetes ? "Ja" : "" },
+      { key: "helbredAndet", label: "Andet relevant",  def: true,  health: true, get: (u, p) => p?.helbredAndet },
+      { key: "kryds",        label: "✓",               def: true,  blank: true, width: "12mm" },
+      { key: "bemaerkning",  label: "Bemærkning",                  blank: true, width: "45mm" }
+    ];
+
+    function openPlModal() {
+      const n = getFiltered().length;
+      document.getElementById("plInfo").textContent =
+        `${n} medarbejder${n === 1 ? "" : "e"} fra listen (din søgning og afdelingsfilter gælder).`;
+      document.getElementById("plCols").innerHTML = PL_COLS.map(c => `
+        <label><input type="checkbox" class="plColCheck" value="${c.key}" ${c.def ? "checked" : ""} />
+          ${c.blank ? (c.key === "kryds" ? "Tom kolonne til afkrydsning" : "Tom kolonne: Bemærkning") : esc(c.label)}</label>`).join("");
+      document.getElementById("plMsg").textContent = "";
+      document.getElementById("plAccessNote").textContent = "";
+      document.getElementById("plModalBackdrop").classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+    function closePlModal() {
+      document.getElementById("plModalBackdrop").classList.remove("open");
+      document.body.style.overflow = "";
+    }
+
+    async function runPrintPersonaleliste() {
+      const btn = document.getElementById("plPrintBtn");
+      const msg = document.getElementById("plMsg");
+      const keys = new Set([...document.querySelectorAll(".plColCheck:checked")].map(cb => cb.value));
+      const cols = PL_COLS.filter(c => keys.has(c.key));
+      const onlyHelbred = document.getElementById("plOnlyHelbred").checked;
+      const title = document.getElementById("plTitle").value.trim() || "Personaleliste";
+
+      btn.disabled = true;
+      msg.className = "saveMsg";
+      msg.textContent = "Henter oplysninger…";
+      let data;
+      try {
+        const r = await fetch("/api/employee-private-list", { cache: "no-store" });
+        data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      } catch (e) {
+        msg.textContent = "Fejl: " + e.message;
+        msg.classList.add("err");
+        btn.disabled = false;
+        return;
+      }
+      btn.disabled = false;
+      msg.textContent = "";
+
+      const byMail = new Map((data.rows || []).map(p => [p.mail, p]));
+      const priv = (u) => byMail.get(String(u.mail || u.userPrincipalName || "").toLowerCase()) || null;
+      const hasHelbred = (p) => !!p && p.helbredVisible && !!(p.allergier || p.diabetes || p.helbredAndet);
+
+      let users = getFiltered();
+      if (onlyHelbred) users = users.filter(u => hasHelbred(priv(u)));
+      if (!users.length) {
+        msg.textContent = onlyHelbred ? "Ingen af de viste personer har registreret allergier, diabetes eller andet." : "Ingen medarbejdere at udskrive.";
+        msg.classList.add("err");
+        return;
+      }
+
+      const cell = (c, u, p) => {
+        if (c.blank) return `<td class="pl-blank"${c.width ? ` style="width:${c.width}"` : ""}></td>`;
+        if (c.health && p && !p.helbredVisible) return `<td><span class="pl-hidden">kun for ledere</span></td>`;
+        return `<td>${esc(c.get(u, p) || "")}</td>`;
+      };
+      const usesHealth = cols.some(c => c.health);
+      const orientation = cols.filter(c => !c.blank).length > 5 ? "pl-landscape" : "pl-portrait";
+
+      const printArea = document.getElementById("printArea");
+      printArea.classList.add("pl-mode");
+      printArea.innerHTML = `
+        <div class="pl-print ${orientation}">
+          <div class="pl-head">
+            <div class="pl-title">${esc(title)}</div>
+            <div class="pl-meta">${new Date().toLocaleDateString("da-DK")} · ${users.length} person${users.length === 1 ? "" : "er"}</div>
+          </div>
+          <table class="pl-table">
+            <thead><tr><th>#</th><th>Navn</th>${cols.map(c => `<th>${esc(c.label)}</th>`).join("")}</tr></thead>
+            <tbody>
+              ${users.map((u, i) => {
+                const p = priv(u);
+                return `<tr><td class="pl-num">${i + 1}</td><td class="pl-name">${esc(u.displayName || "")}</td>${cols.map(c => cell(c, u, p)).join("")}</tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+          ${usesHealth ? `<div class="pl-foot">Fortroligt: listen kan indeholde helbredsoplysninger. Del den kun med dem, der skal bruge den, og makulér den efter brug.</div>` : ""}
+        </div>`;
+
+      const cleanup = () => {
+        printArea.classList.remove("pl-mode");
+        printArea.innerHTML = "";
+        window.removeEventListener("afterprint", cleanup);
+      };
+      window.addEventListener("afterprint", cleanup);
+      closePlModal();
+      setTimeout(() => window.print(), 50);
     }
 
     // ── Nødkontakter ──────────────────────────────────────────────────────────
@@ -1904,7 +2222,15 @@ if (window.updateHeaderStatus) {
         telefonVises:  document.getElementById("eTelefonVises").checked,
         adresseVises:  document.getElementById("eAdresseVises").checked,
         noedKontakter,
-        noedSynlighed: noedSynlighedInput ? noedSynlighedInput.value : ""
+        noedSynlighed: noedSynlighedInput ? noedSynlighedInput.value : "",
+        fodselsdag:       document.getElementById("eFodselsdag").value.trim(),
+        fodselsdagVises:  document.getElementById("eFodselsdagVises").checked,
+        altMail:          document.getElementById("eAltMail").value.trim(),
+        techId:           document.getElementById("eTechId").value.trim(),
+        allergier:        document.getElementById("eAllergier").value.trim(),
+        diabetes:         document.getElementById("eDiabetes").checked,
+        helbredAndet:     document.getElementById("eHelbredAndet").value.trim(),
+        helbredSynlighed: document.querySelector('input[name="helbredSynlighed"]:checked')?.value || "leder"
       };
 
       try {
@@ -1916,7 +2242,11 @@ if (window.updateHeaderStatus) {
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
 
-        currentPrivateData = { found: true, ...payload };
+        currentPrivateData = {
+          found: true, ...payload,
+          fodselsdagMd: payload.fodselsdag ? payload.fodselsdag.slice(5) : null,
+          helbredVisibleToMe: true, noedVisibleToMe: true
+        };
         msg.textContent = "Gemt ✓";
         msg.classList.add("ok");
 
@@ -1927,6 +2257,8 @@ if (window.updateHeaderStatus) {
           editBtn.classList.remove("cancel");
           document.getElementById("mPrivatDetails").innerHTML = renderPrivateView(currentPrivateData);
           document.getElementById("mNoedkontakter").innerHTML = renderEmergencyView(currentPrivateData);
+          document.getElementById("mOvrige").innerHTML = renderOvrigeView(currentPrivateData);
+          document.getElementById("mHelbred").innerHTML = renderHelbredView(currentPrivateData);
           document.getElementById("mPrivatEditActions").innerHTML = "";
         }, 600);
       } catch (e) {
