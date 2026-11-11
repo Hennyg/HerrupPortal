@@ -620,6 +620,151 @@ async function searchPeople(q, box) {
   }
 }
 
+// ── Kunder i det øverste søgefelt ───────────────────────────────────────────
+// Når man skriver i søgefeltet øverst på forsiden (#q), vises matchende kunder
+// fra Kundelisten i en boks under medarbejderne. Kun for brugere med rollen
+// portal_kundeliste (eller som ser en tile med URL /kundeliste.html).
+// Søger i de samme felter som søgefeltet i kundeliste.html: kundenr, navn,
+// område, kundestatus, kontrakt og aktiv/inaktiv. Data: /api/kunder (alle
+// kunder, aktive og inaktive), hentes første gang der søges og huskes, til
+// siden genindlæses. Klik åbner kunden i kunde.html i en ny fane.
+const KUNDE_ROLES = ["portal_kundeliste"];
+const KUNDE_SEARCH_PATHS = ["/kundeliste.html"];
+const KUNDE_MAX = 8;
+let kundeSearchEnabled = false;
+let kundeTimer = null;
+let kundeSeq = 0;
+let kundeCache = null;     // array med kunder, når de er hentet
+let kundePromise = null;   // igangværende hentning
+
+function isKundelisteTile(it) {
+  try {
+    const u = new URL(it?.url || "", location.origin);
+    if (u.origin !== location.origin) return false;
+    return KUNDE_SEARCH_PATHS.includes(u.pathname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function injectKundeCss() {
+  injectPeopleCss();
+  if (document.getElementById("kundeHitsCss")) return;
+  const st = document.createElement("style");
+  st.id = "kundeHitsCss";
+  st.textContent = `
+    .kundeHit .pav { border-radius:10px; font-size:.7rem; }
+    .kundeHit.harXX .pn { color:#c30a14; }
+    .kundeHit.inaktiv { opacity:.6; }
+    .peopleHits h3 a { font-weight:400; font-size:.85rem; margin-left:auto; color:#850c18; }
+  `;
+  document.head.appendChild(st);
+}
+
+function kundeContainer() {
+  let box = document.getElementById("kundeHits");
+  if (box) return box;
+  const sections = document.getElementById("sections");
+  if (!sections) return null;
+  injectKundeCss();
+  box = document.createElement("div");
+  box.id = "kundeHits";
+  box.className = "peopleHits";
+  box.hidden = true;
+  sections.parentNode.insertBefore(box, sections);
+  box.addEventListener("click", (e) => {
+    const btn = e.target.closest(".kundeHit[data-kundenr]");
+    if (!btn) return;
+    window.open(`/kunde.html?kundenr=${encodeURIComponent(btn.dataset.kundenr)}`, "_blank", "noopener");
+  });
+  return box;
+}
+
+function loadKundeCache() {
+  if (kundeCache) return Promise.resolve(kundeCache);
+  if (kundePromise) return kundePromise;
+  kundePromise = (async () => {
+    const r = await fetch("/api/kunder?aktiv=", { cache: "no-store" });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+    kundeCache = Array.isArray(data.kunder) ? data.kunder : [];
+    return kundeCache;
+  })();
+  // Ved fejl må næste søgning prøve igen
+  kundePromise.catch(() => {}).finally(() => { kundePromise = null; });
+  return kundePromise;
+}
+
+// Samme søgetekst som kundeliste.html
+function kundeSearchText(k) {
+  return [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt, k.aktiv ? "aktiv" : "inaktiv"]
+    .join(" ").toLowerCase();
+}
+
+function updateKundeHits(rawQuery) {
+  const box = kundeContainer();
+  if (!box) return;
+  const q = String(rawQuery || "").trim();
+  clearTimeout(kundeTimer);
+  if (!kundeSearchEnabled || q.length < 2) {
+    kundeSeq++;
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  kundeTimer = setTimeout(() => searchKunder(q, box), 250);
+}
+
+async function searchKunder(q, box) {
+  const seq = ++kundeSeq;
+  try {
+    if (!kundeCache) {
+      box.innerHTML = `<div class="peopleInfo">Søger i kunder…</div>`;
+      box.hidden = false;
+    }
+    const all = await loadKundeCache();
+    if (seq !== kundeSeq) return;
+
+    const ql = q.toLowerCase();
+    const list = all.filter(k => kundeSearchText(k).includes(ql));
+    // Aktive først, så eksakt kundenr, så navne der starter med søgningen
+    const rank = (k) =>
+      (k.aktiv === false ? 10 : 0) +
+      (String(k.kundenr || "").toLowerCase() === ql ? 0 : (String(k.navn || "").toLowerCase().startsWith(ql) ? 1 : 2));
+    list.sort((a, b) => rank(a) - rank(b) || String(a.navn || "").localeCompare(String(b.navn || ""), "da"));
+
+    if (!list.length) { box.hidden = true; box.innerHTML = ""; return; }
+
+    const shown = list.slice(0, KUNDE_MAX);
+    const allLink = `/kundeliste.html?${new URLSearchParams({ q, aktiv: "" }).toString()}`;
+    box.innerHTML = `
+      <h3>Kunder <span class="muted">${list.length > KUNDE_MAX ? `${KUNDE_MAX} af ${list.length} – skriv mere for at indsnævre` : list.length}</span>
+        <a href="${esc(allLink)}" target="_blank" rel="noopener">Vis i kundelisten →</a></h3>
+      <div class="peopleGrid">
+        ${shown.map(k => {
+          const sub = [k.kundenr, k.omraade, k.kundestatus, k.kontrakt, k.aktiv === false ? "Inaktiv" : ""].filter(Boolean).join(" · ");
+          const cls = ["personHit", "kundeHit", k.harXX ? "harXX" : "", k.aktiv === false ? "inaktiv" : ""].filter(Boolean).join(" ");
+          return `
+          <button type="button" class="${cls}" data-kundenr="${esc(k.kundenr)}" title="Åbn ${esc(k.navn || "")} i kundelisten">
+            <span class="pav">${esc(String(k.kundenr || "").slice(-4) || "#")}</span>
+            <span class="pt">
+              <div class="pn">${esc(k.navn || "–")}</div>
+              <div class="ps">${esc(sub)}</div>
+            </span>
+          </button>`;
+        }).join("")}
+      </div>`;
+    box.hidden = false;
+  } catch (e) {
+    if (seq !== kundeSeq) return;
+    const msg = e instanceof TypeError
+      ? "Forbindelsen blev afbrudt – din login-session er sandsynligvis udløbet. Genindlæs siden."
+      : e.message;
+    box.innerHTML = `<div class="peopleInfo">Kunne ikke søge efter kunder: ${esc(msg)}</div>`;
+    box.hidden = false;
+  }
+}
+
 // ── Browser/Desktop-tile (Admin: Åbn = "Browser / Desktop") ──────────────────
 // I stedet for beskrivelsen får tile'n to knapper: "Browser" åbner linket som
 // normalt, "Desktop" åbner filen i Office-appen via ms-excel:/ms-word:/ms-powerpoint:.
@@ -1021,8 +1166,24 @@ function renderSections(items, myFavItems) {
   setSelectOptions(catSel, categories, { includeEmpty: true, emptyText: "Alle kategorier" });
   setSelectOptions(grpSel, groups, { includeEmpty: true, emptyText: "Alle grupper" });
 
+  // Medarbejdersøgning i det øverste søgefelt - kun hvis brugeren har adgang
+  // til Personalelisten (ser en /herrup.html-tile)
+  peopleSearchEnabled = itemsAll.some(isEmployeeSearchTile);
+  // Kundesøgning - kun med rollen portal_kundeliste (eller en /kundeliste.html-tile)
+  kundeSearchEnabled = roles.some(r => KUNDE_ROLES.includes(r)) || itemsAll.some(isKundelisteTile);
+
+  // Søgefeltets tekst afspejler, hvad brugeren kan søge i
   const q = document.getElementById("q");
-  if (q) q.placeholder = itemsAll.some(isEmployeeSearchTile) ? "Søg i apps og medarbejdere..." : "Søg...";
+  if (q) {
+    const parts = ["apps"];
+    if (peopleSearchEnabled) parts.push("medarbejdere");
+    if (kundeSearchEnabled) parts.push("kunder");
+    q.placeholder = parts.length === 1
+      ? "Søg..."
+      : `Søg i ${parts.slice(0, -1).join(", ")} og ${parts[parts.length - 1]}...`;
+    // Hent kunderne i baggrunden, så snart brugeren går i søgefeltet
+    if (kundeSearchEnabled) q.addEventListener("focus", () => { loadKundeCache().catch(() => {}); }, { once: true });
+  }
   const qx = document.getElementById("qx");
 
   function syncClearBtn() {
@@ -1030,13 +1191,10 @@ function renderSections(items, myFavItems) {
     qx.style.visibility = q.value ? "visible" : "hidden";
   }
 
-  // Medarbejdersøgning i det øverste søgefelt - kun hvis brugeren har adgang
-  // til Personalelisten (ser en /herrup.html-tile)
-  peopleSearchEnabled = itemsAll.some(isEmployeeSearchTile);
-
   function render() {
     const qq = (q?.value || "").toLowerCase();
     updatePeopleHits(q?.value || "");
+    updateKundeHits(q?.value || "");
     const cat = catSel?.value || "";
     const grp = grpSel?.value || "";
     const matchesSearch = (x) => !qq
