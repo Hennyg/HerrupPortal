@@ -251,7 +251,7 @@ async function load(){
  if(!r.ok || j.error) return setStatus('error','Fejl: '+esc(j.error || r.status));
  state = { kunde:j.kunde, adresser:j.adresser||[], produkter:j.produkter||[], selectedAdresseKey:'' };
  setStatus('',''); document.getElementById('content').style.display='block'; render();
- loadSalmonella(j.kunde?.chr);
+ loadSalmonella(j.kunde?.chr, j.adresser || []);
  if (snFilter) openProdukter();
 }
 
@@ -290,11 +290,20 @@ function salTileHtml(){
   return salSort(sal.list).map(h => { const dc = salDateClass(h.salmonellaStatus, h.salmonellaDato); return `
     <div class="salLine">${multi ? `<span class="chrNr">CHR ${esc(h.chr)}</span>` : ''}${salBadge(h.salmonellaStatus)}${h.salmonellaDato ? `<span class="salDate ${dc}">${esc(dateText(h.salmonellaDato))}</span>` : ''}</div>`; }).join('');
 }
-async function loadSalmonella(chr){
+// Slår både kundens CHR-numre OG kundens adresser op i besætningstabellen,
+// så en adresse får status, selvom dens CHR-nr. ikke står på kunden.
+async function loadSalmonella(chr, adresser){
   const value = String(chr || '').trim();
-  if (!value) { sal = { state:'nochr', list:[] }; return updateSalTile(); }
+  const adr = (adresser || [])
+    .filter(a => a.adresse)
+    .map(a => `${String(a.adresse).replace(/[|;]/g, ' ')}|${String(a.postnr || '').trim()}`)
+    .join(';');
+  if (!value && !adr) { sal = { state:'nochr', list:[] }; return updateSalTile(); }
   try {
-    const r = await fetch('/api/kunde-salmonella?chr=' + encodeURIComponent(value));
+    const qs = new URLSearchParams();
+    if (value) qs.set('chr', value);
+    if (adr) qs.set('adr', adr);
+    const r = await fetch('/api/kunde-salmonella?' + qs.toString());
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.status);
     sal = { state:'ok', list: Array.isArray(j.besaetninger) ? j.besaetninger : [] };
@@ -372,9 +381,15 @@ function render(){
 // tegnsætning ignoreres; "Asfergvej 28, Asferg" matcher "Asfergvej 28").
 function normAdr(s){ return String(s || '').toLowerCase().split(',')[0].replace(/[^a-z0-9æøå]+/g, ''); }
 function herdMatchesAddress(h, a){
-  const ha = normAdr(h.adresse), aa = normAdr(a.adresse);
+  // Ejendommens eller brugerens adresse (nyere API) - ellers den samlede adresse
+  const alts = [[h.ejendomAdresse, h.ejendomPostnr], [h.brugerAdresse, h.brugerPostnr]].filter(([x]) => x);
+  if (alts.length) return alts.some(([adr, pn]) => herdAddrMatch(adr, pn, a));
+  return herdAddrMatch(h.adresse, h.postnr, a);
+}
+function herdAddrMatch(adr, postnr, a){
+  const ha = normAdr(adr), aa = normAdr(a.adresse);
   if (!ha || !aa || ha !== aa) return false;
-  const hp = String(h.postnr || '').trim(), ap = String(a.postnr || '').trim();
+  const hp = String(postnr || '').trim(), ap = String(a.postnr || '').trim();
   return !hp || !ap || hp === ap;
 }
 const isFri = h => String(h.salmonellaStatus || '').trim().toLowerCase() === 'fri';

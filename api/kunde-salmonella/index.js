@@ -4,6 +4,13 @@
 // Salmonella-appens (CHR-external) Dataverse-miljø for ét eller flere
 // CHR-numre: /api/kunde-salmonella?chr=12345,67890
 //
+// Desuden kan kundens adresser slås op direkte i tabellen:
+//   /api/kunde-salmonella?chr=...&adr=Kanalvej 20|8500;Dalsagervej 1|8500
+// Så findes besætninger på adressen, selvom deres CHR-nr. ikke står på kunden.
+// Der matches på ejendommens OG brugerens adresse (vejnavn + husnr. + postnr.,
+// store/små bogstaver, mellemrum og tegnsætning ignoreres). Kun eksakte
+// match returneres.
+//
 // App settings:
 //   CHR_DV_URL          Salmonella-appens DATAVERSE_URL (påkrævet)
 //   CHR_TABLE_PLURAL    valgfri, standard cr406_chrdatas
@@ -73,6 +80,30 @@ function parseChrList(value) {
   )].slice(0, 25);
 }
 
+// "Asfergvej 28, Asferg" -> "asfergvej28" (samme regel som kunde.html)
+function normAdr(s) {
+  return String(s || "").toLowerCase().split(",")[0].replace(/[^a-z0-9æøå]+/g, "");
+}
+
+// "Kanalvej 20|8500;Dalsagervej 1|8500" -> [{ adresse, postnr, norm, vej }]
+function parseAdrList(value) {
+  const seen = new Set();
+  const out = [];
+  for (const part of String(value || "").split(";")) {
+    const [adresse = "", postnr = ""] = part.split("|");
+    const norm = normAdr(adresse);
+    // Vejnavn = alt før første ciffer ("Kanalvej 20" -> "Kanalvej")
+    const vej = adresse.split(",")[0].replace(/\s*\d.*$/, "").trim();
+    const pn = postnr.replace(/[^0-9]/g, "");
+    if (!norm || !vej || seen.has(norm + "|" + pn)) continue;
+    seen.add(norm + "|" + pn);
+    out.push({ adresse: adresse.trim(), postnr: pn, norm, vej });
+  }
+  return out.slice(0, 15);
+}
+
+function odataStr(s) { return String(s).replace(/'/g, "''"); }
+
 function mapRow(r) {
   const sygdomme = SYGDOMME.map(kode => {
     const k = kode.toLowerCase();
@@ -90,6 +121,11 @@ function mapRow(r) {
     adresse: r.cr406_ejendomadresse || r.cr406_brugeradresse || "",
     postnr: r.cr406_ejendompostnr || r.cr406_brugerpostnummer || "",
     by: r.cr406_ejendomby || r.cr406_brugerbynavn || "",
+    // Begge adresser, så kunde.html kan koble på den ene eller den anden
+    ejendomAdresse: r.cr406_ejendomadresse || "",
+    ejendomPostnr: String(r.cr406_ejendompostnr ?? ""),
+    brugerAdresse: r.cr406_brugeradresse || "",
+    brugerPostnr: String(r.cr406_brugerpostnummer ?? ""),
     salmonellaStatus: r.cr406_uisygdomsniveautekst || "",
     salmonellaDato: r.cr406_sdudatoveterinrstatus || "",
     kreaturerIAlt: r.cr406_kreaturerialt ?? null,
@@ -100,10 +136,24 @@ function mapRow(r) {
   };
 }
 
+// Matcher besætningen en af adresserne (ejendom eller bruger)?
+function rowMatchesAdr(r, a) {
+  const pairs = [
+    [r.cr406_ejendomadresse, r.cr406_ejendompostnr],
+    [r.cr406_brugeradresse, r.cr406_brugerpostnummer]
+  ];
+  return pairs.some(([adr, pn]) => {
+    if (normAdr(adr) !== a.norm) return false;
+    const p = String(pn ?? "").replace(/[^0-9]/g, "");
+    return !p || !a.postnr || p === a.postnr;
+  });
+}
+
 module.exports = async function (context, req) {
   try {
     const chrList = parseChrList(req.query.chr);
-    if (!chrList.length) return json(context, 200, { chr: [], besaetninger: [] });
+    const adrList = parseAdrList(req.query.adr);
+    if (!chrList.length && !adrList.length) return json(context, 200, { chr: [], besaetninger: [] });
 
     const resource = dvUrl();
     const table = process.env.CHR_TABLE_PLURAL || "cr406_chrdatas";
@@ -126,15 +176,54 @@ module.exports = async function (context, req) {
       );
     };
 
-    let r = await query(true);
-    if (r.status === 400) r = await query(false);
-    const txt = await r.text();
-    if (!r.ok) throw new Error(`dv_error ${r.status}: ${txt.slice(0, 300)}`);
+    const byChr = new Map();   // cr406_chr -> rå række (dubletter fjernes)
+    const add = (list) => { for (const row of list) byChr.set(String(row.cr406_chr || ""), row); };
 
-    const rows = (JSON.parse(txt).value || []).map(mapRow);
+    if (chrList.length) {
+      let r = await query(true);
+      if (r.status === 400) r = await query(false);
+      const txt = await r.text();
+      if (!r.ok) throw new Error(`dv_error ${r.status}: ${txt.slice(0, 300)}`);
+      add(JSON.parse(txt).value || []);
+    }
+
+    // Opslag på kundens adresser: vejnavn (startswith) + postnr. i Dataverse,
+    // derefter eksakt match på vej + husnr. her. Postnr. kan være tekst eller
+    // tal i tabellen - afviser Dataverse den citerede filter, prøves uden.
+    if (adrList.length) {
+      const adrQuery = quoted => {
+        const pn = p => quoted ? `'${p}'` : p;
+        const parts = adrList.map(a => {
+          const vej = odataStr(a.vej);
+          const e = `startswith(cr406_ejendomadresse,'${vej}')` + (a.postnr ? ` and cr406_ejendompostnr eq ${pn(a.postnr)}` : "");
+          const b = `startswith(cr406_brugeradresse,'${vej}')` + (a.postnr ? ` and cr406_brugerpostnummer eq ${pn(a.postnr)}` : "");
+          return `(${e}) or (${b})`;
+        });
+        return fetch(
+          `${resource}/api/data/v9.2/${table}` +
+          `?$select=${FIELDS.join(",")}&$filter=${encodeURIComponent(parts.join(" or "))}&$top=200`,
+          { headers }
+        );
+      };
+      try {
+        let r = await adrQuery(true);
+        if (r.status === 400) r = await adrQuery(false);
+        const txt = await r.text();
+        if (!r.ok) throw new Error(`dv_error ${r.status}: ${txt.slice(0, 300)}`);
+        add((JSON.parse(txt).value || []).filter(row => adrList.some(a => rowMatchesAdr(row, a))));
+      } catch (e) {
+        // Adresseopslaget må ikke vælte CHR-opslaget
+        context.log.warn("kunde-salmonella: adresseopslag fejlede", e.message);
+      }
+    }
+
+    const rows = [...byChr.values()].map(mapRow).sort((a, b) => String(a.chr).localeCompare(String(b.chr)));
     json(context, 200, { chr: chrList, besaetninger: rows });
   } catch (e) {
     context.log.error("kunde-salmonella error", e);
     json(context, e.status || 500, { error: e.message });
   }
 };
+
+
+
