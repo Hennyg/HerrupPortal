@@ -53,6 +53,11 @@
     .adrLegend .lg { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-2px; border:2px solid; }
     .adrLegend .lgRed   { border-color:#dc2626; background:#fef2f2; }
     .adrLegend .lgGreen { border-color:#16a34a; background:#f0fdf4; }
+    .adrLegend .lgYellow { border-color:#eab308; background:#fefce8; }
+    /* Adresse uden besætning i CHR-registeret */
+    .adrBox.salNone { border-color:#eab308; background:#fefce8; }
+    .adrBox.salNone.clickable:hover { background:#fef9c3; }
+    .adrNoChr { font-size:12px; color:#854d0e; margin-top:4px; }
     .adrUnmatched { margin-top:4px; color:#4b5563; }
     .txtRed { color:#b91c1c; font-weight:600; } .txtGreen { color:#15803d; font-weight:600; }
     .salDate { font-size:11px; color:#6b7280; }
@@ -411,10 +416,12 @@ function renderAdresser(adresser){
   const selected = state.selectedAdresseKey ? adresser.filter(a=>a.adressekey===state.selectedAdresseKey) : adresser;
   const list = selected.map(a => {
     const herds = herdsFor(a);
-    const cls = !herds.length ? '' : herds.some(h => !isFri(h)) ? ' salRed' : ' salGreen';
+    // Gul ramme: opslaget lykkedes, men der står ingen besætning på adressen
+    const noChr = sal.state === 'ok' && !herds.length;
+    const cls = noChr ? ' salNone' : !herds.length ? '' : herds.some(h => !isFri(h)) ? ' salRed' : ' salGreen';
     const chrInfo = herds.length
       ? `<div class="adrChr">${salSort(herds).map(h => `CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}${h.salmonellaDato ? ` ${esc(dateText(h.salmonellaDato))}` : ''}`).join('<br>')}</div>`
-      : '';
+      : noChr ? '<div class="adrNoChr">Ingen CHR-nummer på denne adresse</div>' : '';
     const multi = adresser.length > 1;
     const sel = state.selectedAdresseKey === a.adressekey;
     const click = multi ? ` onclick="toggleAddress('${escAttr(a.adressekey)}')" title="${sel ? 'Vis alle adresser' : 'Vis kun produkter på denne adresse'}"` : '';
@@ -425,12 +432,12 @@ function renderAdresser(adresser){
 
 // Forklaring nederst i Adresser-tile'n (+ besætninger der ikke kunne kobles)
 function salAdrLegend(adresser){
-  if (sal.state !== 'ok' || !sal.list.length) return '';
+  if (sal.state !== 'ok') return '';
   const unmatched = salSort(sal.list.filter(h => !adresser.some(a => herdMatchesAddress(h, a))));
   return `<div class="adrLegend">
     <div><span class="lg lgRed"></span>Rød ramme: salmonella på en besætning (CHR) på adressen</div>
     <div><span class="lg lgGreen"></span>Grøn ramme: besætningen på adressen er fri</div>
-    <div class="muted">Uden ramme: ingen besætning fundet på adressen</div>
+    <div><span class="lg lgYellow"></span>Gul ramme: ingen CHR-nummer på adressen</div>
     ${unmatched.length ? `<div class="adrUnmatched">Kunne ikke kobles til en adresse:<br>${unmatched.map(h => {
       const adr = [h.adresse, [h.postnr, h.by].filter(Boolean).join(' ')].filter(Boolean).join(', ');
       return `<span class="${isFri(h) ? 'txtGreen' : 'txtRed'}">CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}</span>${adr ? ` – ${esc(adr)}` : ''}`;
