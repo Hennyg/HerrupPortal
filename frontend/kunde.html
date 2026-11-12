@@ -40,6 +40,12 @@
 
     /* Adresser markeret efter salmonellastatus på besætningen (CHR) */
     .adrBox { border:2px solid transparent; border-radius:8px; padding:8px 10px; margin:0 0 10px; }
+    /* Klik på en adresse filtrerer produkterne (klik igen = alle adresser) */
+    .adrBox.clickable { cursor:pointer; transition:background .15s, box-shadow .15s; }
+    .adrBox.clickable:hover { background:#f9fafb; box-shadow:0 0 0 1px #e5e7eb; }
+    .adrBox.salRed.clickable:hover   { background:#fee2e2; }
+    .adrBox.salGreen.clickable:hover { background:#dcfce7; }
+    .adrBox.selected { box-shadow:0 0 0 2px var(--red); }
     .adrBox.salRed   { border-color:#dc2626; background:#fef2f2; }
     .adrBox.salGreen { border-color:#16a34a; background:#f0fdf4; }
     .adrChr { font-size:12px; color:#4b5563; margin-top:4px; }
@@ -357,6 +363,8 @@ function countByProduct(products){
   return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'da') || (a.xx - b.xx));
 }
 function setAddress(key){ state.selectedAdresseKey = key || ''; render(); }
+// Klik på en adresseboks: vælg adressen – eller tilbage til alle, hvis den allerede er valgt
+function toggleAddress(key){ setAddress(state.selectedAdresseKey === key ? '' : key); }
 
 function render(){
  const k=state.kunde, adresser=state.adresser;
@@ -405,7 +413,10 @@ function renderAdresser(adresser){
     const chrInfo = herds.length
       ? `<div class="adrChr">${salSort(herds).map(h => `CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}${h.salmonellaDato ? ` ${esc(dateText(h.salmonellaDato))}` : ''}`).join('<br>')}</div>`
       : '';
-    return `<div class="adrBox${cls}"><b>${esc(a.adresse)}</b><br>${esc(a.postnr)} ${esc(a.by)}${chrInfo}</div>`;
+    const multi = adresser.length > 1;
+    const sel = state.selectedAdresseKey === a.adressekey;
+    const click = multi ? ` onclick="toggleAddress('${escAttr(a.adressekey)}')" title="${sel ? 'Vis alle adresser' : 'Vis kun produkter på denne adresse'}"` : '';
+    return `<div class="adrBox${cls}${multi ? ' clickable' : ''}${sel ? ' selected' : ''}"${click}><b>${esc(a.adresse)}</b><br>${esc(a.postnr)} ${esc(a.by)}${chrInfo}</div>`;
   }).join('');
   return buttons + list + salAdrLegend(adresser);
 }
