@@ -7,7 +7,8 @@
 // Desuden kan kundens adresser slås op direkte i tabellen:
 //   /api/kunde-salmonella?chr=...&adr=Kanalvej 20|8500;Dalsagervej 1|8500
 // Så findes besætninger på adressen, selvom deres CHR-nr. ikke står på kunden.
-// Der matches på ejendommens OG brugerens adresse (vejnavn + husnr. + postnr.,
+// Der matches på ejendommens adresse - brugerens kun, hvis ejendomsadressen
+// mangler (vejnavn + husnr. + postnr.,
 // store/små bogstaver, mellemrum og tegnsætning ignoreres). Kun eksakte
 // match returneres.
 //
@@ -136,17 +137,16 @@ function mapRow(r) {
   };
 }
 
-// Matcher besætningen en af adresserne (ejendom eller bruger)?
+// Står besætningen på adressen? Ejendommens adresse bruges; brugerens
+// (ejerens) adresse kun, hvis besætningen ikke har en ejendomsadresse.
+// Samme regel som kunde.html.
 function rowMatchesAdr(r, a) {
-  const pairs = [
-    [r.cr406_ejendomadresse, r.cr406_ejendompostnr],
-    [r.cr406_brugeradresse, r.cr406_brugerpostnummer]
-  ];
-  return pairs.some(([adr, pn]) => {
-    if (normAdr(adr) !== a.norm) return false;
-    const p = String(pn ?? "").replace(/[^0-9]/g, "");
-    return !p || !a.postnr || p === a.postnr;
-  });
+  const [adr, pn] = r.cr406_ejendomadresse
+    ? [r.cr406_ejendomadresse, r.cr406_ejendompostnr]
+    : [r.cr406_brugeradresse, r.cr406_brugerpostnummer];
+  if (normAdr(adr) !== a.norm) return false;
+  const p = String(pn ?? "").replace(/[^0-9]/g, "");
+  return !p || !a.postnr || p === a.postnr;
 }
 
 module.exports = async function (context, req) {

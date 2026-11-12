@@ -389,9 +389,11 @@ function render(){
 // tegnsætning ignoreres; "Asfergvej 28, Asferg" matcher "Asfergvej 28").
 function normAdr(s){ return String(s || '').toLowerCase().split(',')[0].replace(/[^a-z0-9æøå]+/g, ''); }
 function herdMatchesAddress(h, a){
-  // Ejendommens eller brugerens adresse (nyere API) - ellers den samlede adresse
-  const alts = [[h.ejendomAdresse, h.ejendomPostnr], [h.brugerAdresse, h.brugerPostnr]].filter(([x]) => x);
-  if (alts.length) return alts.some(([adr, pn]) => herdAddrMatch(adr, pn, a));
+  // Ejendommens adresse = hvor besætningen står. Brugerens adresse er ejerens
+  // (fx hovedgården, der ejer flere besætninger) og bruges KUN, hvis
+  // besætningen ikke har en ejendomsadresse.
+  if (h.ejendomAdresse) return herdAddrMatch(h.ejendomAdresse, h.ejendomPostnr, a);
+  if (h.brugerAdresse)  return herdAddrMatch(h.brugerAdresse, h.brugerPostnr, a);
   return herdAddrMatch(h.adresse, h.postnr, a);
 }
 function herdAddrMatch(adr, postnr, a){
