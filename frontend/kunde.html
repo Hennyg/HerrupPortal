@@ -74,6 +74,34 @@
     .prodModalBody { flex:1; min-height:0; display:flex; flex-direction:column; padding:12px 18px 16px; }
     .prodModalBody .tableWrap { flex:1; min-height:0; max-height:none !important; }
 
+    /* Søgning på serienummer: kun det produkt vises */
+    .snBanner { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fdf2f2; border:1px solid #f5c2c2;
+                border-radius:8px; padding:8px 12px; margin:0 0 10px; font-size:14px; }
+    .snBanner b { color:var(--red); }
+    .snBanner[hidden] { display:none; }
+
+    /* Klik på et produkt → options på produktlinjen */
+    #tbody tr.prodRow { cursor:pointer; }
+    #tbody tr.prodRow:hover td { background:#fdf2f2; }
+    .optToolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; }
+    .optToolbar .toolbarSpacer { flex:1; }
+    .optToolbar .btn.active { background:#fdf2f2; border-color:var(--red); color:var(--red); }
+    .optHead { border:1px solid #eee; border-radius:10px; padding:12px 14px; margin-bottom:14px; background:#fafafa; }
+    .optHead .optTitle { font-size:17px; font-weight:700; margin-bottom:4px; }
+    .optHead .optMeta { font-size:13px; color:#4b5563; display:flex; gap:6px 18px; flex-wrap:wrap; }
+    .optHead .optMeta b { color:#111827; font-weight:600; }
+    .optGrid { display:grid; grid-template-columns:minmax(0, 2fr) minmax(0, 1fr); gap:16px; overflow:auto; min-height:0; }
+    @media (max-width:900px) { .optGrid { grid-template-columns:1fr; } }
+    .optGrid h3 { margin:0 0 8px; font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:#6b7280; }
+    .optTable { width:100%; border-collapse:collapse; font-size:14px; }
+    .optTable td { border-bottom:1px solid #eee; padding:7px 8px; vertical-align:top; }
+    .optTable td.optVal { text-align:right; font-weight:700; white-space:nowrap; width:1%; }
+    .optTable tr.optEmpty td { color:#9ca3af; font-weight:400; }
+    .optTable tr.optSet td.optVal { color:var(--red); }
+    #prodDetailView { flex:1; min-height:0; display:flex; flex-direction:column; }
+    #prodDetailView[hidden], #prodListView[hidden] { display:none; }
+    #prodListView { flex:1; min-height:0; display:flex; flex-direction:column; }
+
     /* Produkter med "xx" i installationsdato = ikke aktive */
     .dataTable tr.inactiveXX td { color:#b91c1c; background:#fef2f2; }
     .dataTable tr.inactiveXX:hover td { background:#fde8e8; }
@@ -120,12 +148,17 @@
       <button type="button" class="closeX" id="btnCloseProdukter" title="Luk (Esc)">×</button>
     </div>
     <div class="prodModalBody">
-      <div class="panelTitleLine" style="margin:0 0 8px;">
-        <span id="tableInfo" class="muted tableInfo"></span>
-        <span class="toolbarSpacer"></span>
-        <button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button>
+      <div id="prodListView">
+        <div class="snBanner" id="snBanner" hidden></div>
+        <div class="panelTitleLine" style="margin:0 0 8px;">
+          <span id="tableInfo" class="muted tableInfo"></span>
+          <span class="muted small">Klik på et produkt for at se options på produktlinjen</span>
+          <span class="toolbarSpacer"></span>
+          <button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button>
+        </div>
+        <div class="tableWrap"><table class="dataTable"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
       </div>
-      <div class="tableWrap"><table class="dataTable"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+      <div id="prodDetailView" hidden></div>
     </div>
   </div>
 </div>
@@ -133,6 +166,8 @@
 <script>
 initUser();
 const params = new URLSearchParams(location.search); const kundenr = params.get('kundenr') || ''; const id = params.get('id') || '';
+// ?sn=... (fra søgning på serienr. i kundelisten): åbn produktlisten med kun det produkt
+let snFilter = (params.get('sn') || '').trim();
 let state = { kunde:null, adresser:[], produkter:[], selectedAdresseKey:'' };
 
 // ── Produkttabellens visninger ──────────────────────────────────────────────
@@ -152,6 +187,39 @@ const COLS = {
               html:p => isXX(p) ? '<span class="badge err">Ikke aktiv</span>' : '<span class="badge ok">Aktiv</span>' },
   note:     { label:'Note',     text:p => p.note || '' }
 };
+
+// ── Options på produktlinjen (Excel-kolonnerne MQC-C … SAND) ────────────────
+// Nøglerne er første linje af overskriften i Excel, som robotten gemmer dem i
+// cr1eb_lch_udstyr. Rækkefølgen følger regnearket. Nøgler, der ikke står her
+// (nye kolonner i Excel), vises til sidst.
+const UDSTYR_KEYS = [
+  'MQC-C',
+  'PURA (9.1189.0086.2) A3',
+  'PURA II Type-1 (5.1004.5088.0)',
+  'PURA II Type-2 (5.1005.4066.0+5.1005.5632.0)',
+  'PURA II Type-3 (5.1005.4066.0+5.1005.6256.0)',
+  'Pura Filter',
+  'Pure Water Unit (DEMI)',
+  'Pulsator type 4 – A4 -A5 -A5N',
+  'Pulsator_A3',
+  'Pulsator Type 3 (A3-A4-A5)',
+  'Pulsator Type 1 (UDG)',
+  'Non return valve type 1 (ball) A5_Ball (5.1004.0920.0) Tomblæsning',
+  'Non return valve type 2 (check valve)',
+  'CRS+',
+  'CRS M3',
+  'Milk Line 2',
+  'Mælkefilter',
+  'Twinfilter Type 1',
+  'Twinfilter Type 2',
+  'Twinfilter Type 3',
+  'Meteor2',
+  'Meteor_3',
+  'Klovskyl',
+  'SAND'
+];
+let detailShowAll = false;
+let detailProductId = null;
 const VIEWS = {
   adresse:  ['adresse', 'produkt', 'produktnr', 'serienr', 'datoer', 'kontrakt', 'note'],
   produkt:  ['produkt', 'produktnr', 'serienr', 'kontrakt', 'datoer', 'aktiv', 'adresse', 'note'],
@@ -184,6 +252,7 @@ async function load(){
  state = { kunde:j.kunde, adresser:j.adresser||[], produkter:j.produkter||[], selectedAdresseKey:'' };
  setStatus('',''); document.getElementById('content').style.display='block'; render();
  loadSalmonella(j.kunde?.chr);
+ if (snFilter) openProdukter();
 }
 
 // ── Salmonella-status (samme kilde som kundeinfo: Salmonella-appens Dataverse via CHR) ──
@@ -242,6 +311,9 @@ function updateSalTile(){
 
 // ── Popup med produktlisten ──
 function openProdukter(){
+  const k = state.kunde;
+  document.getElementById('prodModalTitle').textContent = k ? `Produkter – ${k.navn} (${k.kundenr})` : 'Produkter';
+  showProductList();
   const m = document.getElementById('prodModal');
   m.classList.add('open'); m.setAttribute('aria-hidden','false');
   document.body.style.overflow = 'hidden';
@@ -254,7 +326,12 @@ function closeProdukter(){
 document.getElementById('btnProdukter').addEventListener('click', openProdukter);
 document.getElementById('btnCloseProdukter').addEventListener('click', closeProdukter);
 document.getElementById('prodModal').addEventListener('click', e => { if (e.target.id === 'prodModal') closeProdukter(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('prodModal').classList.contains('open')) closeProdukter(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !document.getElementById('prodModal').classList.contains('open')) return;
+  // Esc i options-visningen går tilbage til listen, ellers lukkes popuppen
+  if (!document.getElementById('prodDetailView').hidden) showProductList();
+  else closeProdukter();
+});
 function setStatus(cls, html){ const el=document.getElementById('status'); el.className='status '+cls; el.innerHTML=html; el.style.display=html?'flex':'none'; }
 function addressText(a){ return [a.adresse, [a.postnr,a.by].filter(Boolean).join(' ')].filter(Boolean).join(', '); }
 function selectedProducts(){ return state.selectedAdresseKey ? state.produkter.filter(p=>p.adressekey===state.selectedAdresseKey) : state.produkter; }
@@ -360,7 +437,9 @@ function renderProductTable(products){
 function renderRows(){
   const cols = VIEWS[currentView];
   const active = cols.filter(c => (filters[c] || '').trim());
+  const snq = snFilter.toLowerCase();
   const rows = tableProducts
+    .filter(p => !snq || String(p.serienr || '').toLowerCase().includes(snq))
     .filter(p => active.every(c => COLS[c].text(p).toLowerCase().includes(filters[c].trim().toLowerCase())))
     .sort((a, b) => {
       // Sortér efter visningens kolonner i rækkefølge (fx adresse, så produkt ...)
@@ -371,10 +450,11 @@ function renderRows(){
       return isXX(a) - isXX(b);
     });
 
-  document.getElementById('tbody').innerHTML = rows.map(p => `<tr class="${isXX(p)?'inactiveXX':''}"${isXX(p)?' title="Ikke aktiv (xx i installationsdato)"':''}>${cols.map(c => `<td>${COLS[c].html ? COLS[c].html(p) : esc(COLS[c].text(p))}</td>`).join('')}</tr>`).join('')
+  renderSnBanner(rows.length);
+  document.getElementById('tbody').innerHTML = rows.map(p => `<tr class="prodRow${isXX(p)?' inactiveXX':''}" data-pid="${escAttr(p.id)}"${isXX(p)?' title="Ikke aktiv (xx i installationsdato)"':''}>${cols.map(c => `<td>${COLS[c].html ? COLS[c].html(p) : esc(COLS[c].text(p))}</td>`).join('')}</tr>`).join('')
     || `<tr><td colspan="${cols.length}" class="muted">${tableProducts.length ? 'Ingen produkter matcher filtrene' : 'Ingen produkter'}</td></tr>`;
 
-  document.getElementById('tableInfo').textContent = active.length ? `${rows.length} af ${tableProducts.length} produkter` : `${tableProducts.length} produkter`;
+  document.getElementById('tableInfo').textContent = (active.length || snq) ? `${rows.length} af ${tableProducts.length} produkter` : `${tableProducts.length} produkter`;
   document.getElementById('btnClearFilters').style.display = Object.values(filters).some(v => (v || '').trim()) ? '' : 'none';
 }
 
@@ -396,6 +476,98 @@ document.getElementById('btnClearFilters').addEventListener('click', () => {
   renderRows();
 });
 
+// ── Filter på serienummer (?sn=) ──
+function renderSnBanner(count){
+  const el = document.getElementById('snBanner');
+  if (!snFilter) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `<span>Viser kun produkter med serienr. <b>${esc(snFilter)}</b> (${count})</span>
+    <button type="button" class="btn" id="btnSnAll">Vis alle produkter</button>`;
+  document.getElementById('btnSnAll').onclick = () => {
+    snFilter = '';
+    const u = new URL(location.href); u.searchParams.delete('sn'); history.replaceState(null, '', u);
+    renderRows();
+  };
+}
+
+// ── Options-visning for ét produkt ──
+document.getElementById('tbody').addEventListener('click', e => {
+  const tr = e.target.closest('tr.prodRow[data-pid]');
+  if (tr) showProductDetail(tr.dataset.pid);
+});
+
+function showProductList(){
+  document.getElementById('prodDetailView').hidden = true;
+  document.getElementById('prodListView').hidden = false;
+  document.getElementById('viewTabs').style.visibility = '';
+  detailProductId = null;
+}
+
+function showProductDetail(pid){
+  const p = state.produkter.find(x => String(x.id) === String(pid));
+  if (!p) return;
+  detailProductId = pid;
+  document.getElementById('prodListView').hidden = true;
+  document.getElementById('viewTabs').style.visibility = 'hidden';
+  const view = document.getElementById('prodDetailView');
+  view.hidden = false;
+  renderProductDetail(p);
+}
+
+function renderProductDetail(p){
+  const k = state.kunde;
+  const ud = p.udstyr || {};
+  const has = v => String(v ?? '').trim() !== '';
+  const extra = Object.keys(ud).filter(key => !UDSTYR_KEYS.includes(key));
+  const keys = [...UDSTYR_KEYS, ...extra];
+  const setCount = keys.filter(key => has(ud[key])).length;
+  const shownKeys = detailShowAll ? keys : keys.filter(key => has(ud[key]));
+
+  const service = [
+    ['Næste service dato', dateText(p.naesteservicedato)],
+    ['Næste service type', p.naesteservicetype],
+    ['Tags type', p.tagstype],
+    ['Recognition', p.recognition],
+    ['Receiver', p.receiver]
+  ];
+  const shownService = detailShowAll ? service : service.filter(([, v]) => has(v));
+
+  const optRows = shownKeys.length
+    ? shownKeys.map(key => `<tr class="${has(ud[key]) ? 'optSet' : 'optEmpty'}"><td>${esc(key)}</td><td class="optVal">${has(ud[key]) ? esc(ud[key]) : '–'}</td></tr>`).join('')
+    : `<tr class="optEmpty"><td colspan="2">Ingen options registreret på produktlinjen.${setCount ? '' : ' Klik "Vis alle" for at se alle options.'}</td></tr>`;
+  const serviceRows = shownService.length
+    ? shownService.map(([l, v]) => `<tr class="${has(v) ? '' : 'optEmpty'}"><td>${esc(l)}</td><td class="optVal" style="color:inherit">${has(v) ? esc(v) : '–'}</td></tr>`).join('')
+    : `<tr class="optEmpty"><td colspan="2">Ingen oplysninger.</td></tr>`;
+
+  const meta = [
+    ['Kunde', `${k.navn} (${k.kundenr})`],
+    ['Prod. nr', p.produktnr],
+    ['SN', p.serienr],
+    ['Kontrakt', p.kontrakt],
+    ['Inst.', dateText(p.installationsdato)],
+    ['Adresse', addrMap[p.adressekey] || p.adressekey]
+  ].filter(([, v]) => has(v));
+
+  document.getElementById('prodDetailView').innerHTML = `
+    <div class="optToolbar">
+      <button type="button" class="btn" id="btnOptBack">← Tilbage til produkter</button>
+      <span class="toolbarSpacer"></span>
+      <span class="muted small">${setCount} af ${keys.length} options valgt</span>
+      <button type="button" class="btn${detailShowAll ? ' active' : ''}" id="btnOptAll">${detailShowAll ? 'Vis kun valgte' : 'Vis alle'}</button>
+    </div>
+    <div class="optHead">
+      <div class="optTitle">${esc(p.produkt || p.navn || 'Produkt')}${isXX(p) ? ' <span class="badge err">Ikke aktiv</span>' : ''}</div>
+      <div class="optMeta">${meta.map(([l, v]) => `<span>${esc(l)}: <b>${esc(v)}</b></span>`).join('')}</div>
+    </div>
+    <div class="optGrid">
+      <div><h3>Options</h3><table class="optTable">${optRows}</table></div>
+      <div><h3>Service og tags</h3><table class="optTable">${serviceRows}</table></div>
+    </div>`;
+
+  document.getElementById('btnOptBack').onclick = showProductList;
+  document.getElementById('btnOptAll').onclick = () => { detailShowAll = !detailShowAll; renderProductDetail(p); };
+}
+
 function escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 (function(){
   document.getElementById('btnInfo').href = '/kundeinfo.html?kundenr=' + encodeURIComponent(kundenr);
@@ -408,3 +580,6 @@ load();
 </script>
 </body>
 </html>
+
+
+

@@ -686,7 +686,8 @@ function kundeContainer() {
   box.addEventListener("click", (e) => {
     const btn = e.target.closest(".kundeHit[data-kundenr]");
     if (!btn) return;
-    window.open(`/kunde.html?kundenr=${encodeURIComponent(btn.dataset.kundenr)}`, "_blank", "noopener");
+    const sn = btn.dataset.sn ? `&sn=${encodeURIComponent(btn.dataset.sn)}` : "";
+    window.open(`/kunde.html?kundenr=${encodeURIComponent(btn.dataset.kundenr)}${sn}`, "_blank", "noopener");
   });
   return box;
 }
@@ -708,8 +709,17 @@ function loadKundeCache() {
 
 // Samme søgetekst som kundeliste.html
 function kundeSearchText(k) {
-  return [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt, k.aktiv ? "aktiv" : "inaktiv"]
+  return [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt, k.aktiv ? "aktiv" : "inaktiv", ...(k.serier || [])]
     .join(" ").toLowerCase();
+}
+
+// Matcher søgningen kun et serienummer (ikke kundens egne felter), åbnes
+// kunde.html med produktlisten filtreret på det (sn=...)
+function kundeSnMatch(k, ql) {
+  if (ql.length < 3) return "";
+  const own = [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt].join(" ").toLowerCase();
+  if (own.includes(ql)) return "";
+  return (k.serier || []).find(s => String(s).toLowerCase().includes(ql)) || "";
 }
 
 function updateKundeHits(rawQuery) {
@@ -753,10 +763,11 @@ async function searchKunder(q, box) {
         <a href="${esc(allLink)}" target="_blank" rel="noopener">Vis i kundelisten →</a></h3>
       <div class="peopleGrid">
         ${shown.map(k => {
-          const sub = [k.kundenr, k.omraade, k.kundestatus, k.kontrakt, k.aktiv === false ? "Inaktiv" : ""].filter(Boolean).join(" · ");
+          const snHit = kundeSnMatch(k, ql);
+          const sub = [k.kundenr, snHit ? `SN ${snHit}` : "", k.omraade, k.kundestatus, k.kontrakt, k.aktiv === false ? "Inaktiv" : ""].filter(Boolean).join(" · ");
           const cls = ["personHit", "kundeHit", k.harXX ? "harXX" : "", k.aktiv === false ? "inaktiv" : ""].filter(Boolean).join(" ");
           return `
-          <button type="button" class="${cls}" data-kundenr="${esc(k.kundenr)}" title="Åbn ${esc(k.navn || "")} i kundelisten">
+          <button type="button" class="${cls}" data-kundenr="${esc(k.kundenr)}"${snHit ? ` data-sn="${esc(ql)}"` : ""} title="Åbn ${esc(k.navn || "")} i kundelisten">
             <span class="pav">${esc(String(k.kundenr || "").slice(-4) || "#")}</span>
             <span class="pt">
               <div class="pn">${esc(k.navn || "–")}</div>

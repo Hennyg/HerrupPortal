@@ -35,17 +35,24 @@ function mapRow(r) {
 //                indeholder "xx", fx "xx-xx-xxxx" (= ikke aktivt endnu,
 //                samme regel som på kunde.html)
 //  - kontrakter: kundenr -> { kontrakttype: antal produkter }
+//  - serier:     kundenr -> [serienumre] (så kundelisten kan søge på serienr.)
 // Fejler stille, så kundelisten altid kan vises.
 async function produktInfo(context) {
   const xx = new Set();
   const kontrakter = new Map();
+  const serier = new Map();
   try {
     const filter = "cr1eb_lch_aktiv eq true";
-    const rows = await fetchAll(`${PRODUKT_TABLE}?$select=cr1eb_lch_kundenr,cr1eb_lch_kontrakt,cr1eb_lch_installationsdato&$filter=${encodeURIComponent(filter)}&$top=5000`);
+    const rows = await fetchAll(`${PRODUKT_TABLE}?$select=cr1eb_lch_kundenr,cr1eb_lch_kontrakt,cr1eb_lch_installationsdato,cr1eb_lch_serienr&$filter=${encodeURIComponent(filter)}&$top=5000`);
     for (const r of rows) {
       const nr = String(r.cr1eb_lch_kundenr || "").trim();
       if (!nr) continue;
       if (/xx/i.test(String(r.cr1eb_lch_installationsdato || ""))) xx.add(nr);
+      const sn = String(r.cr1eb_lch_serienr || "").trim();
+      if (sn) {
+        if (!serier.has(nr)) serier.set(nr, []);
+        serier.get(nr).push(sn);
+      }
       const k = String(r.cr1eb_lch_kontrakt || "").trim();
       if (!k) continue;
       if (!kontrakter.has(nr)) kontrakter.set(nr, {});
@@ -55,7 +62,7 @@ async function produktInfo(context) {
   } catch (e) {
     context.log("kunder: kunne ikke hente produkter", e.message);
   }
-  return { xx, kontrakter };
+  return { xx, kontrakter, serier };
 }
 
 // { "Master A5": 3, "Garanti A5": 1 } -> "Master A5+Garanti A5" (flest først)
@@ -81,11 +88,11 @@ module.exports = async function (context, req) {
     let rows = raw.map(mapRow).map(k => {
       const nr = String(k.kundenr).trim();
       const m = info.kontrakter.get(nr) || null;
-      return { ...k, harXX: info.xx.has(nr), kontrakt: kontraktTekst(m), kontraktAntal: m || {} };
+      return { ...k, harXX: info.xx.has(nr), kontrakt: kontraktTekst(m), kontraktAntal: m || {}, serier: info.serier.get(nr) || [] };
     });
 
     if (q.length >= 2) {
-      rows = rows.filter(k => [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt].join(" ").toLowerCase().includes(q));
+      rows = rows.filter(k => [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt, ...k.serier].join(" ").toLowerCase().includes(q));
     }
 
     json(context, 200, { kunder: rows, total: rows.length });
@@ -94,3 +101,6 @@ module.exports = async function (context, req) {
     json(context, e.status || 500, { error: e.message, kunder: [] });
   }
 };
+
+
+

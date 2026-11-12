@@ -50,8 +50,26 @@ function mapProdukt(r) {
     garantiudloeb: r.cr1eb_lch_garantiudloeb || "",
     note: r.cr1eb_lch_note || "",
     aktiv: r.cr1eb_lch_aktiv ?? true,
-    sidstImporteret: r.cr1eb_lch_sidst_importeret || ""
+    sidstImporteret: r.cr1eb_lch_sidst_importeret || "",
+    // Fra Excel-kolonnerne efter "Betaling" (robotten v6.2+)
+    udstyr: parseUdstyr(r.cr1eb_lch_udstyr),
+    naesteservicedato: r.cr1eb_lch_naesteservicedato || "",
+    naesteservicetype: r.cr1eb_lch_naesteservicetype || "",
+    tagstype: r.cr1eb_lch_tagstype || "",
+    recognition: r.cr1eb_lch_recognition || "",
+    receiver: r.cr1eb_lch_receiver || ""
   };
+}
+
+// cr1eb_lch_udstyr er JSON: { "MQC-C": "1", "SAND": "x", ... } (kun udfyldte kolonner)
+function parseUdstyr(s) {
+  if (!s) return {};
+  try {
+    const o = JSON.parse(s);
+    return o && typeof o === "object" && !Array.isArray(o) ? o : {};
+  } catch {
+    return {};
+  }
 }
 
 module.exports = async function (context, req) {
@@ -74,7 +92,7 @@ module.exports = async function (context, req) {
 
     const adresser = (await fetchAll(`${ADRESSE_TABLE}?$select=cr1eb_lch_kundeadresseid,cr1eb_lch_adressekey,cr1eb_lch_adresse,cr1eb_lch_postnr,cr1eb_lch_by,cr1eb_lch_omraade,cr1eb_lch_aktiv&$filter=${encodeURIComponent(adresseFilter)}&$orderby=cr1eb_lch_adresse asc&$top=5000`)).map(mapAdresse);
 
-    const produkter = (await fetchAll(`${PRODUKT_TABLE}?$select=cr1eb_lch_kundeproduktid,cr1eb_lch_kundeproduktnavn,cr1eb_lch_kundenr,cr1eb_lch_adressekey,cr1eb_lch_produkt,cr1eb_lch_produktnr,cr1eb_lch_serienr,cr1eb_lch_kontrakt,cr1eb_lch_matchstatus,cr1eb_lch_datakvalitet,cr1eb_lch_installationsdato,cr1eb_lch_garantistart,cr1eb_lch_garantiudloeb,cr1eb_lch_note,cr1eb_lch_aktiv,cr1eb_lch_sidst_importeret&$filter=${encodeURIComponent(produktFilter)}&$orderby=cr1eb_lch_produkt asc&$top=5000`)).map(mapProdukt);
+    const produkter = (await fetchAll(`${PRODUKT_TABLE}?$select=cr1eb_lch_kundeproduktid,cr1eb_lch_kundeproduktnavn,cr1eb_lch_kundenr,cr1eb_lch_adressekey,cr1eb_lch_produkt,cr1eb_lch_produktnr,cr1eb_lch_serienr,cr1eb_lch_kontrakt,cr1eb_lch_matchstatus,cr1eb_lch_datakvalitet,cr1eb_lch_installationsdato,cr1eb_lch_garantistart,cr1eb_lch_garantiudloeb,cr1eb_lch_note,cr1eb_lch_aktiv,cr1eb_lch_sidst_importeret,cr1eb_lch_udstyr,cr1eb_lch_naesteservicedato,cr1eb_lch_naesteservicetype,cr1eb_lch_tagstype,cr1eb_lch_recognition,cr1eb_lch_receiver&$filter=${encodeURIComponent(produktFilter)}&$orderby=cr1eb_lch_produkt asc&$top=5000`)).map(mapProdukt);
 
     json(context, 200, { kunde: k, adresser, produkter });
   } catch (e) {
@@ -82,3 +100,6 @@ module.exports = async function (context, req) {
     json(context, e.status || 500, { error: e.message, stack: e.stack });
   }
 };
+
+
+
