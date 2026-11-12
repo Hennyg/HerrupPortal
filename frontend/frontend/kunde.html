@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <title>Kundedetalje</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/assets/kundeliste/app.css" />
+  <style>
+    .addressChoice { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 12px 0; }
+    .addressChoice .btn.active { background:#fdf2f2; border-color:var(--red); color:var(--red); }
+    .productCountTable { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+    .productCountTable td { border-bottom:1px solid #eee; padding:6px 0; }
+    .productCountTable td:last-child { text-align:right; font-weight:700; }
+    .productCountTable tr.inactiveXX td { color:#b91c1c; }
+    .productCountTable tr.inactiveXX td:first-child::after { content:" (ikke aktiv)"; font-weight:400; font-size:12px; }
+    .panelTitleLine { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:10px; }
+    .panelTitleLine h2 { margin:0; }
+    .panelTitleLine .toolbarSpacer { flex:1; }
+
+    /* Visninger af produkttabellen */
+    .viewTabs { display:flex; gap:8px; flex-wrap:wrap; }
+    .viewTabs .btn.active { background:#fdf2f2; border-color:var(--red); color:var(--red); }
+    .tableInfo { font-size:13px; }
+
+    /* Filterfelt under hver kolonneoverskrift (i samme sticky header-celle) */
+    .dataTable thead th .colLabel { display:block; margin-bottom:6px; }
+    .dataTable thead th .colFilter {
+      width:100%; min-width:70px; box-sizing:border-box; height:30px;
+      border:1px solid #d1d5db; border-radius:6px; padding:0 8px;
+      font:inherit; font-size:13px; font-weight:400; background:#fff;
+    }
+    .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
+
+    /* 5 tiles i toppen (kundenr, adresser, produkter, område, salmonella) */
+    #summary.cards { grid-template-columns: repeat(5, minmax(150px, 1fr)); }
+    @media (max-width: 900px) { #summary.cards { grid-template-columns: 1fr; } }
+    .salLine { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px; }
+    .salLine .badge { font-size:13px; padding:4px 10px; }
+    .salLine .chrNr { font-size:11px; color:#6b7280; min-width:62px; }
+
+    /* Adresser markeret efter salmonellastatus på besætningen (CHR) */
+    .adrBox { border:2px solid transparent; border-radius:8px; padding:8px 10px; margin:0 0 10px; }
+    .adrBox.salRed   { border-color:#dc2626; background:#fef2f2; }
+    .adrBox.salGreen { border-color:#16a34a; background:#f0fdf4; }
+    .adrChr { font-size:12px; color:#4b5563; margin-top:4px; }
+    .adrLegend { border-top:1px solid #eee; margin-top:12px; padding-top:8px; font-size:12px; color:#374151; display:grid; gap:4px; }
+    .adrLegend .lg { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-2px; border:2px solid; }
+    .adrLegend .lgRed   { border-color:#dc2626; background:#fef2f2; }
+    .adrLegend .lgGreen { border-color:#16a34a; background:#f0fdf4; }
+    .adrUnmatched { margin-top:4px; color:#4b5563; }
+    .txtRed { color:#b91c1c; font-weight:600; } .txtGreen { color:#15803d; font-weight:600; }
+    .salDate { font-size:11px; color:#6b7280; }
+    .salDate.sal-date-7   { background:#dc2626; color:#fff; padding:1px 6px; border-radius:4px; font-weight:600; }
+    .salDate.sal-date-14  { background:#f97316; color:#fff; padding:1px 6px; border-radius:4px; font-weight:600; }
+    .salDate.sal-date-30  { background:#facc15; color:#333; padding:1px 6px; border-radius:4px; font-weight:600; }
+    .salDate.sal-date-old { background:#fef08a; color:#333; padding:1px 6px; border-radius:4px; }
+    #salTile { max-height:110px; overflow-y:auto; }
+
+    /* Stor "Se produkter"-knap */
+    .btn.btnBig { font-size:1.25rem; font-weight:700; padding:14px 28px; border-radius:10px;
+                  border:2px solid var(--red); color:var(--red); background:#fff; }
+    .btn.btnBig:hover { background:#fdf2f2; }
+
+    /* Popup med produktlisten */
+    .prodModalBackdrop { position:fixed; inset:0; background:rgba(17,24,39,.45); z-index:1000; display:none;
+                         align-items:center; justify-content:center; padding:20px; }
+    .prodModalBackdrop.open { display:flex; }
+    .prodModal { background:#fff; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.25);
+                 width:min(1400px, 100%); height:min(90vh, 100%); display:flex; flex-direction:column; overflow:hidden; }
+    .prodModalHead { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid #eee; }
+    .prodModalHead h2 { margin:0; font-size:18px; }
+    .prodModalHead .closeX { margin-left:auto; border:0; background:none; font-size:26px; line-height:1; cursor:pointer; color:#6b7280; padding:0 4px; }
+    .prodModalHead .closeX:hover { color:var(--red); }
+    .prodModalBody { flex:1; min-height:0; display:flex; flex-direction:column; padding:12px 18px 16px; }
+    .prodModalBody .tableWrap { flex:1; min-height:0; max-height:none !important; }
+
+    /* Søgning på serienummer: kun det produkt vises */
+    .snBanner { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fdf2f2; border:1px solid #f5c2c2;
+                border-radius:8px; padding:8px 12px; margin:0 0 10px; font-size:14px; }
+    .snBanner b { color:var(--red); }
+    .snBanner[hidden] { display:none; }
+
+    /* Klik på et produkt → options på produktlinjen */
+    #tbody tr.prodRow { cursor:pointer; }
+    #tbody tr.prodRow:hover td { background:#fdf2f2; }
+    .optToolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; }
+    .optToolbar .toolbarSpacer { flex:1; }
+    .optToolbar .btn.active { background:#fdf2f2; border-color:var(--red); color:var(--red); }
+    .optHead { border:1px solid #eee; border-radius:10px; padding:12px 14px; margin-bottom:14px; background:#fafafa; }
+    .optHead .optTitle { font-size:17px; font-weight:700; margin-bottom:4px; }
+    .optHead .optMeta { font-size:13px; color:#4b5563; display:flex; gap:6px 18px; flex-wrap:wrap; }
+    .optHead .optMeta b { color:#111827; font-weight:600; }
+    .optGrid { display:grid; grid-template-columns:minmax(0, 2fr) minmax(0, 1fr); gap:16px; overflow:auto; min-height:0; }
+    @media (max-width:900px) { .optGrid { grid-template-columns:1fr; } }
+    .optGrid h3 { margin:0 0 8px; font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:#6b7280; }
+    .optTable { width:100%; border-collapse:collapse; font-size:14px; }
+    .optTable td { border-bottom:1px solid #eee; padding:7px 8px; vertical-align:top; }
+    .optTable td.optVal { text-align:right; font-weight:700; white-space:nowrap; width:1%; }
+    .optTable tr.optEmpty td { color:#9ca3af; font-weight:400; }
+    .optTable tr.optSet td.optVal { color:var(--red); }
+    #prodDetailView { flex:1; min-height:0; display:flex; flex-direction:column; }
+    #prodDetailView[hidden], #prodListView[hidden] { display:none; }
+    #prodListView { flex:1; min-height:0; display:flex; flex-direction:column; }
+
+    /* Produkter med "xx" i installationsdato = ikke aktive */
+    .dataTable tr.inactiveXX td { color:#b91c1c; background:#fef2f2; }
+    .dataTable tr.inactiveXX:hover td { background:#fde8e8; }
+  </style>
+</head>
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div id="brandTitle">Kundedetalje</div>
+    </div>
+    <div class="nav">
+      <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+<main class="pageWrap">
+  <div id="status" class="status loading"><div class="spinner"></div> Henter kunde...</div>
+  <section id="content" style="display:none; overflow:auto;">
+    <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;"><a id="btnBack" class="btn" href="/kundeliste.html">← Tilbage til kundeliste</a><button type="button" class="btn btnBig" id="btnProdukter">📋 Se produkter</button></div><a id="btnInfo" class="btn" href="/kundeinfo.html">Kundeinfo</a></div>
+    <div class="cards" id="summary"></div>
+    <div class="detailGrid">
+      <div class="panel"><h2>Kunde</h2><div id="kundeInfo"></div></div>
+      <div class="panel"><h2>Adresser</h2><div id="adresseInfo"></div></div>
+      <div class="panel"><div class="panelTitleLine"><h2>Produkter</h2><span id="produktTopCounts" class="muted small"></span></div><div id="produktInfo"></div></div>
+    </div>
+  </section>
+</main>
+
+<!-- Popup med produktlisten -->
+<div class="prodModalBackdrop" id="prodModal" aria-hidden="true">
+  <div class="prodModal" role="dialog" aria-modal="true" aria-labelledby="prodModalTitle">
+    <div class="prodModalHead">
+      <h2 id="prodModalTitle">Produkter</h2>
+      <div class="viewTabs" id="viewTabs">
+        <button type="button" class="btn" data-view="adresse">Produkter pr. adresse</button>
+        <button type="button" class="btn" data-view="produkt">Produkter pr. produkt</button>
+        <button type="button" class="btn" data-view="kontrakt">Produkter pr. kontrakt</button>
+      </div>
+      <button type="button" class="closeX" id="btnCloseProdukter" title="Luk (Esc)">×</button>
+    </div>
+    <div class="prodModalBody">
+      <div id="prodListView">
+        <div class="snBanner" id="snBanner" hidden></div>
+        <div class="panelTitleLine" style="margin:0 0 8px;">
+          <span id="tableInfo" class="muted tableInfo"></span>
+          <span class="muted small">Klik på et produkt for at se options på produktlinjen</span>
+          <span class="toolbarSpacer"></span>
+          <button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button>
+        </div>
+        <div class="tableWrap"><table class="dataTable"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+      </div>
+      <div id="prodDetailView" hidden></div>
+    </div>
+  </div>
+</div>
+<script src="/assets/kundeliste/common.js"></script>
+<script>
+initUser();
+const params = new URLSearchParams(location.search); const kundenr = params.get('kundenr') || ''; const id = params.get('id') || '';
+// ?sn=... (fra søgning på serienr. i kundelisten): åbn produktlisten med kun det produkt
+let snFilter = (params.get('sn') || '').trim();
+let state = { kunde:null, adresser:[], produkter:[], selectedAdresseKey:'' };
+
+// ── Produkttabellens visninger ──────────────────────────────────────────────
+// Hver kolonne har en tekst til filtrering/sortering (text) og evt. egen HTML.
+let addrMap = {};
+const COLS = {
+  adresse:  { label:'Adresse',  text:p => addrMap[p.adressekey] || p.adressekey || '' },
+  produkt:  { label:'Produkt',  text:p => p.produkt || p.navn || '' },
+  produktnr:{ label:'Prod. nr', text:p => p.produktnr || '' },
+  serienr:  { label:'SN',       text:p => p.serienr || '' },
+  datoer:   { label:'Datoer',
+              text:p => `Inst: ${dateText(p.installationsdato)} Garanti: ${dateText(p.garantistart)} - ${dateText(p.garantiudloeb)}`,
+              html:p => `<span class="small">Inst: ${esc(dateText(p.installationsdato))}<br>Garanti: ${esc(dateText(p.garantistart))} - ${esc(dateText(p.garantiudloeb))}</span>` },
+  kontrakt: { label:'Kontrakt', text:p => p.kontrakt || '' },
+  aktiv:    { label:'Aktiv',
+              text:p => isXX(p) ? 'Ikke aktiv' : 'Aktiv',
+              html:p => isXX(p) ? '<span class="badge err">Ikke aktiv</span>' : '<span class="badge ok">Aktiv</span>' },
+  note:     { label:'Note',     text:p => p.note || '' }
+};
+
+// ── Options på produktlinjen (Excel-kolonnerne MQC-C … SAND) ────────────────
+// Nøglerne er første linje af overskriften i Excel, som robotten gemmer dem i
+// cr1eb_lch_udstyr. Rækkefølgen følger regnearket. Nøgler, der ikke står her
+// (nye kolonner i Excel), vises til sidst.
+const UDSTYR_KEYS = [
+  'MQC-C',
+  'PURA (9.1189.0086.2) A3',
+  'PURA II Type-1 (5.1004.5088.0)',
+  'PURA II Type-2 (5.1005.4066.0+5.1005.5632.0)',
+  'PURA II Type-3 (5.1005.4066.0+5.1005.6256.0)',
+  'Pura Filter',
+  'Pure Water Unit (DEMI)',
+  'Pulsator type 4 – A4 -A5 -A5N',
+  'Pulsator_A3',
+  'Pulsator Type 3 (A3-A4-A5)',
+  'Pulsator Type 1 (UDG)',
+  'Non return valve type 1 (ball) A5_Ball (5.1004.0920.0) Tomblæsning',
+  'Non return valve type 2 (check valve)',
+  'CRS+',
+  'CRS M3',
+  'Milk Line 2',
+  'Mælkefilter',
+  'Twinfilter Type 1',
+  'Twinfilter Type 2',
+  'Twinfilter Type 3',
+  'Meteor2',
+  'Meteor_3',
+  'Klovskyl',
+  'SAND'
+];
+let detailShowAll = false;
+let detailProductId = null;
+const VIEWS = {
+  adresse:  ['adresse', 'produkt', 'produktnr', 'serienr', 'datoer', 'kontrakt', 'note'],
+  produkt:  ['produkt', 'produktnr', 'serienr', 'kontrakt', 'datoer', 'aktiv', 'adresse', 'note'],
+  kontrakt: ['kontrakt', 'produkt', 'produktnr', 'serienr', 'datoer', 'adresse', 'note']
+};
+let currentView = 'adresse';
+try { const v = localStorage.getItem('kundeProduktView'); if (VIEWS[v]) currentView = v; } catch {}
+const filters = {}; // kolonne-nøgle -> filtertekst (huskes på tværs af visninger)
+
+// "xx" i installationsdato (fx "xx-xx-xxxx" på projektprodukter) betyder,
+// at produktet ikke er aktivt endnu
+function isXX(p){ return /xx/i.test(String(p.installationsdato || '')); }
+// Datoerne ligger som tekst i Dataverse i dansk format (dd-mm-åååå), som i Excel.
+// De må IKKE sendes gennem new Date(): browseren læser "10-12-2025" som
+// amerikansk måned-dag (12. oktober), og "28-01-2019" som ugyldig.
+// Vises altid som dd-mm-åååå. Tekst som "ingen" eller "xx-xx-xxxx" vises som den er.
+function dateText(s){
+  const v = String(s || '').trim();
+  if (!v) return '';
+  let m = /^(\d{1,2})[-./](\d{1,2})[-./](\d{4})$/.exec(v);           // dd-mm-åååå / dd.mm.åååå / dd/mm/åååå
+  if (m) return `${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}-${m[3]}`;
+  m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/.exec(v);                // ISO (åååå-mm-dd)
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return v;
+}
+
+async function load(){
+ const r = await fetch('/api/kunde?' + new URLSearchParams({ kundenr, id }).toString()); const j = await r.json();
+ if(!r.ok || j.error) return setStatus('error','Fejl: '+esc(j.error || r.status));
+ state = { kunde:j.kunde, adresser:j.adresser||[], produkter:j.produkter||[], selectedAdresseKey:'' };
+ setStatus('',''); document.getElementById('content').style.display='block'; render();
+ loadSalmonella(j.kunde?.chr);
+ if (snFilter) openProdukter();
+}
+
+// ── Salmonella-status (samme kilde som kundeinfo: Salmonella-appens Dataverse via CHR) ──
+let sal = { state:'loading', list:[] };
+// Samme regler som Salmonella-appen (CHR-external):
+//  - status = cr406_uisygdomsniveautekst: "Fri" = grøn, alt andet (fx "Salmonella") = rød
+//  - dato   = cr406_sdudatoveterinrstatus; ved Salmonella farves datoen efter alder:
+//    ≤ 7 dage rød, 8–14 orange, 15–30 gul, > 30 lysegul
+function salBadge(text){
+  const s = String(text || '').trim().toLowerCase();
+  const cls = !s ? '' : s === 'fri' ? 'ok' : 'err';
+  return `<span class="badge ${cls}">${esc(text || 'Ukendt')}</span>`;
+}
+function salDateClass(status, iso){
+  if (String(status || '').trim().toLowerCase() !== 'salmonella' || !iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  return days <= 7 ? 'sal-date-7' : days <= 14 ? 'sal-date-14' : days <= 30 ? 'sal-date-30' : 'sal-date-old';
+}
+// Smittede besætninger først, nyeste dato først
+function salSort(list){
+  return [...list].sort((a, b) => {
+    const fa = String(a.salmonellaStatus || '').trim().toLowerCase() === 'fri' ? 1 : 0;
+    const fb = String(b.salmonellaStatus || '').trim().toLowerCase() === 'fri' ? 1 : 0;
+    return fa - fb || String(b.salmonellaDato || '').localeCompare(String(a.salmonellaDato || ''));
+  });
+}
+function salTileHtml(){
+  if (sal.state === 'loading') return '<div class="muted small">Henter…</div>';
+  if (sal.state === 'nochr')   return '<div class="muted small">Intet CHR-nr.</div>';
+  if (sal.state === 'error')   return '<div class="muted small">Kunne ikke hentes</div>';
+  if (!sal.list.length)        return '<div class="muted small">Ingen data</div>';
+  const multi = sal.list.length > 1;
+  return salSort(sal.list).map(h => { const dc = salDateClass(h.salmonellaStatus, h.salmonellaDato); return `
+    <div class="salLine">${multi ? `<span class="chrNr">CHR ${esc(h.chr)}</span>` : ''}${salBadge(h.salmonellaStatus)}${h.salmonellaDato ? `<span class="salDate ${dc}">${esc(dateText(h.salmonellaDato))}</span>` : ''}</div>`; }).join('');
+}
+async function loadSalmonella(chr){
+  const value = String(chr || '').trim();
+  if (!value) { sal = { state:'nochr', list:[] }; return updateSalTile(); }
+  try {
+    const r = await fetch('/api/kunde-salmonella?chr=' + encodeURIComponent(value));
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.status);
+    sal = { state:'ok', list: Array.isArray(j.besaetninger) ? j.besaetninger : [] };
+  } catch (e) {
+    console.warn('Salmonella:', e);
+    sal = { state:'error', list:[] };
+  }
+  updateSalTile();
+}
+function updateSalTile(){
+  const el = document.getElementById('salTile'); if (el) el.innerHTML = salTileHtml();
+  const ad = document.getElementById('adresseInfo'); if (ad && state.kunde) ad.innerHTML = renderAdresser(state.adresser);
+}
+
+// ── Popup med produktlisten ──
+function openProdukter(){
+  const k = state.kunde;
+  document.getElementById('prodModalTitle').textContent = k ? `Produkter – ${k.navn} (${k.kundenr})` : 'Produkter';
+  showProductList();
+  const m = document.getElementById('prodModal');
+  m.classList.add('open'); m.setAttribute('aria-hidden','false');
+  document.body.style.overflow = 'hidden';
+}
+function closeProdukter(){
+  const m = document.getElementById('prodModal');
+  m.classList.remove('open'); m.setAttribute('aria-hidden','true');
+  document.body.style.overflow = '';
+}
+document.getElementById('btnProdukter').addEventListener('click', openProdukter);
+document.getElementById('btnCloseProdukter').addEventListener('click', closeProdukter);
+document.getElementById('prodModal').addEventListener('click', e => { if (e.target.id === 'prodModal') closeProdukter(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !document.getElementById('prodModal').classList.contains('open')) return;
+  // Esc i options-visningen går tilbage til listen, ellers lukkes popuppen
+  if (!document.getElementById('prodDetailView').hidden) showProductList();
+  else closeProdukter();
+});
+function setStatus(cls, html){ const el=document.getElementById('status'); el.className='status '+cls; el.innerHTML=html; el.style.display=html?'flex':'none'; }
+function addressText(a){ return [a.adresse, [a.postnr,a.by].filter(Boolean).join(' ')].filter(Boolean).join(', '); }
+function selectedProducts(){ return state.selectedAdresseKey ? state.produkter.filter(p=>p.adressekey===state.selectedAdresseKey) : state.produkter; }
+
+// Antal pr. produkt - aktive og "xx" (ikke aktive) tælles hver for sig
+function countByProduct(products){
+  const map = new Map();
+  for (const p of products) {
+    const name = p.produkt || p.navn || 'Ukendt produkt';
+    const key = `${name}|${isXX(p) ? 1 : 0}`;
+    if (!map.has(key)) map.set(key, { name, xx:isXX(p), count:0 });
+    map.get(key).count++;
+  }
+  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'da') || (a.xx - b.xx));
+}
+function setAddress(key){ state.selectedAdresseKey = key || ''; render(); }
+
+function render(){
+ const k=state.kunde, adresser=state.adresser;
+ // Som før vises kun produkter, der er aktive i Dataverse. Af dem er
+ // "xx"-produkterne ikke aktive og tælles ikke med i de aktive.
+ const visibleProducts = selectedProducts().filter(p=>p.aktiv);
+ const activeCount = visibleProducts.filter(p=>!isXX(p)).length;
+ const xxCount = visibleProducts.length - activeCount;
+ document.getElementById('brandTitle').textContent = `${k.navn} (${k.kundenr})`; document.title = `Kunde – ${k.navn}`;
+ document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresser.length}</div></div><div class="card"><div class="label">Produkter</div><div class="value">${activeCount}</div></div><div class="card"><div class="label">Område</div><div class="value">${esc(k.omraade)}</div></div><div class="card"><div class="label">Salmonella${k.chr ? ` <span class="muted" style="font-weight:400">· CHR ${esc(k.chr)}</span>` : ''}</div><div id="salTile">${salTileHtml()}</div></div>`;
+ document.getElementById('kundeInfo').innerHTML = `<p><b>${esc(k.navn)}</b></p><p>Kundestatus: ${esc(k.kundestatus)}</p><p>Aktiv: ${k.aktiv?'Ja':'Nej'}</p><p>Sidst opdateret: ${fmtDateTime(k.sidstImporteret || k.modifiedon)}</p>`;
+ document.getElementById('adresseInfo').innerHTML = renderAdresser(adresser);
+ document.getElementById('produktTopCounts').innerHTML = `Aktive: ${activeCount}${xxCount ? ` · <span style="color:#b91c1c">Ikke aktive: ${xxCount}</span>` : ''}`;
+ document.getElementById('produktInfo').innerHTML = renderProduktCounts(visibleProducts);
+ addrMap = Object.fromEntries(adresser.map(a=>[a.adressekey, addressText(a)]));
+ renderProductTable(visibleProducts);
+}
+
+// ── Kobling mellem kundens adresser og besætningerne (CHR) ──
+// En besætning kobles til en adresse, når postnr er ens (hvis begge har et)
+// og vejnavn + husnummer er ens (store/små bogstaver, mellemrum og
+// tegnsætning ignoreres; "Asfergvej 28, Asferg" matcher "Asfergvej 28").
+function normAdr(s){ return String(s || '').toLowerCase().split(',')[0].replace(/[^a-z0-9æøå]+/g, ''); }
+function herdMatchesAddress(h, a){
+  const ha = normAdr(h.adresse), aa = normAdr(a.adresse);
+  if (!ha || !aa || ha !== aa) return false;
+  const hp = String(h.postnr || '').trim(), ap = String(a.postnr || '').trim();
+  return !hp || !ap || hp === ap;
+}
+const isFri = h => String(h.salmonellaStatus || '').trim().toLowerCase() === 'fri';
+function herdsFor(a){ return sal.state === 'ok' ? sal.list.filter(h => herdMatchesAddress(h, a)) : []; }
+
+function renderAdresser(adresser){
+  if (!adresser.length) return '<p class="muted">Ingen adresser</p>';
+  const buttons = adresser.length > 1 ? `<div class="addressChoice"><button class="btn ${state.selectedAdresseKey===''?'active':''}" onclick="setAddress('')">Alle adresser</button>${adresser.map(a=>`<button class="btn ${state.selectedAdresseKey===a.adressekey?'active':''}" onclick="setAddress('${escAttr(a.adressekey)}')">${esc(a.adresse)}</button>`).join('')}</div>` : '';
+  const selected = state.selectedAdresseKey ? adresser.filter(a=>a.adressekey===state.selectedAdresseKey) : adresser;
+  const list = selected.map(a => {
+    const herds = herdsFor(a);
+    const cls = !herds.length ? '' : herds.some(h => !isFri(h)) ? ' salRed' : ' salGreen';
+    const chrInfo = herds.length
+      ? `<div class="adrChr">${salSort(herds).map(h => `CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}${h.salmonellaDato ? ` ${esc(dateText(h.salmonellaDato))}` : ''}`).join('<br>')}</div>`
+      : '';
+    return `<div class="adrBox${cls}"><b>${esc(a.adresse)}</b><br>${esc(a.postnr)} ${esc(a.by)}${chrInfo}</div>`;
+  }).join('');
+  return buttons + list + salAdrLegend(adresser);
+}
+
+// Forklaring nederst i Adresser-tile'n (+ besætninger der ikke kunne kobles)
+function salAdrLegend(adresser){
+  if (sal.state !== 'ok' || !sal.list.length) return '';
+  const unmatched = salSort(sal.list.filter(h => !adresser.some(a => herdMatchesAddress(h, a))));
+  return `<div class="adrLegend">
+    <div><span class="lg lgRed"></span>Rød ramme: salmonella på en besætning (CHR) på adressen</div>
+    <div><span class="lg lgGreen"></span>Grøn ramme: besætningen på adressen er fri</div>
+    <div class="muted">Uden ramme: ingen besætning fundet på adressen</div>
+    ${unmatched.length ? `<div class="adrUnmatched">Kunne ikke kobles til en adresse:<br>${unmatched.map(h => {
+      const adr = [h.adresse, [h.postnr, h.by].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+      return `<span class="${isFri(h) ? 'txtGreen' : 'txtRed'}">CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}</span>${adr ? ` – ${esc(adr)}` : ''}`;
+    }).join('<br>')}</div>` : ''}
+  </div>`;
+}
+
+function renderProduktCounts(products){
+  const counts = countByProduct(products);
+  if (!counts.length) return '<p class="muted">Ingen produkter</p>';
+  return `<table class="productCountTable">${counts.map(c=>`<tr class="${c.xx?'inactiveXX':''}"><td>${esc(c.name)}</td><td>${c.count}</td></tr>`).join('')}</table>`;
+}
+
+// ── Produkttabel: visning, filtre og sortering ──────────────────────────────
+let tableProducts = [];
+
+function renderProductTable(products){
+  tableProducts = products;
+  const cols = VIEWS[currentView];
+
+  document.querySelectorAll('#viewTabs .btn').forEach(b => b.classList.toggle('active', b.dataset.view === currentView));
+
+  // Header med filterfelt pr. kolonne (bygges kun om, når visningen skifter)
+  const thead = document.getElementById('thead');
+  if (thead.dataset.view !== currentView) {
+    thead.dataset.view = currentView;
+    thead.innerHTML = `<tr>${cols.map(c => `<th><span class="colLabel">${esc(COLS[c].label)}</span><input class="colFilter" type="search" data-col="${c}" placeholder="Filtrér…" value="${esc(filters[c] || '')}" autocomplete="off"></th>`).join('')}</tr>`;
+  }
+  renderRows();
+}
+
+function renderRows(){
+  const cols = VIEWS[currentView];
+  const active = cols.filter(c => (filters[c] || '').trim());
+  const snq = snFilter.toLowerCase();
+  const rows = tableProducts
+    .filter(p => !snq || String(p.serienr || '').toLowerCase().includes(snq))
+    .filter(p => active.every(c => COLS[c].text(p).toLowerCase().includes(filters[c].trim().toLowerCase())))
+    .sort((a, b) => {
+      // Sortér efter visningens kolonner i rækkefølge (fx adresse, så produkt ...)
+      for (const c of cols.slice(0, 3)) {
+        const r = COLS[c].text(a).localeCompare(COLS[c].text(b), 'da', { numeric:true, sensitivity:'base' });
+        if (r) return r;
+      }
+      return isXX(a) - isXX(b);
+    });
+
+  renderSnBanner(rows.length);
+  document.getElementById('tbody').innerHTML = rows.map(p => `<tr class="prodRow${isXX(p)?' inactiveXX':''}" data-pid="${escAttr(p.id)}"${isXX(p)?' title="Ikke aktiv (xx i installationsdato)"':''}>${cols.map(c => `<td>${COLS[c].html ? COLS[c].html(p) : esc(COLS[c].text(p))}</td>`).join('')}</tr>`).join('')
+    || `<tr><td colspan="${cols.length}" class="muted">${tableProducts.length ? 'Ingen produkter matcher filtrene' : 'Ingen produkter'}</td></tr>`;
+
+  document.getElementById('tableInfo').textContent = (active.length || snq) ? `${rows.length} af ${tableProducts.length} produkter` : `${tableProducts.length} produkter`;
+  document.getElementById('btnClearFilters').style.display = Object.values(filters).some(v => (v || '').trim()) ? '' : 'none';
+}
+
+document.getElementById('viewTabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-view]');
+  if (!b || b.dataset.view === currentView) return;
+  currentView = b.dataset.view;
+  try { localStorage.setItem('kundeProduktView', currentView); } catch {}
+  renderProductTable(tableProducts);
+});
+document.getElementById('thead').addEventListener('input', e => {
+  if (!e.target.matches('.colFilter')) return;
+  filters[e.target.dataset.col] = e.target.value;
+  renderRows();
+});
+document.getElementById('btnClearFilters').addEventListener('click', () => {
+  Object.keys(filters).forEach(k => delete filters[k]);
+  document.querySelectorAll('#thead .colFilter').forEach(i => { i.value = ''; });
+  renderRows();
+});
+
+// ── Filter på serienummer (?sn=) ──
+function renderSnBanner(count){
+  const el = document.getElementById('snBanner');
+  if (!snFilter) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `<span>Viser kun produkter med serienr. <b>${esc(snFilter)}</b> (${count})</span>
+    <button type="button" class="btn" id="btnSnAll">Vis alle produkter</button>`;
+  document.getElementById('btnSnAll').onclick = () => {
+    snFilter = '';
+    const u = new URL(location.href); u.searchParams.delete('sn'); history.replaceState(null, '', u);
+    renderRows();
+  };
+}
+
+// ── Options-visning for ét produkt ──
+document.getElementById('tbody').addEventListener('click', e => {
+  const tr = e.target.closest('tr.prodRow[data-pid]');
+  if (tr) showProductDetail(tr.dataset.pid);
+});
+
+function showProductList(){
+  document.getElementById('prodDetailView').hidden = true;
+  document.getElementById('prodListView').hidden = false;
+  document.getElementById('viewTabs').style.visibility = '';
+  detailProductId = null;
+}
+
+function showProductDetail(pid){
+  const p = state.produkter.find(x => String(x.id) === String(pid));
+  if (!p) return;
+  detailProductId = pid;
+  document.getElementById('prodListView').hidden = true;
+  document.getElementById('viewTabs').style.visibility = 'hidden';
+  const view = document.getElementById('prodDetailView');
+  view.hidden = false;
+  renderProductDetail(p);
+}
+
+function renderProductDetail(p){
+  const k = state.kunde;
+  const ud = p.udstyr || {};
+  const has = v => String(v ?? '').trim() !== '';
+  const extra = Object.keys(ud).filter(key => !UDSTYR_KEYS.includes(key));
+  const keys = [...UDSTYR_KEYS, ...extra];
+  const setCount = keys.filter(key => has(ud[key])).length;
+  const shownKeys = detailShowAll ? keys : keys.filter(key => has(ud[key]));
+
+  const service = [
+    ['Næste service dato', dateText(p.naesteservicedato)],
+    ['Næste service type', p.naesteservicetype],
+    ['Tags type', p.tagstype],
+    ['Recognition', p.recognition],
+    ['Receiver', p.receiver]
+  ];
+  const shownService = detailShowAll ? service : service.filter(([, v]) => has(v));
+
+  const optRows = shownKeys.length
+    ? shownKeys.map(key => `<tr class="${has(ud[key]) ? 'optSet' : 'optEmpty'}"><td>${esc(key)}</td><td class="optVal">${has(ud[key]) ? esc(ud[key]) : '–'}</td></tr>`).join('')
+    : `<tr class="optEmpty"><td colspan="2">Ingen options registreret på produktlinjen.${setCount ? '' : ' Klik "Vis alle" for at se alle options.'}</td></tr>`;
+  const serviceRows = shownService.length
+    ? shownService.map(([l, v]) => `<tr class="${has(v) ? '' : 'optEmpty'}"><td>${esc(l)}</td><td class="optVal" style="color:inherit">${has(v) ? esc(v) : '–'}</td></tr>`).join('')
+    : `<tr class="optEmpty"><td colspan="2">Ingen oplysninger.</td></tr>`;
+
+  const meta = [
+    ['Kunde', `${k.navn} (${k.kundenr})`],
+    ['Prod. nr', p.produktnr],
+    ['SN', p.serienr],
+    ['Kontrakt', p.kontrakt],
+    ['Inst.', dateText(p.installationsdato)],
+    ['Adresse', addrMap[p.adressekey] || p.adressekey]
+  ].filter(([, v]) => has(v));
+
+  document.getElementById('prodDetailView').innerHTML = `
+    <div class="optToolbar">
+      <button type="button" class="btn" id="btnOptBack">← Tilbage til produkter</button>
+      <span class="toolbarSpacer"></span>
+      <span class="muted small">${setCount} af ${keys.length} options valgt</span>
+      <button type="button" class="btn${detailShowAll ? ' active' : ''}" id="btnOptAll">${detailShowAll ? 'Vis kun valgte' : 'Vis alle'}</button>
+    </div>
+    <div class="optHead">
+      <div class="optTitle">${esc(p.produkt || p.navn || 'Produkt')}${isXX(p) ? ' <span class="badge err">Ikke aktiv</span>' : ''}</div>
+      <div class="optMeta">${meta.map(([l, v]) => `<span>${esc(l)}: <b>${esc(v)}</b></span>`).join('')}</div>
+    </div>
+    <div class="optGrid">
+      <div><h3>Options</h3><table class="optTable">${optRows}</table></div>
+      <div><h3>Service og tags</h3><table class="optTable">${serviceRows}</table></div>
+    </div>`;
+
+  document.getElementById('btnOptBack').onclick = showProductList;
+  document.getElementById('btnOptAll').onclick = () => { detailShowAll = !detailShowAll; renderProductDetail(p); };
+}
+
+function escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+(function(){
+  document.getElementById('btnInfo').href = '/kundeinfo.html?kundenr=' + encodeURIComponent(kundenr);
+  const backBtn = document.getElementById('btnBack');
+  if (document.referrer && document.referrer.indexOf('/kundeliste.html') !== -1) {
+    backBtn.addEventListener('click', function(e){ e.preventDefault(); history.back(); });
+  }
+})();
+load();
+</script>
+</body>
+</html>
+
+
+

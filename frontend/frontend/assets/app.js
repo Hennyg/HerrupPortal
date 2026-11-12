@@ -1,0 +1,1252 @@
+// assets/app.js
+
+// Brugsstatistik: sidevisninger og klik på tiles logges via /api/track til
+// Dataverse (lch_accesslog) og vises i statistik.html for portal_admin.
+const TRACKING_ENABLED = true;
+
+// ── "Mine favoritter" (stjernemarkering) ─────────────────────────────────────
+// Hvilke link-id'er den indloggede bruger har markeret med stjernen. Gemmes
+// centralt via /api/favoritter, så valget følger brugeren på tværs af enheder.
+let favoriteIds = new Set();
+let favSaveTimer = null;
+// Sat af init() til dens lokale render(), så toggleFavorite() (som ligger
+// uden for init-closuren) kan bede om et gentegn efter en stjerne skifter.
+let rerenderMain = () => {};
+
+async function loadFavorites() {
+  try {
+    const r = await fetch("/api/favoritter", { cache: "no-store" });
+    if (!r.ok) { favoriteIds = new Set(); return; }
+    const data = await r.json();
+    favoriteIds = new Set(Array.isArray(data.ids) ? data.ids : []);
+  } catch {
+    // Offline/fejl: ingen favoritter markeret ved denne indlæsning — påvirker
+    // ikke resten af siden, og intet gemmes før brugeren selv klikker en stjerne.
+    favoriteIds = new Set();
+  }
+}
+
+// ── Nyheder/tips i "Velkommen"-banneret ─────────────────────────────────────
+// Henter alle aktive poster, blander rækkefølgen én gang og roterer hvert 10. sekund.
+// En post markeres kort første gang den ses i denne browser. Hover pauser rotationen.
+let newsRotationTimer = null;
+let newsRotationItems = [];
+let newsRotationIndex = 0;
+
+function shuffleNews(items) {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function showNewsItem(item) {
+  const title = document.getElementById("newsTitle");
+  const text = document.getElementById("newsTip");
+  const hero = title?.closest(".hero");
+  if (!title || !text || !item) return;
+
+  const isBirthday = item.type === "fodselsdag";
+  const icon = isBirthday ? "🎂" : (item.type === "tip" ? "💡" : (item.type === "olkassemode" ? "🍺" : "📢"));
+  title.textContent = item.overskrift || (item.type === "tip" ? "Tip" : "Nyhed");
+  text.textContent = `${icon} ${item.indhold || ""}`.trim();
+
+  // Hele tile'n er klikbar til nyheden (se wireNewsTile)
+  // Fødselsdage har ingen nyhedsside, så tile'n er ikke klikbar for dem.
+  const tile = document.getElementById("newsTile");
+  if (tile && item.id && !isBirthday) {
+    tile.dataset.href = `/nyhed.html?id=${encodeURIComponent(item.id)}`;
+    tile.classList.add("clickable");
+    tile.setAttribute("role", "link");
+    tile.tabIndex = 0;
+    tile.title = "Åbn nyheden";
+  } else if (tile) {
+    delete tile.dataset.href;
+    tile.classList.remove("clickable");
+    tile.removeAttribute("role");
+    tile.tabIndex = -1;
+    tile.title = "";
+  }
+
+  // "Læs mere" når nyheden har en længere tekst eller en video
+  if (!isBirthday && (item.hasBody || item.videourl)) {
+    const a = document.createElement("a");
+    a.className = "newsReadMore";
+    a.href = `/nyhed.html?id=${encodeURIComponent(item.id)}`;
+    a.textContent = "Læs mere →";
+    text.appendChild(document.createTextNode(" "));
+    text.appendChild(a);
+  }
+
+  if (hero && item.id) {
+    const key = `herrup-news-seen-${item.id}`;
+    let seen = false;
+    try { seen = localStorage.getItem(key) === "1"; } catch {}
+    hero.classList.remove("newsFirstSeen");
+    if (!seen) {
+      // Genstart animationen hvis to usete poster vises efter hinanden.
+      void hero.offsetWidth;
+      hero.classList.add("newsFirstSeen");
+      try { localStorage.setItem(key, "1"); } catch {}
+      setTimeout(() => hero.classList.remove("newsFirstSeen"), 2400);
+    }
+  }
+}
+
+// Pile i begge sider + klik på hele tile'n
+function stepNews(dir) {
+  if (newsRotationItems.length <= 1) return;
+  newsRotationIndex = (newsRotationIndex + dir + newsRotationItems.length) % newsRotationItems.length;
+  showNewsItem(newsRotationItems[newsRotationIndex]);
+}
+
+function wireNewsTile() {
+  const tile = document.getElementById("newsTile");
+  if (!tile || tile.dataset.wired) return;
+  tile.dataset.wired = "1";
+  const multi = newsRotationItems.length > 1;
+  document.getElementById("newsPrev")?.classList.toggle("off", !multi);
+  document.getElementById("newsNext")?.classList.toggle("off", !multi);
+  document.getElementById("newsPrev")?.addEventListener("click", e => { e.stopPropagation(); stepNews(-1); });
+  document.getElementById("newsNext")?.addEventListener("click", e => { e.stopPropagation(); stepNews(1); });
+
+  const open = () => { if (tile.dataset.href) location.href = tile.dataset.href; };
+  tile.addEventListener("click", e => {
+    // Links og knapper inde i tile'n (bjælke, "Læs mere", pile) klarer sig selv
+    if (e.target.closest("a, button")) return;
+    open();
+  });
+  tile.addEventListener("keydown", e => {
+    if (e.target !== tile) return;
+    if (e.key === "Enter") open();
+    if (e.key === "ArrowLeft") stepNews(-1);
+    if (e.key === "ArrowRight") stepNews(1);
+  });
+}
+
+function scheduleNewsRotation() {
+  clearInterval(newsRotationTimer);
+  if (newsRotationItems.length <= 1) return;
+  newsRotationTimer = setInterval(() => {
+    newsRotationIndex = (newsRotationIndex + 1) % newsRotationItems.length;
+    showNewsItem(newsRotationItems[newsRotationIndex]);
+  }, 10000);
+}
+
+async function loadNewsOrTip() {
+  const title = document.getElementById("newsTitle");
+  const text = document.getElementById("newsTip");
+  const hero = title?.closest(".hero");
+  if (!title || !text) return;
+
+  try {
+    const r = await fetch("/api/tips", { cache: "no-store" });
+    if (!r.ok) return;
+    const data = await r.json();
+    if (window.HerrupTicker) window.HerrupTicker.render(data?.banners || []);
+    const items = Array.isArray(data?.items) ? data.items : [];
+    if (!items.length) {
+      if (data?.error) console.warn("/api/tips:", data.error);
+      return;
+    }
+
+    // Fødselsdage (type "fodselsdag") vises altid først, resten blandes
+    const birthdays = items.filter(i => i.type === "fodselsdag");
+    const others = items.filter(i => i.type !== "fodselsdag");
+    newsRotationItems = [...birthdays, ...shuffleNews(others)];
+    newsRotationIndex = 0;
+    showNewsItem(newsRotationItems[0]);
+    scheduleNewsRotation();
+    wireNewsTile();
+
+    if (hero && !hero.dataset.newsRotationWired) {
+      hero.dataset.newsRotationWired = "1";
+      hero.addEventListener("mouseenter", () => clearInterval(newsRotationTimer));
+      hero.addEventListener("mouseleave", scheduleNewsRotation);
+    }
+  } catch (e) {
+    console.warn("Kunne ikke hente nyheder/tips:", e);
+  }
+}
+
+function saveFavoritesDebounced() {
+  clearTimeout(favSaveTimer);
+  favSaveTimer = setTimeout(async () => {
+    try {
+      await fetch("/api/favoritter", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(favoriteIds) })
+      });
+    } catch (e) {
+      console.warn("Kunne ikke gemme favoritter:", e);
+    }
+  }, 400);
+}
+
+function toggleFavorite(id) {
+  if (!id) return;
+  if (favoriteIds.has(id)) favoriteIds.delete(id);
+  else favoriteIds.add(id);
+  saveFavoritesDebounced();
+  rerenderMain();
+}
+
+function safeUrl(u) {
+  try {
+    const url = new URL(u, location.origin);
+    return url.origin + url.pathname + (url.search ? url.search.substring(0, 200) : "");
+  } catch {
+    return String(u || "").substring(0, 500);
+  }
+}
+
+async function track(eventType, extra = {}) {
+  if (!TRACKING_ENABLED) return;
+  try {
+    await fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eventType,
+        pageUrl: safeUrl(location.href),
+        path: location.pathname,
+        referrer: safeUrl(document.referrer || ""),
+        tsLocal: new Date().toISOString(),
+        ...extra
+      })
+    });
+  } catch {}
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  track("PageView");
+});
+
+function detectPlatform() {
+  const ua = navigator.userAgent.toLowerCase();
+  const isMobileUA = /iphone|ipad|android|mobile/.test(ua);
+  const isSmallScreen = window.matchMedia("(max-width: 900px)").matches;
+  return (isMobileUA || isSmallScreen) ? "mobile" : "desktop";
+}
+
+async function getMe() {
+  const r = await fetch("/.auth/me", { cache: "no-store" });
+  if (!r.ok) return null;
+  const j = await r.json();
+  return j?.clientPrincipal || null;
+}
+
+function normRoles(roles) {
+  return (roles || []).map(r => String(r).toLowerCase());
+}
+
+function expandRoles(roles) {
+  const set = new Set(normRoles(roles));
+  if (set.has("portal_admin")) set.add("portal_user");
+  return [...set];
+}
+
+function rolesFromMe(me) {
+  if (!me) return [];
+  const fromUserRoles = (me.userRoles || []).map(r => String(r).toLowerCase());
+  const fromClaims = (me.claims || [])
+    .filter(c => {
+      const t = String(c.typ || "").toLowerCase();
+      return t === "roles" || t === "role" || t.endsWith("/identity/claims/role");
+    })
+    .map(c => String(c.val || "").toLowerCase());
+  return Array.from(new Set([...fromUserRoles, ...fromClaims]));
+}
+
+function parseAllowedRoles(s) {
+  if (Array.isArray(s)) {
+    return s.map(x => String(x).trim().toLowerCase()).filter(Boolean);
+  }
+  return String(s || "").split(";").map(x => x.trim().toLowerCase()).filter(Boolean);
+}
+
+function matchesRoles(itemRoles, userRoles) {
+  if (!itemRoles || itemRoles.length === 0) return true;
+  const set = new Set(userRoles);
+  return itemRoles.some(r => set.has(r));
+}
+
+async function loadLinks() {
+  const r = await fetch("/api/links", { cache: "no-store" });
+  if (!r.ok) throw new Error(`api_not_ok_${r.status}`);
+  return await r.json();
+}
+
+function uniq(arr) {
+  return Array.from(new Set((arr || []).filter(Boolean).map(x => String(x).trim())))
+    .sort((a, b) => a.localeCompare(b, "da"));
+}
+
+function isImageIcon(v) {
+  v = String(v || "").trim();
+  return (
+    /^data:image\//i.test(v) ||
+    /^https?:\/\//i.test(v) ||
+    v.startsWith("/") ||
+    /\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i.test(v)
+  );
+}
+
+function setIcon(el, iconValue) {
+  const v = String(iconValue || "").trim();
+  if (!el) return;
+  if (v && isImageIcon(v)) {
+    el.innerHTML = `<img src="${v}" alt="" style="max-height:40px;max-width:100%;width:auto;height:auto;object-fit:contain;">`;
+  } else {
+    el.textContent = v || "🔗";
+  }
+}
+
+function setSelectOptions(selectEl, options, { includeEmpty = true, emptyText = "Alle" } = {}) {
+  if (!selectEl) return;
+  selectEl.innerHTML = "";
+  if (includeEmpty) {
+    const o = document.createElement("option");
+    o.value = "";
+    o.textContent = emptyText;
+    selectEl.appendChild(o);
+  }
+  options.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = v;
+    selectEl.appendChild(o);
+  });
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+// Kategorier hvor tiles sorteres alfabetisk på titel i stedet for sort-værdien
+const ALPHA_CATEGORIES = ["andet"];
+
+function sortLinksAlpha(arr) {
+  return (arr || []).slice().sort((a, b) => (a.title || "").localeCompare(b.title || "", "da", { sensitivity: "base" }));
+}
+
+function sortLinks(arr) {
+  return (arr || []).slice().sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
+}
+
+function groupBy(arr, keyFn) {
+  const m = new Map();
+  for (const x of (arr || [])) {
+    const k = (keyFn(x) ?? "").toString();
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(x);
+  }
+  return m;
+}
+
+function normKey(s) { return String(s ?? "").trim(); }
+function normSubgroup(it) { return normKey(it.subgroup || it.subGroup || ""); }
+
+// ── Medarbejdersøgning på en tile ───────────────────────────────────────────
+// Et link, hvis URL peger på personalelisten (/herrup.html), vises som en
+// almindelig tile — men i stedet for forklaringsteksten får den et søgefelt.
+// Oprettes som et helt normalt link i Admin (URL: /herrup.html).
+const EMPLOYEE_SEARCH_PATHS = ["/herrup.html"];
+
+function isEmployeeSearchTile(it) {
+  try {
+    const u = new URL(it?.url || "", location.origin);
+    if (u.origin !== location.origin) return false;
+    return EMPLOYEE_SEARCH_PATHS.includes(u.pathname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function renderEmployeeSearchHTML() {
+  return `
+    <div class="empSearch">
+      <input type="search" class="empSearchInput" placeholder="Søg medarbejder…" autocomplete="off" aria-label="Søg medarbejder">
+      <div class="empSearchResults" hidden></div>
+    </div>
+  `;
+}
+
+let empSearchOutsideWired = false;
+
+function closeAllEmployeeSearches(except) {
+  document.querySelectorAll(".empSearch").forEach(box => {
+    if (box === except) return;
+    const res = box.querySelector(".empSearchResults");
+    if (res) { res.hidden = true; res.innerHTML = ""; }
+    box.closest(".tile")?.classList.remove("empOpen");
+  });
+}
+
+function wireEmployeeSearch(root) {
+  if (!empSearchOutsideWired) {
+    empSearchOutsideWired = true;
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".empSearch")) closeAllEmployeeSearches();
+    });
+  }
+
+  root.querySelectorAll(".empSearch").forEach(box => {
+    const input   = box.querySelector(".empSearchInput");
+    const results = box.querySelector(".empSearchResults");
+    const tile    = box.closest(".tile");
+    let debounceTimer = null;
+    let activeFetch = 0;
+    let lastList = [];
+
+    function show(html) {
+      results.innerHTML = html;
+      results.hidden = false;
+      tile?.classList.add("empOpen");
+    }
+
+    function hide() {
+      results.hidden = true;
+      results.innerHTML = "";
+      tile?.classList.remove("empOpen");
+    }
+
+    function openPerson(id) {
+      if (!id) return;
+      window.open(`/herrup.html?person=${encodeURIComponent(id)}`, "_blank", "noopener");
+      input.value = "";
+      lastList = [];
+      hide();
+    }
+
+    async function runSearch(q) {
+      const myFetchId = ++activeFetch;
+      show(`<div class="empSearchInfo">Søger…</div>`);
+      try {
+        let list;
+        const entry = (typeof entraCacheRead === "function") ? await entraCacheRead() : null;
+
+        if (entry && typeof entraCacheIsFresh === "function" && entraCacheIsFresh(entry)) {
+          // Cache er varm — filtrer lokalt, ingen server-tur.
+          const ql = q.toLowerCase();
+          list = entry.data
+            .filter(u => (u.displayName || "").toLowerCase().includes(ql) || (u.mail || "").toLowerCase().includes(ql))
+            .slice(0, 15);
+        } else {
+          // Koldt cache — brug det lette søge-endpoint.
+          const r = await fetch(`/api/entra-users-search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+          list = Array.isArray(data) ? data : [];
+          if (typeof entraCacheWarm === "function") entraCacheWarm();
+        }
+
+        if (myFetchId !== activeFetch) return;
+        lastList = list;
+        renderResults(list);
+      } catch (e) {
+        if (myFetchId !== activeFetch) return;
+        lastList = [];
+        show(`<div class="empSearchInfo">Kunne ikke søge: ${esc(e.message)}</div>`);
+      }
+    }
+
+    function renderResults(list) {
+      if (!list.length) {
+        show(`<div class="empSearchInfo">Ingen resultater</div>`);
+        return;
+      }
+      show(list.map(u => `
+        <button type="button" class="empSearchResult" data-id="${esc(u.id)}">${esc(u.displayName || "–")}</button>
+      `).join(""));
+      results.querySelectorAll(".empSearchResult").forEach(el => {
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openPerson(el.getAttribute("data-id"));
+        });
+      });
+    }
+
+    input.addEventListener("focus", () => closeAllEmployeeSearches(box));
+
+    input.addEventListener("input", () => {
+      const q = input.value.trim();
+      clearTimeout(debounceTimer);
+      if (q.length < 2) {
+        activeFetch++;
+        lastList = [];
+        hide();
+        return;
+      }
+      debounceTimer = setTimeout(() => runSearch(q), 300);
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (lastList.length) openPerson(lastList[0].id);
+      } else if (e.key === "Escape") {
+        input.value = "";
+        lastList = [];
+        hide();
+        input.blur();
+      }
+    });
+  });
+}
+
+// ── Medarbejdere i det øverste søgefelt ─────────────────────────────────────
+// Når man skriver i søgefeltet øverst på forsiden (#q), vises matchende
+// medarbejdere i en boks over app-listen. Kun for brugere, der har adgang til
+// Personalelisten (dvs. ser en tile med URL /herrup.html). Klik åbner
+// personens kort i herrup.html i en ny fane - samme som søgningen på tile'n.
+// Data: browser-cachen (IndexedDB) hvis den er varm, ellers /api/entra-users-search.
+let peopleSearchEnabled = false;
+let peopleTimer = null;
+let peopleSeq = 0;
+const PEOPLE_MAX = 8;
+
+function injectPeopleCss() {
+  if (document.getElementById("peopleHitsCss")) return;
+  const st = document.createElement("style");
+  st.id = "peopleHitsCss";
+  st.textContent = `
+    .peopleHits { margin:12px 0 4px; }
+    .peopleHits[hidden] { display:none; }
+    .peopleHits h3 { margin:0 0 8px; font-size:1rem; color:var(--heading,#2c3e50); display:flex; align-items:baseline; gap:8px; }
+    .peopleHits h3 .muted { font-weight:400; font-size:.85rem; }
+    .peopleGrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:8px; }
+    .personHit { display:flex; align-items:center; gap:10px; text-align:left; width:100%;
+                 appearance:none; font:inherit; cursor:pointer; background:#fff;
+                 border:1px solid #e5e7eb; border-radius:12px; padding:8px 10px;
+                 transition:border-color .15s, box-shadow .15s; }
+    .personHit:hover, .personHit:focus { border-color:#850c18; box-shadow:0 4px 12px rgba(133,12,24,.12); outline:none; }
+    .personHit .pav { width:38px; height:38px; border-radius:50%; flex-shrink:0; overflow:hidden;
+                      background:#eef1f6; color:#2c3e50; font-weight:700; font-size:.85rem;
+                      display:flex; align-items:center; justify-content:center; }
+    .personHit .pav img { width:100%; height:100%; object-fit:cover; }
+    .personHit .pn { font-weight:700; color:#111827; font-size:.9rem; line-height:1.2; }
+    .personHit .ps { color:#6b7280; font-size:.78rem; line-height:1.2; }
+    .personHit .pt { min-width:0; }
+    .personHit .pn, .personHit .ps { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .peopleInfo { color:#6b7280; font-size:.85rem; padding:4px 0; }
+  `;
+  document.head.appendChild(st);
+}
+
+function peopleContainer() {
+  let box = document.getElementById("peopleHits");
+  if (box) return box;
+  const sections = document.getElementById("sections");
+  if (!sections) return null;
+  injectPeopleCss();
+  box = document.createElement("div");
+  box.id = "peopleHits";
+  box.className = "peopleHits";
+  box.hidden = true;
+  sections.parentNode.insertBefore(box, sections);
+  box.addEventListener("click", (e) => {
+    const btn = e.target.closest(".personHit[data-id]");
+    if (!btn) return;
+    window.open(`/herrup.html?person=${encodeURIComponent(btn.dataset.id)}`, "_blank", "noopener");
+  });
+  return box;
+}
+
+function personInitials(name) {
+  return String(name || "?").trim().split(/\s+/).slice(0, 2).map(p => (p[0] || "").toUpperCase()).join("") || "?";
+}
+
+function updatePeopleHits(rawQuery) {
+  const box = peopleContainer();
+  if (!box) return;
+  const q = String(rawQuery || "").trim();
+  clearTimeout(peopleTimer);
+  if (!peopleSearchEnabled || q.length < 2) {
+    peopleSeq++;
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  peopleTimer = setTimeout(() => searchPeople(q, box), 250);
+}
+
+async function searchPeople(q, box) {
+  const seq = ++peopleSeq;
+  try {
+    let list;
+    const entry = (typeof entraCacheRead === "function") ? await entraCacheRead() : null;
+    if (entry && typeof entraCacheIsFresh === "function" && entraCacheIsFresh(entry)) {
+      // Varm cache - filtrér lokalt (navn, mail, stilling, afdeling)
+      const ql = q.toLowerCase();
+      list = entry.data.filter(u => u.accountEnabled !== false && (
+        (u.displayName || "").toLowerCase().includes(ql) ||
+        (u.mail || "").toLowerCase().includes(ql) ||
+        (u.jobTitle || "").toLowerCase().includes(ql) ||
+        (u.department || "").toLowerCase().includes(ql)
+      ));
+      // Navne der starter med søgningen først
+      list.sort((a, b) => {
+        const as = (a.displayName || "").toLowerCase().startsWith(ql) ? 0 : 1;
+        const bs = (b.displayName || "").toLowerCase().startsWith(ql) ? 0 : 1;
+        return as - bs || (a.displayName || "").localeCompare(b.displayName || "", "da");
+      });
+    } else {
+      // Kold cache - let søge-endpoint (starter-med på navn/mail)
+      const r = await fetch(`/api/entra-users-search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      list = Array.isArray(data) ? data : [];
+      if (typeof entraCacheWarm === "function") entraCacheWarm();
+    }
+    if (seq !== peopleSeq) return;
+
+    if (!list.length) { box.hidden = true; box.innerHTML = ""; return; }
+
+    const shown = list.slice(0, PEOPLE_MAX);
+    box.innerHTML = `
+      <h3>Medarbejdere <span class="muted">${list.length > PEOPLE_MAX ? `${PEOPLE_MAX} af ${list.length} – skriv mere for at indsnævre` : list.length}</span></h3>
+      <div class="peopleGrid">
+        ${shown.map(u => `
+          <button type="button" class="personHit" data-id="${esc(u.id)}" title="Åbn ${esc(u.displayName || "")} i personalelisten">
+            <span class="pav">${u.photo ? `<img src="${esc(u.photo)}" alt="">` : esc(personInitials(u.displayName))}</span>
+            <span class="pt">
+              <div class="pn">${esc(u.displayName || "–")}</div>
+              <div class="ps">${esc([u.jobTitle, u.department].filter(Boolean).join(" · "))}</div>
+            </span>
+          </button>`).join("")}
+      </div>`;
+    box.hidden = false;
+  } catch (e) {
+    if (seq !== peopleSeq) return;
+    const msg = e instanceof TypeError
+      ? "Forbindelsen blev afbrudt – din login-session er sandsynligvis udløbet. Genindlæs siden."
+      : e.message;
+    box.innerHTML = `<div class="peopleInfo">Kunne ikke søge efter medarbejdere: ${esc(msg)}</div>`;
+    box.hidden = false;
+  }
+}
+
+// ── Kunder i det øverste søgefelt ───────────────────────────────────────────
+// Når man skriver i søgefeltet øverst på forsiden (#q), vises matchende kunder
+// fra Kundelisten i en boks under medarbejderne. Kun for brugere med rollen
+// portal_kundeliste (eller som ser en tile med URL /kundeliste.html).
+// Søger i de samme felter som søgefeltet i kundeliste.html: kundenr, navn,
+// område, kundestatus, kontrakt og aktiv/inaktiv. Data: /api/kunder (alle
+// kunder, aktive og inaktive), hentes første gang der søges og huskes, til
+// siden genindlæses. Klik åbner kunden i kunde.html i en ny fane.
+const KUNDE_ROLES = ["portal_kundeliste"];
+const KUNDE_SEARCH_PATHS = ["/kundeliste.html"];
+const KUNDE_MAX = 8;
+let kundeSearchEnabled = false;
+let kundeTimer = null;
+let kundeSeq = 0;
+let kundeCache = null;     // array med kunder, når de er hentet
+let kundePromise = null;   // igangværende hentning
+
+function isKundelisteTile(it) {
+  try {
+    const u = new URL(it?.url || "", location.origin);
+    if (u.origin !== location.origin) return false;
+    return KUNDE_SEARCH_PATHS.includes(u.pathname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+function injectKundeCss() {
+  injectPeopleCss();
+  if (document.getElementById("kundeHitsCss")) return;
+  const st = document.createElement("style");
+  st.id = "kundeHitsCss";
+  st.textContent = `
+    .kundeHit .pav { border-radius:10px; font-size:.7rem; }
+    .kundeHit.harXX .pn { color:#c30a14; }
+    .kundeHit.inaktiv { opacity:.6; }
+    .peopleHits h3 a { font-weight:400; font-size:.85rem; margin-left:auto; color:#850c18; }
+  `;
+  document.head.appendChild(st);
+}
+
+function kundeContainer() {
+  let box = document.getElementById("kundeHits");
+  if (box) return box;
+  const sections = document.getElementById("sections");
+  if (!sections) return null;
+  injectKundeCss();
+  box = document.createElement("div");
+  box.id = "kundeHits";
+  box.className = "peopleHits";
+  box.hidden = true;
+  sections.parentNode.insertBefore(box, sections);
+  box.addEventListener("click", (e) => {
+    const btn = e.target.closest(".kundeHit[data-kundenr]");
+    if (!btn) return;
+    const sn = btn.dataset.sn ? `&sn=${encodeURIComponent(btn.dataset.sn)}` : "";
+    window.open(`/kunde.html?kundenr=${encodeURIComponent(btn.dataset.kundenr)}${sn}`, "_blank", "noopener");
+  });
+  return box;
+}
+
+function loadKundeCache() {
+  if (kundeCache) return Promise.resolve(kundeCache);
+  if (kundePromise) return kundePromise;
+  kundePromise = (async () => {
+    const r = await fetch("/api/kunder?aktiv=", { cache: "no-store" });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+    kundeCache = Array.isArray(data.kunder) ? data.kunder : [];
+    return kundeCache;
+  })();
+  // Ved fejl må næste søgning prøve igen
+  kundePromise.catch(() => {}).finally(() => { kundePromise = null; });
+  return kundePromise;
+}
+
+// Samme søgetekst som kundeliste.html
+function kundeSearchText(k) {
+  return [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt, k.aktiv ? "aktiv" : "inaktiv", ...(k.serier || [])]
+    .join(" ").toLowerCase();
+}
+
+// Matcher søgningen kun et serienummer (ikke kundens egne felter), åbnes
+// kunde.html med produktlisten filtreret på det (sn=...)
+function kundeSnMatch(k, ql) {
+  if (ql.length < 3) return "";
+  const own = [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt].join(" ").toLowerCase();
+  if (own.includes(ql)) return "";
+  return (k.serier || []).find(s => String(s).toLowerCase().includes(ql)) || "";
+}
+
+function updateKundeHits(rawQuery) {
+  const box = kundeContainer();
+  if (!box) return;
+  const q = String(rawQuery || "").trim();
+  clearTimeout(kundeTimer);
+  if (!kundeSearchEnabled || q.length < 2) {
+    kundeSeq++;
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  kundeTimer = setTimeout(() => searchKunder(q, box), 250);
+}
+
+async function searchKunder(q, box) {
+  const seq = ++kundeSeq;
+  try {
+    if (!kundeCache) {
+      box.innerHTML = `<div class="peopleInfo">Søger i kunder…</div>`;
+      box.hidden = false;
+    }
+    const all = await loadKundeCache();
+    if (seq !== kundeSeq) return;
+
+    const ql = q.toLowerCase();
+    const list = all.filter(k => kundeSearchText(k).includes(ql));
+    // Aktive først, så eksakt kundenr, så navne der starter med søgningen
+    const rank = (k) =>
+      (k.aktiv === false ? 10 : 0) +
+      (String(k.kundenr || "").toLowerCase() === ql ? 0 : (String(k.navn || "").toLowerCase().startsWith(ql) ? 1 : 2));
+    list.sort((a, b) => rank(a) - rank(b) || String(a.navn || "").localeCompare(String(b.navn || ""), "da"));
+
+    if (!list.length) { box.hidden = true; box.innerHTML = ""; return; }
+
+    const shown = list.slice(0, KUNDE_MAX);
+    const allLink = `/kundeliste.html?${new URLSearchParams({ q, aktiv: "" }).toString()}`;
+    box.innerHTML = `
+      <h3>Kunder <span class="muted">${list.length > KUNDE_MAX ? `${KUNDE_MAX} af ${list.length} – skriv mere for at indsnævre` : list.length}</span>
+        <a href="${esc(allLink)}" target="_blank" rel="noopener">Vis i kundelisten →</a></h3>
+      <div class="peopleGrid">
+        ${shown.map(k => {
+          const snHit = kundeSnMatch(k, ql);
+          const sub = [k.kundenr, snHit ? `SN ${snHit}` : "", k.omraade, k.kundestatus, k.kontrakt, k.aktiv === false ? "Inaktiv" : ""].filter(Boolean).join(" · ");
+          const cls = ["personHit", "kundeHit", k.harXX ? "harXX" : "", k.aktiv === false ? "inaktiv" : ""].filter(Boolean).join(" ");
+          return `
+          <button type="button" class="${cls}" data-kundenr="${esc(k.kundenr)}"${snHit ? ` data-sn="${esc(ql)}"` : ""} title="Åbn ${esc(k.navn || "")} i kundelisten">
+            <span class="pav">${esc(String(k.kundenr || "").slice(-4) || "#")}</span>
+            <span class="pt">
+              <div class="pn">${esc(k.navn || "–")}</div>
+              <div class="ps">${esc(sub)}</div>
+            </span>
+          </button>`;
+        }).join("")}
+      </div>`;
+    box.hidden = false;
+  } catch (e) {
+    if (seq !== kundeSeq) return;
+    const msg = e instanceof TypeError
+      ? "Forbindelsen blev afbrudt – din login-session er sandsynligvis udløbet. Genindlæs siden."
+      : e.message;
+    box.innerHTML = `<div class="peopleInfo">Kunne ikke søge efter kunder: ${esc(msg)}</div>`;
+    box.hidden = false;
+  }
+}
+
+// ── Browser/Desktop-tile (Admin: Åbn = "Browser / Desktop") ──────────────────
+// I stedet for beskrivelsen får tile'n to knapper: "Browser" åbner linket som
+// normalt, "Desktop" åbner filen i Office-appen via ms-excel:/ms-word:/ms-powerpoint:.
+const OFFICE_APPS = {
+  xlsx: "ms-excel", xlsm: "ms-excel", xlsb: "ms-excel", xls: "ms-excel", csv: "ms-excel",
+  docx: "ms-word", docm: "ms-word", doc: "ms-word", rtf: "ms-word",
+  pptx: "ms-powerpoint", pptm: "ms-powerpoint", ppt: "ms-powerpoint", ppsx: "ms-powerpoint"
+};
+const OFFICE_LINK_TYPES = { x: "ms-excel", w: "ms-word", p: "ms-powerpoint" };
+
+function officeDesktopUrl(url) {
+  try {
+    const u = new URL(url, location.origin);
+    let path = u.pathname;
+    let app = null;
+
+    // SharePoint-links som /:x:/r/sites/.../fil.xlsx -> /sites/.../fil.xlsx
+    const typed = /^\/:([a-z]):\/[a-z]\//i.exec(path);
+    if (typed) {
+      app = OFFICE_LINK_TYPES[typed[1].toLowerCase()] || null;
+      if (/^\/:[a-z]:\/r\//i.test(path)) path = path.replace(/^\/:[a-z]:\/r/i, "");
+    }
+
+    const ext = ((/\.([a-z0-9]+)$/i.exec(path) || [])[1] || "").toLowerCase();
+    const isOfficeFile = !!OFFICE_APPS[ext];
+    if (isOfficeFile) app = OFFICE_APPS[ext];
+    if (!app) {
+      const fileParam = (u.searchParams.get("file") || "").toLowerCase();
+      app = OFFICE_APPS[(/\.([a-z0-9]+)$/.exec(fileParam) || [])[1]] || "ms-excel";
+    }
+
+    // Direkte fil-sti bruges uden parametre. Delingslinks (/:x:/s/...) og
+    // Doc.aspx?sourcedoc=... sendes som de er - Office slår dem selv op.
+    const target = isOfficeFile ? `${u.origin}${path}` : u.href;
+    return `${app}:ofe|u|${target}`;
+  } catch {
+    return url;
+  }
+}
+
+function renderBrowserDesktopHTML(it, target) {
+  const common = `data-track="tile" data-title="${esc(it.title || "")}" data-category="${esc(it.category || "")}" data-group="${esc(it.group || "")}"`;
+  return `
+    <div class="tileActions">
+      <a class="tileAction" href="${esc(it.url)}" target="${target}" rel="noopener" data-url="${esc(it.url || "")}" ${common}>Browser</a>
+      <a class="tileAction" href="${esc(officeDesktopUrl(it.url))}" data-url="${esc(it.url || "")}" ${common}>Desktop</a>
+    </div>
+  `;
+}
+
+function renderTileHTML(it) {
+  const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
+  const isFavStarred = favoriteIds.has(it.id);
+  const isEmpSearch = isEmployeeSearchTile(it);
+  const isBrowserDesktop = !isEmpSearch && it.openMode === "browserDesktop";
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `
+    <div class="tile${isEmpSearch ? " empTile" : ""}">
+      <button
+        class="favStar${isFavStarred ? " is-active" : ""}"
+        type="button"
+        data-fav-id="${esc(it.id)}"
+        aria-pressed="${isFavStarred ? "true" : "false"}"
+        title="${isFavStarred ? "Fjern fra Mine favoritter" : "Tilføj til Mine favoritter"}"
+      >${isFavStarred ? "★" : "☆"}</button>
+      <a class="tileLink"
+         href="${esc(it.url)}"
+         target="${target}"
+         rel="noopener"
+         data-track="tile"
+         data-title="${esc(it.title || "")}"
+         data-url="${esc(it.url || "")}"
+         data-category="${esc(it.category || "")}"
+         data-group="${esc(it.group || "")}">
+        <div class="tileTop">
+          <div class="icon"></div>
+        </div>
+        <div class="tileTitle">${esc(it.title || "Uden titel")}</div>
+        ${isEmpSearch || isBrowserDesktop ? "" : `<div class="tileUrl">${esc(it.description || it.forklaring || "")}</div>`}
+      </a>
+      ${isEmpSearch ? renderEmployeeSearchHTML() : ""}
+      ${isBrowserDesktop ? renderBrowserDesktopHTML(it, target) : ""}
+    </div>
+  `;
+  const tileEl = wrapper.firstElementChild;
+  setIcon(tileEl.querySelector(".icon"), it.icon);
+  return tileEl.outerHTML;
+}
+
+// ── Primær-bokse i toppen af forsiden (Admin: "Primær-boks 1/2") ────────────
+function renderPrimaryTileHTML(it) {
+  const target = (it.openMode || "newTab") === "sameTab" ? "_self" : "_blank";
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `
+    <a class="primaryTile tileLink"
+       href="${esc(it.url)}"
+       target="${target}"
+       rel="noopener"
+       data-track="tile"
+       data-title="${esc(it.title || "")}"
+       data-url="${esc(it.url || "")}"
+       data-category="${esc(it.category || "")}"
+       data-group="${esc(it.group || "")}">
+      <div class="icon"></div>
+      <div class="primaryTitle">${esc(it.title || "")}</div>
+    </a>
+  `;
+  const a = wrapper.firstElementChild;
+  setIcon(a.querySelector(".icon"), it.icon);
+  return a.outerHTML;
+}
+
+// Nyheds-tiles under primær-boksene. Vises indtil videre kun for disse roller –
+// tilføj "portal_user" her, når alle skal kunne se dem.
+const NEWS_TILE_ROLES = ["portal_admin", "portal_hp_nyheder", "portal_hp_nyheder_redaktør", "portal_hp_nyheder_redaktor", "portal_herrup_portal_admin"];
+
+function renderNewsTileHTML(href, icon, title, badgeId) {
+  return `
+    <a class="primaryTile compact" href="${href}">
+      <span class="icon">${icon}</span>
+      <span class="primaryTitle">${esc(title)}</span>
+      ${badgeId ? `<span class="primaryBadge" id="${badgeId}" hidden></span>` : ""}
+    </a>`;
+}
+
+// Antal nyheder der venter på godkendelse (kun for redaktører)
+async function loadPendingNewsBadge() {
+  const badge = document.getElementById("newsPendingBadge");
+  if (!badge) return;
+  try {
+    const r = await fetch("/api/news-admin?count=pending", { cache: "no-store" });
+    if (!r.ok) return;
+    const { pending } = await r.json();
+    if (pending > 0) {
+      badge.textContent = String(pending);
+      badge.title = `${pending} nyhed${pending === 1 ? "" : "er"} venter på godkendelse`;
+      badge.hidden = false;
+    }
+  } catch { /* ikke kritisk */ }
+}
+
+function renderPrimaryBoxes(items, roles = []) {
+  const left = document.getElementById("primaryBoxLeft");
+  const right = document.getElementById("primaryBoxRight");
+  if (!left && !right) return;
+
+  const p1 = items.find(x => x.primaer === 1);
+  const p2 = items.find(x => x.primaer === 2);
+  const showNews = roles.some(r => NEWS_TILE_ROLES.includes(r));
+
+  if (left) {
+    left.innerHTML = `<div class="primaryStack">${p1 ? renderPrimaryTileHTML(p1) : ""}${
+      showNews ? renderNewsTileHTML("/nyheder.html", "📰", "Nyheder", "newsPendingBadge") : ""}</div>`;
+  }
+  if (right) {
+    right.innerHTML = `<div class="primaryStack">${p2 ? renderPrimaryTileHTML(p2) : ""}${
+      showNews ? renderNewsTileHTML("/nyhed-opret.html", "✍️", "Opret nyhed") : ""}</div>`;
+  }
+  if (showNews) loadPendingNewsBadge();
+
+  // Samme klik-tracking som de almindelige tiles (no-op når TRACKING_ENABLED er false).
+  wireTileTracking(document.querySelector(".hero"));
+}
+
+function renderFavGroupHTML(groupName, links, key) {
+  const id = `fav_${key}`;
+  const label = groupName || "Uden gruppe";
+  const count = links.length;
+  const noSub = [];
+  const bySub = new Map();
+  for (const it of (links || [])) {
+    const sub = normSubgroup(it);
+    if (!sub) { noSub.push(it); } else {
+      if (!bySub.has(sub)) bySub.set(sub, []);
+      bySub.get(sub).push(it);
+    }
+  }
+  const subEntries = Array.from(bySub.entries()).sort((a, b) => a[0].localeCompare(b[0], "da"));
+  const noSubHTML = noSub.length ? `<div class="grid">${sortLinks(noSub).map(renderTileHTML).join("")}</div>` : "";
+  const subHTML = subEntries.map(([subName, subLinks]) => {
+    if (!subLinks || subLinks.length === 0) return "";
+    return `
+      <div class="favSubHdr">
+        <span class="favSubIcon">📄</span>
+        <span class="favSubName">${esc(subName)}</span>
+        <span class="favSubCount">${subLinks.length}</span>
+      </div>
+      <div class="grid">${sortLinks(subLinks).map(renderTileHTML).join("")}</div>
+    `;
+  }).join("");
+  return `
+    <div class="favGroup">
+      <button class="favGroupHdr" type="button" data-toggle="${id}" aria-expanded="false">
+        <span class="favFolder">📁</span>
+        <span class="favName">${esc(label)}</span>
+        <span class="favCount">${count}</span>
+        <span class="favChevron">▾</span>
+      </button>
+      <div class="favGroupBody" id="${id}" hidden>
+        ${noSubHTML}
+        ${subHTML}
+      </div>
+    </div>
+  `;
+}
+
+function renderCategorySectionHTML(categoryName, links, sectionIndex) {
+  const rawCat = categoryName || "Andet";
+  const cat = rawCat.toLowerCase() === "static apps" ? "Web Apps" : rawCat;
+  const isFav = cat.toLowerCase() === "lely favoritter";
+  if (isFav) {
+    const byGroup = groupBy(links, x => normKey(x.group) || "Uden gruppe");
+    const groups = Array.from(byGroup.entries()).sort((a, b) => a[0].localeCompare(b[0], "da"));
+    return `
+      <section class="section">
+        <div class="accent-bar" style="margin-bottom:10px;">${esc(cat)}</div>
+        <div class="sectionBody">
+          ${groups.map(([g, ls], i) => renderFavGroupHTML(g, ls, `${sectionIndex}_${i}`)).join("")}
+        </div>
+      </section>
+    `;
+  }
+  return `
+    <section class="section">
+      <div class="accent-bar" style="margin-bottom:10px;">${esc(cat)}</div>
+      <div class="sectionBody">
+        <div class="grid">${(ALPHA_CATEGORIES.includes(cat.toLowerCase()) ? sortLinksAlpha(links) : sortLinks(links)).map(renderTileHTML).join("")}</div>
+      </div>
+    </section>
+  `;
+}
+
+// "Mine favoritter" er ikke en rigtig kategori i Dataverse — det er en
+// virtuel, brugerspecifik sektion styret af stjernemarkeringen, og den
+// vises altid allerførst, uanset hvilke kategorier de stjernemarkerede
+// links faktisk hører til.
+function renderMyFavoritesSectionHTML(links) {
+  const body = links.length
+    ? `<div class="grid">${sortLinks(links).map(renderTileHTML).join("")}</div>`
+    : `<div class="muted" style="padding:.4rem 0 .2rem">Klik på stjernen ☆ på et link for at samle dine mest brugte her.</div>`;
+  return `
+    <section class="section" id="mineFavoritterSection">
+      <div class="accent-bar" style="margin-bottom:10px;">Mine favoritter</div>
+      <div class="sectionBody">${body}</div>
+    </section>
+  `;
+}
+
+function wireAccordions(root) {
+  root.querySelectorAll("[data-toggle]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-toggle");
+      const body = document.getElementById(id);
+      const isOpen = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", String(!isOpen));
+      if (body) body.hidden = isOpen;
+      const ch = btn.querySelector(".favChevron");
+      if (ch) ch.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+    });
+  });
+}
+
+function wireTileTracking(root) {
+  root.querySelectorAll('.tileLink[data-track="tile"], .tileAction[data-track="tile"]').forEach(a => {
+    a.addEventListener("click", () => {
+      track("Click", {
+        targetUrl: safeUrl(a.getAttribute("data-url") || a.href || ""),
+        targetTitle: (a.getAttribute("data-title") || "").substring(0, 200),
+        targetCategory: (a.getAttribute("data-category") || "").substring(0, 100),
+        targetGroup: (a.getAttribute("data-group") || "").substring(0, 100)
+      });
+    }, { passive: true });
+  });
+}
+
+// Stjerne-knapperne sidder inde i selve tile-kortet, men UDEN for det
+// klikbare link (se renderTileHTML) — så et klik på stjernen aldrig åbner
+// linket, kun skifter favorit-status.
+function wireFavoriteStars(root) {
+  root.querySelectorAll(".favStar").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFavorite(btn.getAttribute("data-fav-id"));
+    });
+  });
+}
+
+function renderSections(items, myFavItems) {
+  const root = document.getElementById("sections");
+  if (!root) return;
+  const byCat = groupBy(items, x => normKey(x.category) || "Andet");
+  const entries = Array.from(byCat.entries()).sort((a, b) => {
+    const an = a[0].toLowerCase(), bn = b[0].toLowerCase();
+    if (an === "lely favoritter" && bn !== "lely favoritter") return -1;
+    if (bn === "lely favoritter" && an !== "lely favoritter") return 1;
+    return a[0].localeCompare(b[0], "da");
+  });
+  const catHTML = entries.map(([cat, links], i) => renderCategorySectionHTML(cat, links, i)).join("");
+  const favHTML = renderMyFavoritesSectionHTML(myFavItems || []);
+  root.innerHTML = favHTML + catHTML;
+  wireAccordions(root);
+  wireTileTracking(root);
+  wireFavoriteStars(root);
+  wireEmployeeSearch(root);
+}
+
+(async function init() {
+  const userLine = document.getElementById("userLine");
+  if (userLine) userLine.textContent = "Henter bruger...";
+
+  let me = null;
+  try { me = await getMe(); } catch { me = null; }
+
+  let roles = expandRoles(rolesFromMe(me));
+  let shownUser = me?.userDetails || "Ikke logget ind";
+
+  // Simulering (kun portal_admin), fx til skærmbilleder:
+  //   /?visSom=bruger  → som almindelig bruger (kun portal_user)
+  //   /?visSom=pks     → som brugeren pks@lcherrup.dk (rollerne slås op i Graph)
+  //   /?visSom=mig     → tilbage til egen visning
+  // Huskes i fanen, til den lukkes. Kun visningen ændres – serveren tjekker
+  // stadig de rigtige roller, og "Mine favoritter" er stadig dine egne.
+  try {
+    const isAdmin = roles.includes("portal_admin");
+    const vis = (new URLSearchParams(location.search).get("visSom") || "").trim().toLowerCase();
+    if (vis === "mig" || !isAdmin) sessionStorage.removeItem("hpVisSom");
+    else if (vis) sessionStorage.setItem("hpVisSom", vis);
+
+    const sim = isAdmin ? sessionStorage.getItem("hpVisSom") : null;
+    if (sim === "bruger") {
+      roles = ["portal_user"];
+      shownUser = "Vis som: kontakter";
+      console.info("Herrup Portalen: viser som almindelig bruger (portal_user). Slå fra med ?visSom=mig");
+    } else if (sim) {
+      const r = await fetch(`/api/simulate-roles?initialer=${encodeURIComponent(sim)}`, { cache: "no-store" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        sessionStorage.removeItem("hpVisSom");
+        alert(`Kan ikke vise som "${sim}": ${d.error || `HTTP ${r.status}`}`);
+      } else {
+        roles = expandRoles(d.roles);
+        shownUser = `Vis som: ${String(d.user?.upn || sim).split("@")[0].toUpperCase()}`;
+        console.info(`Herrup Portalen: viser som ${d.user?.displayName} (${d.user?.upn}) med roller: ${roles.join(", ") || "(ingen)"}. Slå fra med ?visSom=mig`);
+      }
+    }
+  } catch (e) { console.warn("visSom:", e); }
+
+  if (userLine) userLine.textContent = shownUser;
+
+  const adminLink = document.getElementById("adminLink");
+  if (adminLink) adminLink.classList.toggle("hidden", !roles.includes("portal_admin"));
+  const statLink = document.getElementById("statLink");
+  if (statLink) statLink.classList.toggle("hidden", !(roles.includes("portal_admin") || roles.includes("portal_herrup_portal_admin")));
+
+  // Hent brugerens stjernemarkerede favoritter parallelt med links, så
+  // "Mine favoritter" er korrekt allerede ved første tegning af siden.
+  const favoritesPromise = loadFavorites();
+
+  // Nyhed/tip er ren dekoration i "Velkommen"-teksten — kaldes uafhængigt og
+  // blokerer ikke resten af siden, uanset om den lykkes eller ikke.
+  loadNewsOrTip();
+
+  let raw = [];
+  try {
+    raw = await loadLinks();
+  } catch (e) {
+    console.warn("Kunne ikke hente links:", e);
+    await favoritesPromise;
+    renderSections([], []);
+    return;
+  }
+  await favoritesPromise;
+
+  const platform = detectPlatform();
+
+  const itemsAll = (raw || [])
+    .map(x => ({
+      ...x,
+      allowedRoles: parseAllowedRoles(x.allowedRoles),
+      enabled: x.enabled !== false,
+      platformHint: (x.platformHint || "all").toLowerCase(),
+      subgroup: normSubgroup(x)
+    }))
+    .filter(x => x.enabled)
+    .filter(x => x.platformHint === "all" || x.platformHint === platform)
+    .filter(x => matchesRoles(x.allowedRoles, roles))
+    .sort((a, b) => (a.sort ?? 1000) - (b.sort ?? 1000));
+
+  const categories = uniq(itemsAll.map(x => x.category));
+  const groups = uniq(itemsAll.map(x => x.group).filter(Boolean));
+
+  // De 2 "primære app"-bokse i toppen af siden — uafhængige af søgning/
+  // kategori-filter, sættes én gang her.
+  renderPrimaryBoxes(itemsAll, roles);
+
+  const catSel = document.getElementById("categoryFilter");
+  const grpSel = document.getElementById("groupFilter");
+  setSelectOptions(catSel, categories, { includeEmpty: true, emptyText: "Alle kategorier" });
+  setSelectOptions(grpSel, groups, { includeEmpty: true, emptyText: "Alle grupper" });
+
+  // Medarbejdersøgning i det øverste søgefelt - kun hvis brugeren har adgang
+  // til Personalelisten (ser en /herrup.html-tile)
+  peopleSearchEnabled = itemsAll.some(isEmployeeSearchTile);
+  // Kundesøgning - kun med rollen portal_kundeliste (eller en /kundeliste.html-tile)
+  kundeSearchEnabled = roles.some(r => KUNDE_ROLES.includes(r)) || itemsAll.some(isKundelisteTile);
+
+  // Søgefeltets tekst afspejler, hvad brugeren kan søge i
+  const q = document.getElementById("q");
+  if (q) {
+    const parts = ["apps"];
+    if (peopleSearchEnabled) parts.push("medarbejdere");
+    if (kundeSearchEnabled) parts.push("kunder");
+    q.placeholder = parts.length === 1
+      ? "Søg..."
+      : `Søg i ${parts.slice(0, -1).join(", ")} og ${parts[parts.length - 1]}...`;
+    // Hent kunderne i baggrunden, så snart brugeren går i søgefeltet
+    if (kundeSearchEnabled) q.addEventListener("focus", () => { loadKundeCache().catch(() => {}); }, { once: true });
+  }
+  const qx = document.getElementById("qx");
+
+  function syncClearBtn() {
+    if (!qx || !q) return;
+    qx.style.visibility = q.value ? "visible" : "hidden";
+  }
+
+  function render() {
+    const qq = (q?.value || "").toLowerCase();
+    updatePeopleHits(q?.value || "");
+    updateKundeHits(q?.value || "");
+    const cat = catSel?.value || "";
+    const grp = grpSel?.value || "";
+    const matchesSearch = (x) => !qq
+      || (x.title || "").toLowerCase().includes(qq)
+      || (x.url || "").toLowerCase().includes(qq);
+
+    const filtered = itemsAll.filter(x => {
+      if (cat && (x.category || "") !== cat) return false;
+      if (grp && (x.group || "") !== grp) return false;
+      return matchesSearch(x);
+    });
+
+    // "Mine favoritter" er brugerens egen samling og ignorerer derfor
+    // kategori/gruppe-filtrene (ellers kunne man "filtrere favoritterne
+    // væk" ved et uheld) — men respekterer stadig søgefeltet.
+    const myFav = itemsAll.filter(x => favoriteIds.has(x.id) && matchesSearch(x));
+
+    renderSections(filtered, myFav);
+  }
+
+  rerenderMain = render;
+
+  if (q) q.addEventListener("input", () => { syncClearBtn(); render(); });
+  if (qx) qx.addEventListener("click", () => { q.value = ""; syncClearBtn(); render(); });
+  if (catSel) catSel.addEventListener("change", render);
+  if (grpSel) grpSel.addEventListener("change", render);
+
+  syncClearBtn();
+  render();
+})();
+
+
+
