@@ -227,3 +227,6 @@ module.exports = async function (context, req) {
 
 
 
+
+// Bruges også af /api/kunder-salmonella
+module.exports.helpers = { getToken, dvUrl, normAdr };

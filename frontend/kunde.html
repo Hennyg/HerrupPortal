@@ -179,6 +179,8 @@ initUser();
 const params = new URLSearchParams(location.search); const kundenr = params.get('kundenr') || ''; const id = params.get('id') || '';
 // ?sn=... (fra søgning på serienr. i kundelisten): åbn produktlisten med kun det produkt
 let snFilter = (params.get('sn') || '').trim();
+// ?vis=produkter (knappen "Produkt" i kundelisten): åbn produktlisten med det samme
+const openProductsOnLoad = params.get('vis') === 'produkter';
 let state = { kunde:null, adresser:[], produkter:[], selectedAdresseKey:'' };
 
 // ── Produkttabellens visninger ──────────────────────────────────────────────
@@ -263,7 +265,7 @@ async function load(){
  state = { kunde:j.kunde, adresser:j.adresser||[], produkter:j.produkter||[], selectedAdresseKey:'' };
  setStatus('',''); document.getElementById('content').style.display='block'; render();
  loadSalmonella(j.kunde?.chr, j.adresser || []);
- if (snFilter) openProdukter();
+ if (snFilter || openProductsOnLoad) openProdukter();
 }
 
 // ── Salmonella-status (samme kilde som kundeinfo: Salmonella-appens Dataverse via CHR) ──
