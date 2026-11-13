@@ -18,6 +18,7 @@
     }
     .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
     /* Knap: kun kunder med produkter, hvor installationsdato er xx-xx-xxxx */
+    #btnSal.active { background:#fee2e2; border-color:#dc2626; color:#991b1b; font-weight:700; }
     #btnXX.active { background:#fdf2f2; border-color:var(--red); color:var(--red); font-weight:700; }
     /* Salmonella på mindst én af kundens adresser */
     .dataTable td.kundenrSal { background:#fee2e2; color:#991b1b !important; font-weight:700; }
@@ -54,6 +55,7 @@
     <section class="toolbar">
       <input id="q" type="search" placeholder="Søg kundenr, navn, område, status, kontrakt – eller serienr. for at gå til produktet" style="min-width:320px" autocomplete="off" />
       <select id="aktiv"><option value="true">Aktive</option><option value="">Alle</option><option value="false">Inaktive</option></select>
+      <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
       <button type="button" class="btn" id="btnXX" title="Vis kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (fx planlagte projekter, der ikke er aktive endnu)">xx-xx-xxxx</button>
       <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
       <div class="toolbarSpacer"></div>
@@ -62,8 +64,8 @@
     </section>
     <div class="snHint" id="snHint" hidden></div>
     <div class="listLegend">
-      <span><span class="lg lgSal"></span>Rød baggrund på kundenr.: salmonella på mindst én af kundens adresser <span id="salStatus" class="muted"></span></span>
-      <span><b>xx-xx-xxxx</b>: viser kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx</span>
+      <span><span class="lg lgSal"></span>Rød baggrund på kundenr. = salmonella (ikke "Fri") på mindst én af kundens adresser. Hold musen over for CHR-nr. <span id="salStatus" class="muted"></span></span>
+      <span><b>xx-xx-xxxx</b> = kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (markeres ikke i listen)</span>
     </div>
     <div id="status" class="status loading"><div class="spinner"></div> Henter kunder...</div>
     <section class="tableWrap">
@@ -84,7 +86,8 @@
   <script>
     let rows = [], filtered = [], sortKey = 'navn', sortDir = 1;
     let onlyXX = false;            // knappen "xx-xx-xxxx"
-    let salRed = new Set();        // kundenumre med salmonella på en adresse
+    let onlySal = false;           // knappen "Salmonella"
+    let salOk = true;              // kunne salmonella hentes?
     const FILTER_COLS = ['kundenr', 'navn', 'omraade', 'kundestatus', 'kontrakt'];
     const colFilters = {}; // kolonne -> filtertekst (gemmes i URL'en som f_<kolonne>)
     restoreStateFromUrl();
@@ -99,6 +102,7 @@
     });
     document.getElementById('aktiv').onchange = () => { syncUrlState(); load(); };
     document.getElementById('btnXX').onclick = () => { onlyXX = !onlyXX; syncUrlState(); render(); };
+    document.getElementById('btnSal').onclick = () => { onlySal = !onlySal; syncUrlState(); render(); };
     document.querySelectorAll('.colFilter').forEach(inp => {
       inp.value = colFilters[inp.dataset.col] || '';
       inp.addEventListener('click', e => e.stopPropagation()); // klik i feltet må ikke sortere
@@ -124,6 +128,7 @@
       if (p.has('sort')) sortKey = p.get('sort');
       if (p.has('dir')) sortDir = p.get('dir') === '-1' ? -1 : 1;
       onlyXX = p.get('xx') === '1';
+      onlySal = p.get('sal') === '1';
       FILTER_COLS.forEach(c => { if (p.get('f_' + c)) colFilters[c] = p.get('f_' + c); });
     }
 
@@ -136,6 +141,7 @@
       if (sortKey !== 'navn') p.set('sort', sortKey);
       if (sortDir !== 1) p.set('dir', String(sortDir));
       if (onlyXX) p.set('xx', '1');
+      if (onlySal) p.set('sal', '1');
       FILTER_COLS.forEach(c => { if ((colFilters[c] || '').trim()) p.set('f_' + c, colFilters[c]); });
       const qs = p.toString();
       history.replaceState(null, '', qs ? `/kundeliste.html?${qs}` : '/kundeliste.html');
@@ -146,25 +152,6 @@
       await Promise.all([loadKunder(), loadLastImport()]);
       setStatus('', '');
       render();
-      loadSalmonellaMarks();   // farver kundenumre, når den er klar (venter ikke)
-    }
-
-    // Kunder med salmonella på mindst én adresse (samme regel som den røde
-    // ramme på kunde.html). Beregnes på serveren og huskes der i 15 min.
-    async function loadSalmonellaMarks() {
-      const st = document.getElementById('salStatus');
-      st.textContent = '(henter…)';
-      try {
-        const r = await fetch('/api/kunder-salmonella');
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j.error || r.status);
-        salRed = new Set(j.red || []);
-        st.textContent = '';
-        render();
-      } catch (e) {
-        console.warn('Salmonella-markering:', e);
-        st.textContent = '(kunne ikke hentes)';
-      }
     }
 
     async function loadKunder() {
@@ -173,6 +160,9 @@
       const j = await r.json();
       if (!r.ok || j.error) throwStatus('Fejl: ' + esc(j.error || r.status));
       rows = j.kunder || [];
+      // Salmonella kommer med kundelisten (k.salmonella = besætninger, der ikke er fri)
+      salOk = j.salmonellaOk !== false;
+      document.getElementById('salStatus').textContent = salOk ? '' : '(kunne ikke hentes lige nu)';
     }
 
     async function loadLastImport() {
@@ -215,6 +205,11 @@
     function openKunde(kundenr) {
       location.href = kundeUrl(kundenr);
     }
+    const hasSal = k => Array.isArray(k.salmonella) && k.salmonella.length > 0;
+    function salTitle(k) {
+      return 'Salmonella på kundens adresse:\n' + k.salmonella.map(h => `CHR ${h.chr} · ${h.status} – ${h.adresse}`).join('\n');
+    }
+
     // Kundesiden med produktlisten åben med det samme
     function produktUrl(kundenr) {
       return `/kunde.html?kundenr=${encodeURIComponent(kundenr)}&vis=produkter`;
@@ -275,9 +270,11 @@
       filtered = rows.filter(k =>
         (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv'].join(' ').toLowerCase().includes(q)) &&
         active.every(c => filterText(k, c).toLowerCase().includes(colFilters[c].trim().toLowerCase())) &&
-        (!onlyXX || k.harXX)
+        (!onlyXX || k.harXX) &&
+        (!onlySal || hasSal(k))
       );
       document.getElementById('btnXX').classList.toggle('active', onlyXX);
+      document.getElementById('btnSal').classList.toggle('active', onlySal);
       document.getElementById('btnClearFilters').style.display = active.length ? '' : 'none';
       filtered.sort((a,b)=>String(sortValue(a, sortKey)).localeCompare(String(sortValue(b, sortKey)),'da',{numeric:true})*sortDir);
       document.querySelectorAll('th.sortable').forEach(th => th.classList.toggle('sort-active', th.dataset.sort === sortKey));
@@ -285,7 +282,7 @@
       renderSnHint();
       document.getElementById('tbody').innerHTML = filtered.map(k => {
         return `<tr class="clickable-row" onclick="openKunde('${esc(k.kundenr)}')">
-        <td class="small muted${salRed.has(String(k.kundenr)) ? ' kundenrSal' : ''}"${salRed.has(String(k.kundenr)) ? ' title="Salmonella på mindst én af kundens adresser"' : ''}>${esc(k.kundenr)}</td>
+        <td class="small muted${hasSal(k) ? ' kundenrSal' : ''}"${hasSal(k) ? ` title="${esc(salTitle(k))}"` : ''}>${esc(k.kundenr)}</td>
         <td><a class="link" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">${esc(k.navn)}</a></td>
         <td>${esc(k.omraade)}</td>
         <td>${esc(k.kundestatus)}</td>

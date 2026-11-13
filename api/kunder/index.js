@@ -74,6 +74,18 @@ function kontraktTekst(m) {
     .join("+");
 }
 
+// Salmonella pr. kunde (kundenr -> [{ chr, status, adresse }]). Fejler det,
+// vises kundelisten stadig - bare uden røde markeringer.
+async function salmonellaInfo(context) {
+  try {
+    const { salmonellaPrKunde } = require("../kunder-salmonella");
+    return await salmonellaPrKunde();
+  } catch (e) {
+    context.log("kunder: kunne ikke hente salmonella", e.message);
+    return null;
+  }
+}
+
 module.exports = async function (context, req) {
   try {
     const q = String(req.query.q || "").trim().toLowerCase();
@@ -84,18 +96,22 @@ module.exports = async function (context, req) {
     if (aktiv === "false") filter = "cr1eb_lch_aktiv eq false";
 
     const path = `${TABLE}?$select=${SELECT}${filter ? `&$filter=${encodeURIComponent(filter)}` : ""}&$orderby=cr1eb_lch_navn asc&$top=5000`;
-    const [raw, info] = await Promise.all([fetchAll(path), produktInfo(context)]);
+    const [raw, info, sal] = await Promise.all([fetchAll(path), produktInfo(context), salmonellaInfo(context)]);
     let rows = raw.map(mapRow).map(k => {
       const nr = String(k.kundenr).trim();
       const m = info.kontrakter.get(nr) || null;
-      return { ...k, harXX: info.xx.has(nr), kontrakt: kontraktTekst(m), kontraktAntal: m || {}, serier: info.serier.get(nr) || [] };
+      return {
+        ...k, harXX: info.xx.has(nr), kontrakt: kontraktTekst(m), kontraktAntal: m || {}, serier: info.serier.get(nr) || [],
+        // Besætninger på kundens adresser, der ikke er salmonella-fri
+        salmonella: sal ? (sal.get(nr) || []) : []
+      };
     });
 
     if (q.length >= 2) {
       rows = rows.filter(k => [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt, ...k.serier].join(" ").toLowerCase().includes(q));
     }
 
-    json(context, 200, { kunder: rows, total: rows.length });
+    json(context, 200, { kunder: rows, total: rows.length, salmonellaOk: !!sal });
   } catch (e) {
     context.log("kunder error", e.message);
     json(context, e.status || 500, { error: e.message, kunder: [] });
