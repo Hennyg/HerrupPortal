@@ -24,6 +24,8 @@
     .dataTable td.kundenrSal { background:#fee2e2; color:#991b1b !important; font-weight:700; }
     .listLegend { font-size:13px; color:#4b5563; margin:-4px 0 10px; display:flex; align-items:center; gap:6px 18px; flex-wrap:wrap; }
     .listLegend .lg { display:inline-block; width:14px; height:14px; border-radius:3px; margin-right:6px; vertical-align:-3px; }
+    .listLegend .activeFilter { color:var(--red); font-weight:700; }
+    .listLegend .activeFilter[hidden] { display:none; }
     .listLegend .lgSal { background:#fee2e2; border:1px solid #fca5a5; }
     /* Søgning på serienummer: link direkte til produktet */
     .snHint { display:flex; align-items:center; gap:6px 12px; flex-wrap:wrap; background:#fdf2f2; border:1px solid #f5c2c2;
@@ -64,6 +66,7 @@
     </section>
     <div class="snHint" id="snHint" hidden></div>
     <div class="listLegend">
+      <span id="activeFilter" class="activeFilter" hidden></span>
       <span><span class="lg lgSal"></span>Rød baggrund på kundenr. = salmonella (ikke "Fri") på mindst én af kundens adresser. Hold musen over for CHR-nr. <span id="salStatus" class="muted"></span></span>
       <span><b>xx-xx-xxxx</b> = kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (markeres ikke i listen)</span>
     </div>
@@ -275,10 +278,15 @@
       );
       document.getElementById('btnXX').classList.toggle('active', onlyXX);
       document.getElementById('btnSal').classList.toggle('active', onlySal);
+      // Vis i den grå linje, hvilken filtrering der er aktiv
+      const aktive = [onlySal ? 'Salmonella' : '', onlyXX ? 'xx-xx-xxxx i inst.dato' : ''].filter(Boolean);
+      const af = document.getElementById('activeFilter');
+      af.hidden = !aktive.length;
+      af.textContent = aktive.length ? `Aktiv filtrering: ${aktive.join(' + ')}` : '';
       document.getElementById('btnClearFilters').style.display = active.length ? '' : 'none';
       filtered.sort((a,b)=>String(sortValue(a, sortKey)).localeCompare(String(sortValue(b, sortKey)),'da',{numeric:true})*sortDir);
       document.querySelectorAll('th.sortable').forEach(th => th.classList.toggle('sort-active', th.dataset.sort === sortKey));
-      document.getElementById('countText').textContent = `${filtered.length} af ${rows.length} kunder`;
+      document.getElementById('countText').textContent = `${filtered.length} af ${rows.length} kunder${onlySal || onlyXX ? ' (filtreret)' : ''}`;
       renderSnHint();
       document.getElementById('tbody').innerHTML = filtered.map(k => {
         return `<tr class="clickable-row" onclick="openKunde('${esc(k.kundenr)}')">
