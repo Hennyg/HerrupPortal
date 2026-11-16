@@ -13,6 +13,57 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-32x32.png">
   <link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+  <style>
+    /* ── Hjælp-popup ─────────────────────────────────────────────────────── */
+    .helpLink { cursor:pointer; }
+    .helpBackdrop {
+      position:fixed; inset:0; z-index:1000; display:none;
+      align-items:center; justify-content:center; padding:1rem;
+      background:rgba(17,24,39,.55);
+    }
+    .helpBackdrop.open { display:flex; }
+    .helpModal {
+      background:#fff; color:#1f2937; border-radius:14px;
+      width:min(720px, 100%); max-height:88vh; display:flex; flex-direction:column;
+      box-shadow:0 20px 50px rgba(0,0,0,.3); overflow:hidden;
+    }
+    .helpHead {
+      display:flex; align-items:center; justify-content:space-between; gap:1rem;
+      padding:1rem 1.25rem; border-bottom:4px solid #c30a14;
+    }
+    .helpHead h2 { margin:0; font-size:1.3rem; }
+    .helpClose {
+      border:0; background:none; font-size:1.6rem; line-height:1; cursor:pointer;
+      color:#6b7280; width:44px; height:44px; border-radius:8px;
+    }
+    .helpClose:hover { background:#f3f4f6; color:#111827; }
+    .helpBody { overflow-y:auto; padding:1rem 1.25rem 1.5rem; overscroll-behavior:contain; }
+    .helpIntro { margin:0 0 1rem; color:#4b5563; font-size:.95rem; }
+    .helpSection { border:1px solid #e5e7eb; border-radius:10px; margin-bottom:.75rem; }
+    .helpSection > summary {
+      list-style:none; cursor:pointer; padding:.85rem 1rem; font-weight:700;
+      display:flex; align-items:center; gap:.6rem; font-size:1.05rem;
+    }
+    .helpSection > summary::-webkit-details-marker { display:none; }
+    .helpSection > summary::after { content:"▸"; margin-left:auto; color:#9ca3af; transition:transform .15s; }
+    .helpSection[open] > summary::after { transform:rotate(90deg); }
+    .helpSection[open] > summary { border-bottom:1px solid #f3f4f6; }
+    .helpSection ul { margin:.6rem 0 .9rem; padding:0 1rem 0 2.2rem; }
+    .helpSection li { margin:.45rem 0; line-height:1.45; font-size:.95rem; }
+    .helpSection li b { color:#111827; }
+    .helpOpen { display:inline-block; margin:0 0 .9rem 1rem; color:#850c18; font-weight:600; text-decoration:none; font-size:.92rem; }
+    .helpOpen:hover { text-decoration:underline; }
+    .helpFoot { margin-top:1rem; color:#6b7280; font-size:.9rem; }
+    body.helpLocked { overflow:hidden; }
+
+    @media (max-width:640px) {
+      .helpBackdrop { padding:0; align-items:stretch; }
+      .helpModal { width:100%; max-height:none; height:100%; border-radius:0; }
+      @supports (height:100dvh) { .helpModal { height:100dvh; } }
+      .helpBody { padding-bottom:calc(2rem + env(safe-area-inset-bottom, 0px)); }
+    }
+  </style>
 </head>
 
 <body>
@@ -30,6 +81,7 @@
 <span class="sep">|</span>
 <a id="statLink" class="hidden" href="/statistik.html">Statistik</a>
 <a id="adminLink" class="hidden" href="/admin.html">Admin</a>
+<a href="#hjaelp" class="helpLink" id="helpLink">Hjælp</a>
 <a href="/logout">Log ud</a>
 </div>
 </div>
@@ -66,6 +118,104 @@
 <div class="muted" style="margin-top:12px">Tip: Åbn på telefon og vælg "Føj til hjemmeskærm".</div>
 </div>
 </div>
+
+<!-- ── Hjælp-popup ──────────────────────────────────────────────────────── -->
+<div class="helpBackdrop" id="helpBackdrop" aria-hidden="true">
+<div class="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+<div class="helpHead">
+<h2 id="helpTitle">Hjælp – hvad kan portalen?</h2>
+<button type="button" class="helpClose" id="helpClose" aria-label="Luk">×</button>
+</div>
+<div class="helpBody">
+<p class="helpIntro">Her er et overblik over de vigtigste funktioner. Tryk på et emne for at folde det ud.</p>
+
+<details class="helpSection" open>
+<summary>🏠 Portalen (forsiden)</summary>
+<ul>
+<li><b>Søg</b> – skriv i søgefeltet for at finde apps og links. Du kan også filtrere på kategori og gruppe.</li>
+<li><b>Mine favoritter</b> – tryk på stjernen ved et link for at gøre det til en favorit. Dine favoritter følger dig på pc, telefon og tablet.</li>
+<li><b>Nyheder</b> – de seneste nyheder vises øverst. Brug pilene til at bladre, eller åbn Nyheder for at se alle.</li>
+<li><b>Opret nyhed</b> – har du noget, kollegerne skal vide? Indsend en nyhed, så bliver den godkendt af en redaktør, før den vises.</li>
+<li><b>Åbn på telefon</b> – scan koden og vælg "Føj til hjemmeskærm", så har du portalen som en app på telefonen.</li>
+</ul>
+</details>
+
+<details class="helpSection">
+<summary>👥 Personalelisten</summary>
+<ul>
+<li><b>Find en kollega</b> – søg på navn, stilling, mail eller telefon, og filtrér på afdeling. Kolonnen "Dagens status" viser, hvem der har fri, ferie eller vagt i dag.</li>
+<li><b>Tre visninger</b> – <i>Liste</i>, <i>Afdelingsoversigt</i> og <i>Organisationsdiagram</i>. Alle kan udskrives.</li>
+<li><b>Personkortet</b> – tryk på en person for at se kontaktinfo, nærmeste leder og medarbejdere. Fanerne <i>Vagt/Ferie</i>, <i>Kalender</i> (optaget/ledig i dag) og <i>Afdeling</i> viser, hvornår personen og afdelingen er til stede.</li>
+<li><b>Dine private oplysninger</b> – på dit eget kort under fanen <i>Privat</i> trykker du "Rediger" og udfylder privat telefon, adresse, fødselsdag m.m. Du bestemmer selv, hvad kollegerne må se.</li>
+<li><b>Nødkontakter</b> – tilføj en eller flere personer, vi skal kontakte ved en ulykke, og vælg hvem der må se dem.</li>
+<li><b>Allergener</b> – angiv evt. allergier, fx til brug ved bestilling af mad til arrangementer. Det er frivilligt, og du vælger selv synligheden.</li>
+<li><b>Udskriv personaleliste</b> – lav en liste over de viste medarbejdere med de kolonner, du har brug for, fx til et arrangement.</li>
+</ul>
+<a class="helpOpen" href="/herrup.html?person=me&amp;tab=privat">→ Gå direkte til mine private oplysninger</a>
+</details>
+
+<details class="helpSection">
+<summary>📋 Kundelisten</summary>
+<ul>
+<li><b>Søg</b> – på kundenummer, navn, område, status eller kontrakt. Skriver du et serienummer, kan du hoppe direkte til produktet.</li>
+<li><b>Aktive / Inaktive / Alle</b> – vælg hvilke kunder der vises.</li>
+<li><b>Salmonella</b> – vis kun kunder med salmonella på mindst én adresse.</li>
+<li><b>xx-xx-xxxx</b> – vis kunder med produkter uden rigtig installationsdato, fx planlagte projekter.</li>
+<li><b>Filtrér kolonner</b> – brug felterne over kolonnerne til at indsnævre listen. "Ryd filtre" nulstiller.</li>
+<li><b>Knapper på hver kunde</b> – <i>Info</i> (kundeinformation), <i>Åbn</i> (kundekortet) og <i>Produkt</i> (kundens produkter).</li>
+</ul>
+</details>
+
+<details class="helpSection">
+<summary>🛠️ IT-support</summary>
+<ul>
+<li><b>Installer printer</b> – find og installer firmaets printere uden at kontakte IT.</li>
+<li><b>Printerproblemer</b> – kør en diagnose, hvis printeren driller.</li>
+<li><b>Dock / skærme</b> – fejlsøg, hvis docking-station eller skærme ikke virker.</li>
+<li><b>Outlook-signatur</b> – opret firmaets standardsignatur på begge dine mailkonti med et par klik.</li>
+<li><b>Hurtige løsninger</b> – ryd midlertidige filer, ryd Edge-cache og løs problemer med Excel, der åbner i beskyttet visning.</li>
+<li><b>Virker det stadig ikke?</b> – kontakt IT, så hjælper vi.</li>
+</ul>
+</details>
+
+<p class="helpFoot">Mangler du en funktion, eller er noget uklart? Skriv til IT.</p>
+</div>
+</div>
+</div>
+
+<script>
+(function () {
+  const backdrop = document.getElementById("helpBackdrop");
+  const link     = document.getElementById("helpLink");
+  const closeBtn = document.getElementById("helpClose");
+  let lastFocus  = null;
+
+  function openHelp() {
+    lastFocus = document.activeElement;
+    backdrop.classList.add("open");
+    backdrop.setAttribute("aria-hidden", "false");
+    document.body.classList.add("helpLocked");
+    closeBtn.focus();
+  }
+  function closeHelp() {
+    backdrop.classList.remove("open");
+    backdrop.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("helpLocked");
+    if (location.hash === "#hjaelp") history.replaceState(null, "", location.pathname + location.search);
+    if (lastFocus) lastFocus.focus();
+  }
+
+  link.addEventListener("click", e => { e.preventDefault(); openHelp(); });
+  closeBtn.addEventListener("click", closeHelp);
+  backdrop.addEventListener("click", e => { if (e.target === backdrop) closeHelp(); });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && backdrop.classList.contains("open")) closeHelp();
+  });
+
+  // Direkte link til hjælpen: /index.html#hjaelp
+  if (location.hash === "#hjaelp") openHelp();
+})();
+</script>
 
 <script src="/assets/entraCache.js?v=20260925-warm"></script>
 <script src="/assets/newsTicker.js?v=20260925-2"></script>
