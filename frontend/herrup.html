@@ -590,7 +590,11 @@
 
     @media (max-width:640px) {
       /* Side */
-      .herrupPage .container { padding:.75rem .6rem 0 !important; }
+      /* .container har margin:0 auto i en flex-kolonne og fik derfor bredden af sit
+         bredeste indhold (fanerne) i stedet for skærmens bredde. Det gjorde hele
+         siden bredere end telefonen, så den blev zoomet ud - også personkortet. */
+      .herrupPage .container { width:100%; min-width:0; box-sizing:border-box; padding:.75rem .6rem 0 !important; }
+      .tabs, #listView, .userToolbar, .tableWrap { min-width:0; max-width:100%; }
       .pageTitle { font-size:1.35rem; }
       .pageSub   { display:none; }
       .panel     { padding:.6rem; margin-top:.5rem; }
@@ -619,6 +623,11 @@
 
       /* ── Personkort: fuld skærm ── */
       .modal-backdrop { padding:0; align-items:stretch; }
+      @supports (height: 100dvh) {
+        .modal-backdrop { bottom:auto; height:100dvh; }   /* undgå at bunden gemmer sig bag browserens værktøjslinje */
+      }
+      .modal input, .modal select, .modal textarea { box-sizing:border-box; max-width:100%; }
+      .modal > * { flex-shrink:0; }   /* ellers klemmes fane-rækken (overflow) ned til 0 px højde */
       .modal, #modal {
         width:100% !important; max-width:100% !important; min-width:0;
         height:100%; max-height:100%;
@@ -663,7 +672,7 @@
       .modal-tabs::-webkit-scrollbar { display:none; }
       .modal-tab, .herrup-vf-tab-btn { flex-shrink:0; white-space:nowrap; padding:.7rem .75rem; font-size:.88rem; }
 
-      .modal-body { padding:.9rem; gap:1rem; }
+      .modal-body { padding:.9rem .9rem calc(2.5rem + env(safe-area-inset-bottom, 0px)); gap:1rem; }
       .modal-tab-panel.active { gap:1rem; }
 
       /* Privat-fanen */
