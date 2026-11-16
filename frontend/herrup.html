@@ -581,6 +581,106 @@
       .oc-print .oc-node.me { outline:none; }
       .oc-menu { display:none !important; }
     }
+    /* ══ Mobil (telefon) ═════════════════════════════════════════════════════
+       Samlet her til sidst, så det overstyrer reglerne ovenfor og
+       herrup-vagtferie.css (der bruger !important på .modal). */
+    @supports (height: 100dvh) {
+      body { height: 100dvh; }   /* 100vh er højere end skærmen i mobil-browsere */
+    }
+
+    @media (max-width:640px) {
+      /* Side */
+      .herrupPage .container { padding:.75rem .6rem 0 !important; }
+      .pageTitle { font-size:1.35rem; }
+      .pageSub   { display:none; }
+      .panel     { padding:.6rem; margin-top:.5rem; }
+
+      .tabs { overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; margin-bottom:.5rem; }
+      .tabs::-webkit-scrollbar { display:none; }
+      .tabs .tab { flex-shrink:0; white-space:nowrap; padding:.45rem .75rem; font-size:.85rem; }
+
+      .userToolbar { gap:.4rem; margin-bottom:.5rem; }
+      .userToolbar .clearable { flex:1 1 100%; max-width:none; min-width:0; }
+      .userToolbar .tab, #deptFilter { font-size:.82rem; padding:.4rem .6rem; }
+      #deptFilter { flex:1; min-width:0; }
+      #userCount { flex-basis:100%; margin-left:0; font-size:.8rem; }
+
+      /* Tabel: kun navn, afdeling og status */
+      .userTable { font-size:.88rem; }
+      .userTable thead th:nth-child(2),
+      .userTable tbody td:nth-child(2) { display:none; }
+      .userTable thead th, .userTable tbody td { padding:.4rem .35rem; }
+
+      .ocHelp { display:none; }
+
+      /* Input under 16px får iOS til at zoome ind ved fokus */
+      input, select, textarea,
+      .editField input, .editField textarea, .noedRow input, .plField input { font-size:16px; }
+
+      /* ── Personkort: fuld skærm ── */
+      .modal-backdrop { padding:0; align-items:stretch; }
+      .modal, #modal {
+        width:100vw !important; max-width:100vw !important;
+        height:100%; max-height:100%;
+        border-radius:0; box-shadow:none;
+      }
+
+      .modal-header { flex-wrap:wrap; gap:.75rem; padding:.9rem 3.2rem .75rem .9rem; }
+      .modal-close {
+        top:.4rem; right:.4rem; width:44px; height:44px;
+        display:flex; align-items:center; justify-content:center;
+      }
+      .modal-big-avatar, .modal-big-avatar img { width:56px; height:56px; }
+      .modal-big-avatar { font-size:1.05rem; }
+      .modal-name  { font-size:1.1rem; }
+      .modal-title { font-size:.85rem; margin-bottom:4px; }
+
+      /* Statuskortet under navnet i fuld bredde */
+      #mCurrentStatusCard {
+        flex:1 1 100%; min-width:0 !important; max-width:none !important;
+        margin:0 !important; margin-right:-2.3rem !important;
+      }
+      #mCurrentStatusCard .herrup-vf-card { padding:8px 10px; }
+      #mCurrentStatusCard .vf-current { font-size:1rem; }
+
+      /* Faner: én række der kan swipes, og som bliver stående ved scroll */
+      .modal-tabs {
+        position:sticky; top:0; z-index:5; background:#fff;
+        margin-top:0; padding:0 .4rem; gap:0;
+        overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none;
+        border-bottom:1px solid #f3f4f6;
+      }
+      .modal-tabs::-webkit-scrollbar { display:none; }
+      .modal-tab, .herrup-vf-tab-btn { flex-shrink:0; white-space:nowrap; padding:.7rem .75rem; font-size:.88rem; }
+
+      .modal-body { padding:.9rem; gap:1rem; }
+      .modal-tab-panel.active { gap:1rem; }
+
+      /* Privat-fanen */
+      .privatHeader { gap:.5rem; }
+      .editActions { flex-wrap:wrap; }
+      .noedRow { padding-bottom:.6rem; border-bottom:1px dashed #e5e7eb; }
+      .noedRow .btn-remove-row { justify-self:end; }
+      .visToggleRow, .visRadioRow { align-items:flex-start; }
+
+      /* Vagt/Ferie-fanen */
+      .herrup-vf-tabpanel.active { margin-top:0; }
+      .herrup-vf-toolbar { flex-direction:column; align-items:stretch; }
+      .herrup-vf-controls-wrap { align-items:stretch; }
+      .herrup-vf-controls, .herrup-vf-quicknav { justify-content:flex-start; }
+      .herrup-vf-toggle button, .herrup-vf-quicknav button { padding:.4rem .6rem; font-size:.82rem; }
+      .herrup-vf-card { padding:10px; }
+      .herrup-vf-row { grid-template-columns:64px minmax(0,1fr) auto; gap:6px; padding:6px 8px; }
+      .herrup-vf-month { gap:2px; }
+      .herrup-vf-daycell { min-height:28px; padding:2px; border-radius:6px; }
+      .herrup-vf-table th:first-child,
+      .herrup-vf-table td:first-child { min-width:130px; }
+
+      /* Popups (udskriv) */
+      #printDeptList { grid-template-columns:1fr 1fr !important; max-height:none !important; }
+      .print-modal-body { padding:1rem; }
+      .plCopyPop { right:auto; left:0; min-width:0; width:100%; }
+    }
   </style>
 </head>
 <body class="herrupPage">
@@ -2776,6 +2876,3 @@ if (window.updateHeaderStatus) {
 
 </body>
 </html>
-
-
-
