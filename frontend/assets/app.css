@@ -1,4 +1,3 @@
-
 :root{
   --nav-bg:#850c18; --nav-accent:#1f6c7a; --text-on-dark:#fff;
   --page-bg:#fff; --heading:#2c3e50; --accent-bar:#c30a14;
@@ -317,31 +316,19 @@ html,body{height:100%;margin:0;background:var(--page-bg);color:#222;font-family:
   50% { background: #fff4cc; box-shadow: 0 0 0 4px rgba(195,10,20,.08); }
 }
 
-/* ── Medarbejdersøgning på tile (link til /herrup.html) ──────────────────── */
+/* ── Afdeling-knap på personaleliste-tile (link til /herrup.html) ────────── */
 .tile.empTile:hover{filter:none}
-.tile.empTile.empOpen{z-index:40}
-.empSearch{position:relative;margin-top:.75rem}
-.empSearchInput{
+.empDept{margin-top:.75rem}
+.empDeptBtn{
+  display:flex;align-items:center;justify-content:center;
   width:100%;box-sizing:border-box;
   min-height:44px;padding:.65rem 1rem;
   border:1px solid #d1d5db;border-radius:22px;
-  font:inherit;font-size:.92rem;background:#fff;
+  font:inherit;font-size:.92rem;font-weight:600;
+  background:#fff;color:#111;text-decoration:none;cursor:pointer;
+  transition:border-color .15s, box-shadow .15s, background .15s;
 }
-.empSearchInput:focus{outline:none;border-color:var(--nav-accent);box-shadow:0 0 0 3px rgba(31,108,122,.15)}
-.empSearchResults{
-  position:absolute;top:calc(100% + 6px);left:0;right:0;
-  background:#fff;border:1px solid #e5e7eb;border-radius:16px;
-  box-shadow:0 8px 24px rgba(0,0,0,.16);
-  max-height:300px;overflow-y:auto;z-index:50;padding:6px;
-}
-.empSearchResult{
-  display:block;width:100%;text-align:left;
-  appearance:none;border:0;background:transparent;cursor:pointer;
-  padding:9px 12px;border-radius:10px;
-  font:inherit;font-size:.9rem;font-weight:600;color:#111;
-}
-.empSearchResult:hover,.empSearchResult:focus{background:#f0f0f0;outline:none}
-.empSearchInfo{color:#6b7280;font-size:.85rem;padding:8px 12px}
+.empDeptBtn:hover,.empDeptBtn:focus{outline:none;border-color:var(--nav-accent);box-shadow:0 0 0 3px rgba(31,108,122,.15);background:#f9fafb}
 
 /* ══ Nyheder ═══════════════════════════════════════════════════════════════ */
 
