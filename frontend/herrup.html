@@ -1148,6 +1148,8 @@
               existing.managerName    = enrichedUser.managerName;
               existing.entraPhoto     = enrichedUser.entraPhoto;
               existing.hasCustomPhoto = enrichedUser.hasCustomPhoto;
+              // Behold det skarpe billede fra /api/employee-private, hvis det allerede er hentet
+              if (existing.bigPhoto) existing.photo = existing.bigPhoto;
               if (currentModalUser && currentModalUser.id === enrichedUser.id) touchedOpenModal = true;
             }
 
@@ -1157,9 +1159,13 @@
 
             // Opdater et evt. åbent personkort løbende, når personen selv
             // netop er beriget (foto + manager-kæde/rapporter).
+            // OBS: kald IKKE openModal() her - det nulstiller fanen til Arbejde,
+            // genindlæser Privat og afbryder en igangværende redigering (sås på
+            // mobil via ?person=me&tab=privat, hvor listen hentes i baggrunden).
             if (touchedOpenModal &&
                 document.getElementById("modalBackdrop").classList.contains("open")) {
-              openModal(currentModalUser.id);
+              renderModalAvatar(currentModalUser);
+              renderMiniOrg(currentModalUser);
             }
           });
 
@@ -1804,6 +1810,10 @@
       if (!u) return;
       currentModalUser = u;
       editMode = false;
+      currentPrivateData = null;
+      const editBtnReset = document.getElementById("btnEditPrivat");
+      editBtnReset.textContent = "Rediger";
+      editBtnReset.classList.remove("cancel");
 
       // Header
       renderModalAvatar(u);
@@ -1889,6 +1899,9 @@ if (window.updateHeaderStatus) {
         const r = await fetch(`/api/employee-private/${encodeURIComponent(lookupEmail)}`, { cache: "no-store" });
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+        // Et senere åbnet kort (eller en igangværende redigering) må ikke
+        // overskrives af et svar, der kommer for sent
+        if (currentModalUser !== u || editMode) return;
         currentPrivateData = data;
         target.innerHTML = renderPrivateView(data);
         noedTarget.innerHTML = renderEmergencyView(data);
@@ -1898,6 +1911,7 @@ if (window.updateHeaderStatus) {
         // Skift til det skarpe billede, hvis det er den samme person der stadig er åben
         if (data.bigPhoto && currentModalUser === u) {
           u.photo = data.bigPhoto;
+          u.bigPhoto = data.bigPhoto;
           u.hasCustomPhoto = !!data.hasCustomPhoto;
           renderModalAvatar(u);
         }
