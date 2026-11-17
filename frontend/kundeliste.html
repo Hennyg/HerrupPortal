@@ -56,7 +56,12 @@
   <main class="pageWrap">
     <section class="toolbar">
       <input id="q" type="search" placeholder="Søg kundenr, navn, område, status, kontrakt – eller serienr. for at gå til produktet" style="min-width:320px" autocomplete="off" />
-      <select id="aktiv"><option value="true">Aktive</option><option value="">Alle</option><option value="false">Inaktive</option></select>
+      <select id="aktiv">
+        <option value="true">Aktive</option>
+        <option value="">Alle</option>
+        <option value="false">Inaktive</option>
+        <option value="flereadresser">Flere adresser</option>
+      </select>
       <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
       <button type="button" class="btn" id="btnXX" title="Vis kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (fx planlagte projekter, der ikke er aktive endnu)">xx-xx-xxxx</button>
       <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
@@ -303,6 +308,3 @@
   </script>
 </body>
 </html>
-
-
-
