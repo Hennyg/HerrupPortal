@@ -55,7 +55,7 @@
 </div>
   <main class="pageWrap">
     <section class="toolbar">
-      <input id="q" type="search" placeholder="Søg kundenr, navn, område, status, kontrakt – eller serienr. for at gå til produktet" style="min-width:320px" autocomplete="off" />
+      <input id="q" type="search" placeholder="Søg kundenr, navn, postnr., område, status, kontrakt – eller serienr. for at gå til produktet" style="min-width:320px" autocomplete="off" />
       <select id="aktiv">
         <option value="true">Aktive</option>
         <option value="">Alle</option>
@@ -276,7 +276,7 @@
       const q = document.getElementById('q').value.trim().toLowerCase();
       const active = FILTER_COLS.filter(c => (colFilters[c] || '').trim());
       filtered = rows.filter(k =>
-        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv'].join(' ').toLowerCase().includes(q)) &&
+        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv',...(k.postnumre || [])].join(' ').toLowerCase().includes(q)) &&
         active.every(c => filterText(k, c).toLowerCase().includes(colFilters[c].trim().toLowerCase())) &&
         (!onlyXX || k.harXX) &&
         (!onlySal || hasSal(k))
