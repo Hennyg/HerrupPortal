@@ -350,11 +350,14 @@ function groupBy(arr, keyFn) {
 function normKey(s) { return String(s ?? "").trim(); }
 function normSubgroup(it) { return normKey(it.subgroup || it.subGroup || ""); }
 
-// ── Medarbejdersøgning på en tile ───────────────────────────────────────────
+// ── Afdeling-knap på personaleliste-tile'n ─────────────────────────────────
 // Et link, hvis URL peger på personalelisten (/herrup.html), vises som en
-// almindelig tile — men i stedet for forklaringsteksten får den et søgefelt.
+// almindelig tile — men i stedet for forklaringsteksten får den en knap,
+// "Afdeling", der åbner den indloggedes eget personkort på fanen Afdeling.
+// (Medarbejdersøgningen ligger nu i det øverste søgefelt.)
 // Oprettes som et helt normalt link i Admin (URL: /herrup.html).
 const EMPLOYEE_SEARCH_PATHS = ["/herrup.html"];
+const MY_DEPARTMENT_URL = "/herrup.html?person=me&tab=afdeling";
 
 function isEmployeeSearchTile(it) {
   try {
@@ -368,135 +371,14 @@ function isEmployeeSearchTile(it) {
 
 function renderEmployeeSearchHTML() {
   return `
-    <div class="empSearch">
-      <input type="search" class="empSearchInput" placeholder="Søg medarbejder…" autocomplete="off" aria-label="Søg medarbejder">
-      <div class="empSearchResults" hidden></div>
+    <div class="empDept">
+      <a class="empDeptBtn"
+         href="${MY_DEPARTMENT_URL}"
+         target="_blank"
+         rel="noopener"
+         title="Åbn dit eget personkort på fanen Afdeling">Afdeling</a>
     </div>
   `;
-}
-
-let empSearchOutsideWired = false;
-
-function closeAllEmployeeSearches(except) {
-  document.querySelectorAll(".empSearch").forEach(box => {
-    if (box === except) return;
-    const res = box.querySelector(".empSearchResults");
-    if (res) { res.hidden = true; res.innerHTML = ""; }
-    box.closest(".tile")?.classList.remove("empOpen");
-  });
-}
-
-function wireEmployeeSearch(root) {
-  if (!empSearchOutsideWired) {
-    empSearchOutsideWired = true;
-    document.addEventListener("click", (e) => {
-      if (!e.target.closest(".empSearch")) closeAllEmployeeSearches();
-    });
-  }
-
-  root.querySelectorAll(".empSearch").forEach(box => {
-    const input   = box.querySelector(".empSearchInput");
-    const results = box.querySelector(".empSearchResults");
-    const tile    = box.closest(".tile");
-    let debounceTimer = null;
-    let activeFetch = 0;
-    let lastList = [];
-
-    function show(html) {
-      results.innerHTML = html;
-      results.hidden = false;
-      tile?.classList.add("empOpen");
-    }
-
-    function hide() {
-      results.hidden = true;
-      results.innerHTML = "";
-      tile?.classList.remove("empOpen");
-    }
-
-    function openPerson(id) {
-      if (!id) return;
-      window.open(`/herrup.html?person=${encodeURIComponent(id)}`, "_blank", "noopener");
-      input.value = "";
-      lastList = [];
-      hide();
-    }
-
-    async function runSearch(q) {
-      const myFetchId = ++activeFetch;
-      show(`<div class="empSearchInfo">Søger…</div>`);
-      try {
-        let list;
-        const entry = (typeof entraCacheRead === "function") ? await entraCacheRead() : null;
-
-        if (entry && typeof entraCacheIsFresh === "function" && entraCacheIsFresh(entry)) {
-          // Cache er varm — filtrer lokalt, ingen server-tur.
-          const ql = q.toLowerCase();
-          list = entry.data
-            .filter(u => (u.displayName || "").toLowerCase().includes(ql) || (u.mail || "").toLowerCase().includes(ql))
-            .slice(0, 15);
-        } else {
-          // Koldt cache — brug det lette søge-endpoint.
-          const r = await fetch(`/api/entra-users-search?q=${encodeURIComponent(q)}`, { cache: "no-store" });
-          const data = await r.json();
-          if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-          list = Array.isArray(data) ? data : [];
-          if (typeof entraCacheWarm === "function") entraCacheWarm();
-        }
-
-        if (myFetchId !== activeFetch) return;
-        lastList = list;
-        renderResults(list);
-      } catch (e) {
-        if (myFetchId !== activeFetch) return;
-        lastList = [];
-        show(`<div class="empSearchInfo">Kunne ikke søge: ${esc(e.message)}</div>`);
-      }
-    }
-
-    function renderResults(list) {
-      if (!list.length) {
-        show(`<div class="empSearchInfo">Ingen resultater</div>`);
-        return;
-      }
-      show(list.map(u => `
-        <button type="button" class="empSearchResult" data-id="${esc(u.id)}">${esc(u.displayName || "–")}</button>
-      `).join(""));
-      results.querySelectorAll(".empSearchResult").forEach(el => {
-        el.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          openPerson(el.getAttribute("data-id"));
-        });
-      });
-    }
-
-    input.addEventListener("focus", () => closeAllEmployeeSearches(box));
-
-    input.addEventListener("input", () => {
-      const q = input.value.trim();
-      clearTimeout(debounceTimer);
-      if (q.length < 2) {
-        activeFetch++;
-        lastList = [];
-        hide();
-        return;
-      }
-      debounceTimer = setTimeout(() => runSearch(q), 300);
-    });
-
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (lastList.length) openPerson(lastList[0].id);
-      } else if (e.key === "Escape") {
-        input.value = "";
-        lastList = [];
-        hide();
-        input.blur();
-      }
-    });
-  });
 }
 
 // ── Medarbejdere i det øverste søgefelt ─────────────────────────────────────
@@ -1091,7 +973,6 @@ function renderSections(items, myFavItems) {
   wireAccordions(root);
   wireTileTracking(root);
   wireFavoriteStars(root);
-  wireEmployeeSearch(root);
 }
 
 (async function init() {
@@ -1247,6 +1128,3 @@ function renderSections(items, myFavItems) {
   syncClearBtn();
   render();
 })();
-
-
-
