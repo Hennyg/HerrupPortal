@@ -2,6 +2,7 @@ const { fetchAll } = require("../_dvKunde");
 
 const TABLE = "cr1eb_lch_kundes";
 const PRODUKT_TABLE = "cr1eb_lch_kundeprodukts";
+const ADRESSE_TABLE = "cr1eb_lch_kundeadresses";
 const SELECT = [
   "cr1eb_lch_kundeid",
   "cr1eb_lch_kundenr",
@@ -65,6 +66,19 @@ async function produktInfo(context) {
   return { xx, kontrakter, serier };
 }
 
+// Antal adresser pr. kunde (kunde-id -> antal). Ingen $top, så fetchAll
+// følger @odata.nextLink og får alle adresser med.
+async function adresseAntal() {
+  const rows = await fetchAll(`${ADRESSE_TABLE}?$select=_cr1eb_lch_kunde_value`);
+  const counts = new Map();
+  for (const a of rows) {
+    const id = a._cr1eb_lch_kunde_value;
+    if (!id) continue;
+    counts.set(id, (counts.get(id) || 0) + 1);
+  }
+  return counts;
+}
+
 // { "Master A5": 3, "Garanti A5": 1 } -> "Master A5+Garanti A5" (flest først)
 function kontraktTekst(m) {
   if (!m) return "";
@@ -90,22 +104,35 @@ module.exports = async function (context, req) {
   try {
     const q = String(req.query.q || "").trim().toLowerCase();
     const aktiv = String(req.query.aktiv || "true").toLowerCase();
+    const flereAdresser = aktiv === "flereadresser";
 
     let filter = "";
-    if (aktiv === "true") filter = "cr1eb_lch_aktiv eq true";
+    if (aktiv === "true" || flereAdresser) filter = "cr1eb_lch_aktiv eq true";
     if (aktiv === "false") filter = "cr1eb_lch_aktiv eq false";
 
     const path = `${TABLE}?$select=${SELECT}${filter ? `&$filter=${encodeURIComponent(filter)}` : ""}&$orderby=cr1eb_lch_navn asc&$top=5000`;
-    const [raw, info, sal] = await Promise.all([fetchAll(path), produktInfo(context), salmonellaInfo(context)]);
+    const [raw, info, sal, adrAntal] = await Promise.all([
+      fetchAll(path),
+      produktInfo(context),
+      salmonellaInfo(context),
+      flereAdresser ? adresseAntal() : Promise.resolve(null)
+    ]);
+
     let rows = raw.map(mapRow).map(k => {
       const nr = String(k.kundenr).trim();
       const m = info.kontrakter.get(nr) || null;
       return {
         ...k, harXX: info.xx.has(nr), kontrakt: kontraktTekst(m), kontraktAntal: m || {}, serier: info.serier.get(nr) || [],
         // Besætninger på kundens adresser, der ikke er salmonella-fri
-        salmonella: sal ? (sal.get(nr) || []) : []
+        salmonella: sal ? (sal.get(nr) || []) : [],
+        ...(adrAntal ? { antalAdresser: adrAntal.get(k.id) || 0 } : {})
       };
     });
+
+    // "Flere adresser": kun aktive kunder med mere end én adresse
+    if (flereAdresser) {
+      rows = rows.filter(k => k.antalAdresser > 1);
+    }
 
     if (q.length >= 2) {
       rows = rows.filter(k => [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt, ...k.serier].join(" ").toLowerCase().includes(q));
@@ -117,6 +144,3 @@ module.exports = async function (context, req) {
     json(context, e.status || 500, { error: e.message, kunder: [] });
   }
 };
-
-
-
