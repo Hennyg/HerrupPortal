@@ -37,6 +37,19 @@
     .msg { font-size:13px; }
     .msg.ok { color:#15803d; } .msg.err { color:#991b1b; }
     .search { height:34px; border:1px solid #d1d5db; border-radius:8px; padding:0 10px; font:inherit; font-size:14px; min-width:220px; }
+    /* Farvepalet til kontraktfarver */
+    .farveCell { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .swatchBtn { width:32px; height:32px; border-radius:6px; border:1px solid #d1d5db; cursor:pointer; padding:0; }
+    .swatchBtn:hover, .swatchBtn:focus-visible { outline:2px solid var(--red); outline-offset:1px; }
+    .palPop { position:fixed; z-index:100; background:#fff; border:1px solid var(--border); border-radius:10px;
+              box-shadow:0 10px 30px rgba(0,0,0,.18); padding:10px 12px; }
+    .palPop[hidden] { display:none; }
+    .palRow { display:grid; grid-template-columns:62px repeat(3, 30px); gap:6px; align-items:center; margin:3px 0; }
+    .palRow span { font-size:12px; color:#4b5563; }
+    .palRow button { width:30px; height:30px; border-radius:6px; border:1px solid rgba(0,0,0,.12); cursor:pointer; padding:0; }
+    .palRow button:hover { transform:scale(1.12); }
+    .palRow button.sel { outline:2px solid #111827; outline-offset:1px; }
+    .palHint { font-size:11px; color:#6b7280; margin-top:6px; }
     .noAccess { background:#fff; border:1px solid var(--border); border-radius:10px; padding:24px; }
     @media (max-width: 640px) { .navExtra { display:none !important; } }
   </style>
@@ -85,6 +98,20 @@
         </a>
       </div>
 
+      <!-- Aftaletekster -->
+      <section class="panel">
+        <div class="panelHead">
+          <h2>📄 Aftaletekster (serviceaftaler)</h2>
+          <span id="aftaleMsg" class="msg"></span>
+          <input type="search" id="aftaleSearch" class="search" placeholder="Søg varenr., navn, servicetype…" autocomplete="off" />
+          <button type="button" class="btn primary" id="btnNyAftale">＋ Ny aftaletekst</button>
+        </div>
+        <p class="muted">Tabellen <code>lch_serviceaftaler_aftalertekst</code>. Ret direkte i felterne og tryk Gem på rækken.</p>
+        <table class="admTable">
+          <thead><tr><th style="width:14%">Varenr.</th><th>Navn</th><th style="width:18%">Servicetype</th><th style="width:16%">Afdeling</th><th></th></tr></thead>
+          <tbody id="aftaleBody"><tr><td colspan="5" class="muted">Henter…</td></tr></tbody>
+        </table>
+      </section>
       <!-- Kontraktfarver -->
       <section class="panel">
         <div class="panelHead">
@@ -100,22 +127,11 @@
         </table>
       </section>
 
-      <!-- Aftaletekster -->
-      <section class="panel">
-        <div class="panelHead">
-          <h2>📄 Aftaletekster (serviceaftaler)</h2>
-          <span id="aftaleMsg" class="msg"></span>
-          <input type="search" id="aftaleSearch" class="search" placeholder="Søg varenr., navn, servicetype…" autocomplete="off" />
-          <button type="button" class="btn primary" id="btnNyAftale">＋ Ny aftaletekst</button>
-        </div>
-        <p class="muted">Tabellen <code>lch_serviceaftaler_aftalertekst</code>. Ret direkte i felterne og tryk Gem på rækken.</p>
-        <table class="admTable">
-          <thead><tr><th style="width:14%">Varenr.</th><th>Navn</th><th style="width:18%">Servicetype</th><th style="width:16%">Afdeling</th><th></th></tr></thead>
-          <tbody id="aftaleBody"><tr><td colspan="5" class="muted">Henter…</td></tr></tbody>
-        </table>
-      </section>
     </div>
   </main>
+
+  <!-- Farvepalet (deles af alle rækker) -->
+  <div class="palPop" id="palPop" hidden role="dialog" aria-label="Vælg farve"></div>
 
   <script src="/assets/kundeliste/common.js"></script>
   <script>
@@ -151,6 +167,55 @@
       return `<span class="kChip"${farve ? ` style="background:${farve};color:${textOn(farve)}"` : ''}>${esc(name)}</span>`;
     }
 
+    // ── Standardfarver: grundfarver i 3 nyancer (lys / mellem / mørk) ──────
+    const PALETTE = [
+      { navn: 'Grøn',   farver: ['#bbf7d0', '#4ade80', '#15803d'] },
+      { navn: 'Orange', farver: ['#fed7aa', '#fb923c', '#c2410c'] },
+      { navn: 'Blå',    farver: ['#bfdbfe', '#60a5fa', '#1d4ed8'] },
+      { navn: 'Rød',    farver: ['#fecaca', '#f87171', '#b91c1c'] },
+      { navn: 'Gul',    farver: ['#fef08a', '#facc15', '#a16207'] },
+      { navn: 'Lilla',  farver: ['#e9d5ff', '#c084fc', '#7e22ce'] },
+      { navn: 'Turkis', farver: ['#a5f3fc', '#22d3ee', '#0e7490'] },
+      { navn: 'Grå',    farver: ['#e5e7eb', '#9ca3af', '#4b5563'] }
+    ];
+    const NYANCE = ['lys', 'mellem', 'mørk'];
+
+    // "#4ade80" → "Grøn mellem" (tom, hvis det ikke er en standardfarve)
+    function paletteName(hex) {
+      hex = String(hex || '').toLowerCase();
+      for (const p of PALETTE) {
+        const i = p.farver.indexOf(hex);
+        if (i >= 0) return `${p.navn} ${NYANCE[i]}`;
+      }
+      return '';
+    }
+
+    let palIndex = -1;
+    function openPalette(btn, i) {
+      const pop = document.getElementById('palPop');
+      palIndex = i;
+      const cur = kontrakter[i]?.farve || '';
+      pop.innerHTML = PALETTE.map(p => `
+        <div class="palRow"><span>${p.navn}</span>${p.farver.map((c, n) =>
+          `<button type="button" data-c="${c}" style="background:${c}" title="${p.navn} ${NYANCE[n]}"${c === cur ? ' class="sel"' : ''}></button>`).join('')}</div>`
+      ).join('') + '<div class="palHint">Lys · mellem · mørk – eller vælg en egen farve i feltet ved siden af</div>';
+      pop.querySelectorAll('button[data-c]').forEach(b => b.onclick = () => {
+        kontrakter[palIndex].farve = b.dataset.c;
+        closePalette();
+        renderKontrakter();
+      });
+      pop.hidden = false;
+      // Placér under knappen, men inden for skærmen
+      const r = btn.getBoundingClientRect();
+      const w = pop.offsetWidth, h = pop.offsetHeight;
+      pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+      pop.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + 'px';
+    }
+    function closePalette() { document.getElementById('palPop').hidden = true; palIndex = -1; }
+    document.addEventListener('click', e => { if (!e.target.closest('#palPop')) closePalette(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePalette(); });
+    document.querySelector('.pageWrap').addEventListener('scroll', closePalette);
+
     // ── Kontraktfarver ──────────────────────────────────────────────────────
     let kontrakter = [];             // [{ kontrakt, antal, farve, orig }]
 
@@ -168,13 +233,18 @@
           <td>${chip(k.kontrakt, k.farve)}</td>
           <td><b>${esc(k.kontrakt)}</b></td>
           <td class="muted">${k.antal || '–'}</td>
-          <td><input type="color" value="${esc(k.farve || '#eef0f2')}" data-i="${i}" title="Vælg farve"> <span class="small muted">${esc(k.farve || 'standard')}</span></td>
+          <td><div class="farveCell">
+            <button type="button" class="swatchBtn" data-pal="${i}" style="background:${esc(k.farve || '#eef0f2')}" title="Vælg standardfarve"></button>
+            <input type="color" value="${esc(k.farve || '#eef0f2')}" data-i="${i}" title="Egen farve">
+            <span class="small muted">${esc(paletteName(k.farve) || k.farve || 'standard')}</span>
+          </div></td>
           <td class="rowBtns">${k.farve ? `<button type="button" class="btn" data-reset="${i}" title="Brug standardfarven (grå)">Nulstil</button>` : ''}</td>
         </tr>`).join('');
       tb.querySelectorAll('input[type=color]').forEach(inp => inp.addEventListener('input', () => {
         kontrakter[+inp.dataset.i].farve = inp.value.toLowerCase();
         renderKontrakter();
       }));
+      tb.querySelectorAll('[data-pal]').forEach(b => b.onclick = e => { e.stopPropagation(); openPalette(b, +b.dataset.pal); });
       tb.querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { kontrakter[+b.dataset.reset].farve = ''; renderKontrakter(); });
       document.getElementById('btnSaveFarver').disabled = !kontrakter.some(k => k.farve !== k.orig);
     }
@@ -183,7 +253,7 @@
       const name = (prompt('Navn på kontrakttype (skal staves som i Dataverse):') || '').trim();
       if (!name) return;
       if (kontrakter.some(k => k.kontrakt.toLowerCase() === name.toLowerCase())) { setMsg('farveMsg', 'Typen findes allerede', 'err'); return; }
-      kontrakter.push({ kontrakt: name, antal: 0, farve: '#4ba3af', orig: '' });
+      kontrakter.push({ kontrakt: name, antal: 0, farve: '#4ade80', orig: '' });
       renderKontrakter();
     };
 
