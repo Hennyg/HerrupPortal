@@ -52,6 +52,32 @@
     .palRow button:hover { transform:scale(1.12); }
     .palRow button.sel { outline:2px solid #111827; outline-offset:1px; }
     .palHint { font-size:11px; color:#6b7280; margin-top:6px; }
+    /* Kolonnegrupper */
+    .kgList { display:grid; gap:8px; }
+    .kgItem { display:grid; grid-template-columns:180px 1fr auto; gap:6px 14px; align-items:start; border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+    .kgItem .kgNavn { font-weight:700; }
+    .kgItem .kgLine { font-size:13px; }
+    .kgItem .kgLine b { color:#6b7280; font-weight:600; margin-right:4px; }
+    .tag { display:inline-block; padding:1px 8px; border-radius:999px; background:#eef0f2; font-size:12px; margin:1px 3px 1px 0; }
+    .tag.std { background:#dcfce7; color:#166534; font-weight:700; }
+    .kgEdit { border:2px solid var(--red); border-radius:10px; padding:12px; margin-bottom:12px; display:grid; gap:12px; background:#fffdfd; }
+    .kgEdit[hidden] { display:none; }
+    .kgEdit h3 { margin:0; font-size:16px; }
+    .kgEdit label.lbl { display:block; font-size:13px; font-weight:600; margin-bottom:4px; }
+    .kgEdit input[type=text] { height:34px; border:1px solid #d1d5db; border-radius:7px; padding:0 9px; font:inherit; font-size:14px; width:100%; max-width:360px; }
+    .kgCols { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .kgBox { border:1px solid var(--border); border-radius:8px; padding:8px; min-height:60px; }
+    .kgBox h4 { margin:0 0 6px; font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; }
+    .kgRow { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px; font-size:14px; }
+    .kgRow:hover { background:#f9fafb; }
+    .kgRow span { flex:1; }
+    .kgRow button { border:1px solid #d1d5db; background:#fff; border-radius:6px; width:28px; height:26px; cursor:pointer; line-height:1; }
+    .kgRow button:disabled { opacity:.35; cursor:default; }
+    .kgAfd { display:flex; flex-wrap:wrap; gap:6px 14px; }
+    .kgAfd label { font-size:14px; display:flex; align-items:center; gap:5px; }
+    .kgAfd .muted { font-size:12px; }
+    .kgActions { display:flex; gap:8px; align-items:center; }
+    @media (max-width:700px) { .kgItem { grid-template-columns:1fr; } .kgCols { grid-template-columns:1fr; } }
     .noAccess { background:#fff; border:1px solid var(--border); border-radius:10px; padding:24px; }
     @media (max-width: 640px) { .navExtra { display:none !important; } }
   </style>
@@ -114,6 +140,48 @@
           <tbody id="aftaleBody"><tr><td colspan="5" class="muted">Henter…</td></tr></tbody>
         </table>
       </section>
+      <!-- Kolonnegrupper -->
+      <section class="panel">
+        <div class="panelHead">
+          <h2>🗂️ Kolonnegrupper</h2>
+          <span id="kgMsg" class="msg"></span>
+          <button type="button" class="btn primary" id="btnNyGruppe">＋ Ny gruppe</button>
+        </div>
+        <p class="muted">Bestem hvilke kolonner hver afdeling ser i kundelisten. Når kundelisten åbnes, findes brugerens afdeling i Entra, og den gruppe afdelingen står i, bruges. Står afdelingen ikke i nogen gruppe, bruges <b>standardgruppen</b> – og findes den heller ikke, vises de normale kolonner. Brugeren kan selv skifte gruppe i kundelisten.</p>
+
+        <div class="kgEdit" id="kgEdit" hidden>
+          <h3 id="kgEditTitle">Ny gruppe</h3>
+          <div>
+            <label class="lbl" for="kgNavn">Navn</label>
+            <input type="text" id="kgNavn" maxlength="100" placeholder="Fx Logistik" />
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px">
+            <input type="checkbox" id="kgStandard" /> Standardgruppe – bruges af alle, hvis deres afdeling ikke står i en gruppe
+          </label>
+          <div>
+            <label class="lbl">Afdelinger</label>
+            <div class="kgAfd" id="kgAfd"><span class="muted">Henter afdelinger…</span></div>
+            <div style="display:flex;gap:6px;margin-top:6px;max-width:420px">
+              <input type="text" id="kgAfdNy" placeholder="Anden afdeling (skal stå som i Entra)" />
+              <button type="button" class="btn" id="kgAfdAdd">Tilføj</button>
+            </div>
+          </div>
+          <div>
+            <label class="lbl">Kolonner (rækkefølgen er den, der vises)</label>
+            <div class="kgCols">
+              <div class="kgBox"><h4>Vises</h4><div id="kgValgte"></div></div>
+              <div class="kgBox"><h4>Kan tilføjes</h4><div id="kgMulige"></div></div>
+            </div>
+          </div>
+          <div class="kgActions">
+            <button type="button" class="btn primary" id="kgSave">Gem gruppe</button>
+            <button type="button" class="btn" id="kgCancel">Annuller</button>
+          </div>
+        </div>
+
+        <div class="kgList" id="kgList"><span class="muted">Henter…</span></div>
+      </section>
+
       <!-- Kontraktfarver -->
       <section class="panel">
         <div class="panelHead">
@@ -136,6 +204,7 @@
   <div class="palPop" id="palPop" hidden role="dialog" aria-label="Vælg farve"></div>
 
   <script src="/assets/kundeliste/common.js"></script>
+  <script src="/assets/kundeliste/kolonner.js"></script>
   <script>
     const API = '/api/kundeliste-admin';
 
@@ -368,6 +437,146 @@
     };
     document.getElementById('aftaleSearch').oninput = renderAftaler;
 
+    // ── Kolonnegrupper ──────────────────────────────────────────────────────
+    let grupper = [];                // [{ id, navn, afdelinger, kolonner, standard }]
+    let entraAfd = null;             // [{ navn, antal }] fra Entra
+    let kgDraft = null;              // gruppen der redigeres
+    const kolLabel = key => KL_KOLONNER.find(c => c.key === key)?.label || key;
+
+    async function loadGrupper() {
+      grupper = (await api('kolonnegrupper')).items || [];
+      renderGrupper();
+    }
+
+    function renderGrupper() {
+      const el = document.getElementById('kgList');
+      if (!grupper.length) { el.innerHTML = '<span class="muted">Ingen grupper endnu – alle ser de normale kolonner.</span>'; return; }
+      el.innerHTML = grupper.map(g => `
+        <div class="kgItem">
+          <div class="kgNavn">${esc(g.navn)} ${g.standard ? '<span class="tag std">Standard</span>' : ''}</div>
+          <div>
+            <div class="kgLine"><b>Afdelinger:</b>${g.afdelinger.length ? g.afdelinger.map(a => `<span class="tag">${esc(a)}</span>`).join('') : '<span class="muted">ingen</span>'}</div>
+            <div class="kgLine"><b>Kolonner:</b>${g.kolonner.map(k => `<span class="tag">${esc(kolLabel(k))}</span>`).join('')}</div>
+          </div>
+          <div class="rowBtns">
+            <button type="button" class="btn" data-edit="${esc(g.id)}">Ret</button>
+            <button type="button" class="btn danger" data-del="${esc(g.id)}">Slet</button>
+          </div>
+        </div>`).join('');
+      el.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openGruppe(grupper.find(g => g.id === b.dataset.edit)));
+      el.querySelectorAll('[data-del]').forEach(b => b.onclick = () => deleteGruppe(b.dataset.del));
+    }
+
+    async function openGruppe(g) {
+      kgDraft = g
+        ? { id: g.id, navn: g.navn, standard: g.standard, afdelinger: [...g.afdelinger], kolonner: [...g.kolonner] }
+        : { id: null, navn: '', standard: false, afdelinger: [], kolonner: [...KL_STANDARD_KOLONNER] };
+      document.getElementById('kgEditTitle').textContent = g ? `Ret gruppe: ${g.navn}` : 'Ny gruppe';
+      document.getElementById('kgNavn').value = kgDraft.navn;
+      document.getElementById('kgStandard').checked = kgDraft.standard;
+      document.getElementById('kgAfdNy').value = '';
+      document.getElementById('kgEdit').hidden = false;
+      renderKolonneValg();
+      renderAfdelinger();
+      document.getElementById('kgNavn').focus();
+      if (!entraAfd) {
+        try { entraAfd = (await api('afdelinger')).items || []; }
+        catch (e) { entraAfd = []; setMsg('kgMsg', 'Kunne ikke hente afdelinger: ' + e.message, 'err'); }
+        renderAfdelinger();
+      }
+    }
+
+    function closeGruppe() { kgDraft = null; document.getElementById('kgEdit').hidden = true; }
+
+    function renderAfdelinger() {
+      if (!kgDraft) return;
+      const el = document.getElementById('kgAfd');
+      if (!entraAfd) { el.innerHTML = '<span class="muted">Henter afdelinger…</span>'; return; }
+      // Entra-afdelinger + evt. afdelinger på gruppen, som ikke (længere) findes i Entra
+      const navne = new Map(entraAfd.map(a => [a.navn.toLowerCase(), a]));
+      kgDraft.afdelinger.forEach(a => { if (!navne.has(a.toLowerCase())) navne.set(a.toLowerCase(), { navn: a, antal: 0 }); });
+      const andenGruppe = a => grupper.find(g => g.id !== kgDraft.id && g.afdelinger.some(x => x.toLowerCase() === a.toLowerCase()));
+      el.innerHTML = [...navne.values()].sort((a, b) => a.navn.localeCompare(b.navn, 'da')).map(a => {
+        const on = kgDraft.afdelinger.some(x => x.toLowerCase() === a.navn.toLowerCase());
+        const anden = andenGruppe(a.navn);
+        return `<label title="${anden ? `Står også i gruppen ${esc(anden.navn)}` : ''}"><input type="checkbox" value="${esc(a.navn)}"${on ? ' checked' : ''}>
+          ${esc(a.navn)} <span class="muted">${a.antal ? `(${a.antal})` : '(ikke i Entra)'}${anden ? ` · i ${esc(anden.navn)}` : ''}</span></label>`;
+      }).join('') || '<span class="muted">Ingen afdelinger fundet</span>';
+      el.querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = () => {
+        if (cb.checked) kgDraft.afdelinger.push(cb.value);
+        else kgDraft.afdelinger = kgDraft.afdelinger.filter(x => x.toLowerCase() !== cb.value.toLowerCase());
+      });
+    }
+
+    function renderKolonneValg() {
+      const valgte = document.getElementById('kgValgte');
+      const mulige = document.getElementById('kgMulige');
+      const k = kgDraft.kolonner;
+      valgte.innerHTML = k.map((key, i) => `
+        <div class="kgRow"><span>${esc(kolLabel(key))}</span>
+          <button type="button" data-up="${i}" title="Flyt op"${i === 0 ? ' disabled' : ''}>↑</button>
+          <button type="button" data-down="${i}" title="Flyt ned"${i === k.length - 1 ? ' disabled' : ''}>↓</button>
+          <button type="button" data-rm="${i}" title="Fjern">✕</button>
+        </div>`).join('') || '<span class="muted small">Ingen kolonner valgt</span>';
+      mulige.innerHTML = KL_KOLONNER.filter(c => !k.includes(c.key)).map(c => `
+        <div class="kgRow"><span>${esc(c.label)}</span><button type="button" data-add="${c.key}" title="Tilføj">＋</button></div>`).join('')
+        || '<span class="muted small">Alle kolonner er valgt</span>';
+
+      valgte.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const i = +b.dataset.up; [k[i - 1], k[i]] = [k[i], k[i - 1]]; renderKolonneValg(); });
+      valgte.querySelectorAll('[data-down]').forEach(b => b.onclick = () => { const i = +b.dataset.down; [k[i + 1], k[i]] = [k[i], k[i + 1]]; renderKolonneValg(); });
+      valgte.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { k.splice(+b.dataset.rm, 1); renderKolonneValg(); });
+      mulige.querySelectorAll('[data-add]').forEach(b => b.onclick = () => { k.push(b.dataset.add); renderKolonneValg(); });
+    }
+
+    document.getElementById('btnNyGruppe').onclick = () => openGruppe(null);
+    document.getElementById('kgCancel').onclick = closeGruppe;
+    document.getElementById('kgAfdAdd').onclick = () => {
+      const inp = document.getElementById('kgAfdNy');
+      const v = inp.value.trim();
+      if (!v || !kgDraft) return;
+      if (!kgDraft.afdelinger.some(x => x.toLowerCase() === v.toLowerCase())) kgDraft.afdelinger.push(v);
+      inp.value = '';
+      renderAfdelinger();
+    };
+
+    document.getElementById('kgSave').onclick = async () => {
+      if (!kgDraft) return;
+      kgDraft.navn = document.getElementById('kgNavn').value.trim();
+      kgDraft.standard = document.getElementById('kgStandard').checked;
+      if (!kgDraft.navn) { setMsg('kgMsg', 'Gruppen skal have et navn', 'err'); return; }
+      if (!kgDraft.kolonner.length) { setMsg('kgMsg', 'Vælg mindst én kolonne', 'err'); return; }
+      const btn = document.getElementById('kgSave');
+      btn.disabled = true;
+      setMsg('kgMsg', 'Gemmer…');
+      try {
+        await api('kolonnegrupper', {
+          method: 'POST', id: kgDraft.id || '',
+          body: { navn: kgDraft.navn, standard: kgDraft.standard, afdelinger: kgDraft.afdelinger, kolonner: kgDraft.kolonner }
+        });
+        closeGruppe();
+        await loadGrupper();
+        setMsg('kgMsg', 'Gemt ✓ (kan gå op til 2 min, før kundelisten viser det)', 'ok');
+      } catch (e) {
+        setMsg('kgMsg', 'Fejl: ' + e.message, 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    async function deleteGruppe(id) {
+      const g = grupper.find(x => x.id === id);
+      if (!confirm(`Slet gruppen "${g?.navn || ''}"?`)) return;
+      setMsg('kgMsg', 'Sletter…');
+      try {
+        await api('kolonnegrupper', { method: 'DELETE', id });
+        if (kgDraft?.id === id) closeGruppe();
+        await loadGrupper();
+        setMsg('kgMsg', 'Slettet ✓', 'ok');
+      } catch (e) {
+        setMsg('kgMsg', 'Fejl: ' + e.message, 'err');
+      }
+    }
+
     // ── Start ───────────────────────────────────────────────────────────────
     (async function init() {
       initUser();
@@ -381,6 +590,9 @@
       document.getElementById('adminWrap').hidden = false;
       loadKontrakter().catch(e => {
         document.getElementById('farveBody').innerHTML = `<tr><td colspan="5" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;
+      });
+      loadGrupper().catch(e => {
+        document.getElementById('kgList').innerHTML = `<span class="msg err">Fejl: ${esc(e.message)}</span>`;
       });
       loadAftaler().catch(e => {
         document.getElementById('aftaleBody').innerHTML = `<tr><td colspan="5" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;

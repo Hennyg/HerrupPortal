@@ -10,6 +10,10 @@
 //   DELETE ?action=aftaletekster&id=<guid>
 //   GET    ?action=serviceaftaler[&kundenr=<nr>] → { items: [...] }  (uden kundenr = alle)
 //   POST   ?action=serviceaftaler          body { kundenr, aftaleId, startdato, enddato, note }
+//   GET    ?action=kolonnegrupper          → { items: [{ id, navn, afdelinger, kolonner, standard }] }
+//   POST   ?action=kolonnegrupper[&id=<guid>] body { navn, afdelinger, kolonner, standard }  (uden id = ny)
+//   DELETE ?action=kolonnegrupper&id=<guid>
+//   GET    ?action=afdelinger              → { items: [{ navn, antal }] }  (afdelinger i Entra)
 
 const N = require("../_news");
 const A = require("../_kundelisteAdmin");
@@ -61,6 +65,17 @@ module.exports = async function (context, req) {
     if (action === "serviceaftaler") {
       if (method === "GET")  return N.json(context, 200, { items: await A.listServiceaftaler(req.query.kundenr) });
       if (method === "POST") return N.json(context, 200, await A.createServiceaftale(req.body || {}));
+    }
+
+    // ── Kolonnegrupper ──
+    if (action === "kolonnegrupper") {
+      const id = String(req.query.id || "");
+      if (method === "GET")    return N.json(context, 200, { items: await A.listGrupper() });
+      if (method === "POST")   return N.json(context, 200, await A.saveGruppe(req.body || {}, id || null));
+      if (method === "DELETE") { await A.deleteGruppe(id); return N.json(context, 200, { ok: true }); }
+    }
+    if (action === "afdelinger" && method === "GET") {
+      return N.json(context, 200, { items: await A.entraAfdelinger() });
     }
 
     return N.json(context, 400, { error: `Ukendt handling: ${method} ${action || "(ingen)"}` });

@@ -4,6 +4,8 @@
 //   - kontraktfarver  (tabel lch_serviceaftaler_kontraktfarve)
 //   - aftaletekster   (tabel lch_serviceaftaler_aftalertekst)
 //   - serviceaftaler  (tabel lch_serviceaftaler) – oprettes fra kundeliste2.html
+//   - kolonnegrupper  (tabel lch_kundeliste_kolonnegruppe) – hvilke kolonner
+//                     hver afdeling ser i kundelisten
 // Alle tabeller ligger i Kundeliste-miljøet (KL_DV_URL) – samme som kunder/produkter.
 
 const N = require("./_news");
@@ -29,6 +31,11 @@ const T = {
     logical: "cr1eb_lch_serviceaftaler",
     set:     "cr1eb_lch_serviceaftalers",
     id:      "cr1eb_lch_serviceaftalerid"
+  },
+  kolonnegruppe: {
+    logical: "cr1eb_lch_kundeliste_kolonnegruppe",
+    set:     "cr1eb_lch_kundeliste_kolonnegruppes",
+    id:      "cr1eb_lch_kundeliste_kolonnegruppeid"
   },
   produkt: { set: "cr1eb_lch_kundeprodukts" }
 };
@@ -304,9 +311,121 @@ async function createServiceaftale(input) {
   return { id: created?.[T.serviceaftale.id] || null };
 }
 
+// ── Kolonnegrupper ──────────────────────────────────────────────────────────
+// lch_name        gruppens navn, fx "Logistik"
+// lch_afdelinger  afdelinger (Entra "department"), én pr. linje
+// lch_kolonner    kolonne-nøgler i visningsrækkefølge, som JSON-array
+// lch_standard    Ja = bruges af alle, hvis afdeling ikke er i nogen gruppe
+const KEY = /^[a-z0-9_]{1,40}$/i;
+
+function parseList(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return [];
+  if (s.startsWith("[")) {
+    try { const a = JSON.parse(s); if (Array.isArray(a)) return a.map(x => String(x).trim()).filter(Boolean); } catch { /* fald igennem */ }
+  }
+  return s.split(/[\r\n,;]+/).map(x => x.trim()).filter(Boolean);
+}
+
+function mapGruppe(r) {
+  return {
+    id: r[T.kolonnegruppe.id],
+    navn: r.cr1eb_lch_name || "",
+    afdelinger: parseList(r.cr1eb_lch_afdelinger),
+    kolonner: parseList(r.cr1eb_lch_kolonner).filter(k => KEY.test(k)),
+    standard: r.cr1eb_lch_standard === true
+  };
+}
+
+async function listGrupper() {
+  const rows = await fetchAll(`${T.kolonnegruppe.set}?$select=${T.kolonnegruppe.id},cr1eb_lch_name,cr1eb_lch_afdelinger,cr1eb_lch_kolonner,cr1eb_lch_standard`);
+  return rows.map(mapGruppe).sort((a, b) => a.navn.localeCompare(b.navn, "da"));
+}
+
+function gruppeBody(input) {
+  const navn = String(input?.navn || "").trim().slice(0, 100);
+  if (!navn) throw bad("Gruppen skal have et navn");
+  const afdelinger = [...new Set((Array.isArray(input?.afdelinger) ? input.afdelinger : parseList(input?.afdelinger))
+    .map(a => String(a).trim()).filter(Boolean))];
+  const kolonner = [...new Set((Array.isArray(input?.kolonner) ? input.kolonner : []).map(k => String(k).trim()).filter(k => KEY.test(k)))];
+  if (!kolonner.length) throw bad("Vælg mindst én kolonne");
+  return {
+    cr1eb_lch_name: navn,
+    cr1eb_lch_afdelinger: afdelinger.join("\n"),
+    cr1eb_lch_kolonner: JSON.stringify(kolonner),
+    cr1eb_lch_standard: input?.standard === true
+  };
+}
+
+// Kun én gruppe kan være standard
+async function clearStandard(exceptId) {
+  for (const g of (await listGrupper()).filter(g => g.standard && g.id !== exceptId)) {
+    await dvFetch(`${T.kolonnegruppe.set}(${g.id})`, { method: "PATCH", body: { cr1eb_lch_standard: false } });
+  }
+}
+
+async function saveGruppe(input, id) {
+  const body = gruppeBody(input);
+  let savedId = id;
+  if (id) {
+    if (!GUID.test(id)) throw bad("Ugyldigt id");
+    await dvFetch(`${T.kolonnegruppe.set}(${id})`, { method: "PATCH", body });
+  } else {
+    const created = await dvFetch(T.kolonnegruppe.set, { method: "POST", body, headers: { Prefer: "return=representation" } });
+    savedId = created?.[T.kolonnegruppe.id] || null;
+  }
+  if (body.cr1eb_lch_standard) await clearStandard(savedId);
+  return { id: savedId };
+}
+
+async function deleteGruppe(id) {
+  if (!GUID.test(String(id || ""))) throw bad("Ugyldigt id");
+  await dvFetch(`${T.kolonnegruppe.set}(${id})`, { method: "DELETE" });
+}
+
+// Afdelinger i Entra (fra gruppen "Alle - lely center herrup"), til forslag i admin
+async function entraAfdelinger() {
+  const token = await N.graphToken();
+  const filter = encodeURIComponent("displayName eq 'Alle - lely center herrup'");
+  const g = await N.graphJson(token, `groups?$filter=${filter}&$select=id`);
+  const groupId = g.value?.[0]?.id;
+  if (!groupId) return [];
+  const set = new Map();
+  let url = `groups/${groupId}/transitiveMembers/microsoft.graph.user?$select=department,accountEnabled&$top=999`;
+  for (let guard = 0; url && guard < 50; guard++) {
+    const j = await N.graphJson(token, url);
+    for (const u of j.value || []) {
+      if (u.accountEnabled === false) continue;
+      const d = String(u.department || "").trim();
+      if (d) set.set(d, (set.get(d) || 0) + 1);
+    }
+    url = j["@odata.nextLink"] || null;
+  }
+  return [...set.entries()].map(([navn, antal]) => ({ navn, antal })).sort((a, b) => a.navn.localeCompare(b.navn, "da"));
+}
+
+// Den indloggede brugers afdeling (Entra "department")
+async function userDepartment(userId) {
+  if (!userId) return "";
+  try {
+    const token = await N.graphToken();
+    const u = await N.graphJson(token, `users/${userId}?$select=department`);
+    return String(u.department || "").trim();
+  } catch { return ""; }
+}
+
+// Gruppen for en afdeling: første gruppe, hvor afdelingen står – ellers standard
+function gruppeForAfdeling(grupper, afdeling) {
+  const a = String(afdeling || "").trim().toLowerCase();
+  return (a && grupper.find(g => g.afdelinger.some(x => x.toLowerCase() === a)))
+      || grupper.find(g => g.standard)
+      || null;
+}
+
 module.exports = {
   ADMIN_ROLES, isKundelisteAdmin,
   loadFarver, kontraktTyper, saveFarve,
   listAftaler, createAftale, updateAftale, deleteAftale,
-  listServiceaftaler, createServiceaftale
+  listServiceaftaler, createServiceaftale,
+  listGrupper, saveGruppe, deleteGruppe, entraAfdelinger, userDepartment, gruppeForAfdeling
 };

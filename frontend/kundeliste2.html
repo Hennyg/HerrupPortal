@@ -122,6 +122,7 @@
       </select>
       <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
       <button type="button" class="btn" id="btnXX" title="Vis kun projekter: kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (planlagte projekter, der ikke er aktive endnu)">Projekt</button>
+      <select id="kolGruppe" title="Hvilke kolonner der vises. Automatisk = ud fra din afdeling"></select>
       <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
       <div class="toolbarSpacer"></div>
       <div id="countText" class="muted small"></div>
@@ -136,14 +137,8 @@
     <div id="status" class="status loading"><div class="spinner"></div> Henter kunder...</div>
     <section class="tableWrap">
       <table class="dataTable">
-        <thead><tr>
-          <th class="sortable" data-sort="kundenr"><span class="colLabel">Kundenr.</span><input class="colFilter" type="search" data-col="kundenr" placeholder="Filtrér…" autocomplete="off"></th>
-          <th class="sortable" data-sort="navn"><span class="colLabel">Navn</span><input class="colFilter" type="search" data-col="navn" placeholder="Filtrér…" autocomplete="off"></th>
-          <th class="sortable" data-sort="omraade"><span class="colLabel">Område</span><input class="colFilter" type="search" data-col="omraade" placeholder="Filtrér…" autocomplete="off"></th>
-          <th class="sortable" data-sort="kundestatus"><span class="colLabel">Kundestatus</span><input class="colFilter" type="search" data-col="kundestatus" placeholder="Filtrér…" autocomplete="off"></th>
-          <th class="sortable" data-sort="kontrakt"><span class="colLabel">Kontrakt</span><input class="colFilter" type="search" data-col="kontrakt" placeholder="Filtrér…" autocomplete="off"></th>
-          <th style="vertical-align:bottom;"><button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button></th>
-        </tr></thead>
+        <!-- Kolonnerne bygges ud fra brugerens kolonnegruppe (se buildHead) -->
+        <thead><tr id="headRow"></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </section>
@@ -209,12 +204,14 @@
   </div>
 
   <script src="/assets/kundeliste/common.js"></script>
+  <script src="/assets/kundeliste/kolonner.js"></script>
   <script>
     let rows = [], filtered = [], sortKey = 'navn', sortDir = 1;
     let onlyXX = false;            // knappen "Projekt" (installationsdato xx-xx-xxxx)
     let onlySal = false;           // knappen "Salmonella"
     let salOk = true;              // kunne salmonella hentes?
-    const FILTER_COLS = ['kundenr', 'navn', 'omraade', 'kundestatus', 'kontrakt'];
+    const FILTER_COLS = KL_KOLONNER.map(c => c.key);   // alle kolonner kan filtreres (kun de viste bruges)
+    let activeCols = [...KL_STANDARD_KOLONNER];         // kolonner der vises lige nu
     const colFilters = {}; // kolonne -> filtertekst (gemmes i URL'en som f_<kolonne>)
     restoreStateFromUrl();
     initUser();
@@ -238,23 +235,7 @@
     document.getElementById('aktiv').onchange = () => { syncUrlState(); load(); };
     document.getElementById('btnXX').onclick = () => { onlyXX = !onlyXX; syncUrlState(); render(); };
     document.getElementById('btnSal').onclick = () => { onlySal = !onlySal; syncUrlState(); render(); };
-    document.querySelectorAll('.colFilter').forEach(inp => {
-      inp.value = colFilters[inp.dataset.col] || '';
-      inp.addEventListener('click', e => e.stopPropagation()); // klik i feltet må ikke sortere
-      inp.addEventListener('input', () => { colFilters[inp.dataset.col] = inp.value; syncUrlState(); render(); });
-    });
-    document.getElementById('btnClearFilters').onclick = () => {
-      FILTER_COLS.forEach(c => { delete colFilters[c]; });
-      document.querySelectorAll('.colFilter').forEach(i => { i.value = ''; });
-      syncUrlState(); render();
-    };
-    document.querySelectorAll('th.sortable').forEach(th => th.onclick = () => {
-      const nextKey = th.dataset.sort;
-      if (sortKey === nextKey) sortDir *= -1;
-      else { sortKey = nextKey; sortDir = 1; }
-      syncUrlState();
-      render();
-    });
+    buildHead();
 
     function restoreStateFromUrl() {
       const p = new URLSearchParams(location.search);
@@ -306,9 +287,10 @@
       }).join('');
     }
 
+    let kolCfgLoaded = null;       // kolonnegrupper hentes kun første gang
     async function load() {
       setStatus('loading','<div class="spinner"></div> Henter kunder...');
-      await Promise.all([loadKunder(), loadLastImport(), loadFarver()]);
+      await Promise.all([loadKunder(), loadLastImport(), loadFarver(), kolCfgLoaded || (kolCfgLoaded = loadKolonner())]);
       setStatus('', '');
       render();
     }
@@ -340,15 +322,128 @@
     function throwStatus(msg) { setStatus('error', msg); throw new Error(msg); }
     function setStatus(cls, html) { const el=document.getElementById('status'); el.className='status '+cls; el.innerHTML=html; el.style.display=html?'flex':'none'; }
 
+    // ── Kolonner ────────────────────────────────────────────────────────────
+    // Hver kolonne: hvad der sorteres/filtreres på, og hvordan cellen tegnes.
+    // Nye kolonner tilføjes her OG i /assets/kundeliste/kolonner.js.
+    const COLDEF = {
+      kundenr: {
+        sort: k => k.kundenr, text: k => k.kundenr,
+        cell: k => `<td class="small muted${hasSal(k) ? ' kundenrSal' : ''}"${hasSal(k) ? ` title="${esc(salTitle(k))}"` : ''}>${esc(k.kundenr)}</td>`
+      },
+      navn: {
+        sort: k => k.navn, text: k => k.navn,
+        cell: k => `<td><a class="link" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">${esc(k.navn)}</a></td>`
+      },
+      omraade:     { sort: k => k.omraade, text: k => k.omraade, cell: k => `<td>${esc(k.omraade)}</td>` },
+      kundestatus: { sort: k => k.kundestatus, text: k => k.kundestatus, cell: k => `<td>${esc(k.kundestatus)}</td>` },
+      kontrakt: {
+        sort: k => k.kontrakt, text: k => k.kontrakt,
+        cell: k => `<td class="small" title="${esc(kontraktTitle(k))}">${kontraktChips(k)}</td>`
+      },
+      postnr: {
+        sort: k => (k.postnumre || [])[0] || '', text: k => (k.postnumre || []).join(' '),
+        cell: k => `<td class="small">${esc((k.postnumre || []).join(', '))}</td>`
+      },
+      adresser: {
+        sort: k => String(k.antalAdresser ?? '').padStart(4, '0'), text: k => String(k.antalAdresser ?? ''),
+        cell: k => `<td class="num">${k.antalAdresser ?? ''}</td>`
+      },
+      produkter: {
+        sort: k => String((k.serier || []).length).padStart(5, '0'), text: k => String((k.serier || []).length),
+        cell: k => `<td class="num">${(k.serier || []).length || ''}</td>`
+      },
+      aktiv: {
+        sort: k => k.aktiv ? '1' : '0', text: k => k.aktiv ? 'aktiv ja' : 'inaktiv nej',
+        cell: k => `<td>${k.aktiv ? 'Ja' : '<span class="muted">Nej</span>'}</td>`
+      },
+      importeret: {
+        sort: k => k.sidstImporteret || '', text: k => fmtDate(k.sidstImporteret),
+        cell: k => `<td class="small" style="white-space:nowrap">${fmtDate(k.sidstImporteret)}</td>`
+      }
+    };
+    // (funktion, ikke const – buildHead() kaldes tidligt i scriptet)
+    function colLabel(key) { return KL_KOLONNER.find(c => c.key === key)?.label || key; }
+
     function sortValue(row, key) {
-      if (key === 'aktiv') return row.aktiv ? '1' : '0';
-      return row[key] || '';
+      const d = COLDEF[key];
+      return d ? (d.sort(row) || '') : (row[key] || '');
     }
 
     // Den tekst en kolonne filtreres på (samme som der vises)
     function filterText(row, col) {
-      return String(row[col] || '');
+      const d = COLDEF[col];
+      return String(d ? (d.text(row) || '') : (row[col] || ''));
     }
+
+    // Overskriftslinjen med sortering + filterfelt pr. kolonne
+    function buildHead() {
+      document.getElementById('headRow').innerHTML =
+        activeCols.map(key => `<th class="sortable" data-sort="${key}"><span class="colLabel">${esc(colLabel(key))}</span><input class="colFilter" type="search" data-col="${key}" placeholder="Filtrér…" autocomplete="off"></th>`).join('') +
+        `<th style="vertical-align:bottom;"><button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button></th>`;
+
+      document.querySelectorAll('.colFilter').forEach(inp => {
+        inp.value = colFilters[inp.dataset.col] || '';
+        inp.addEventListener('click', e => e.stopPropagation()); // klik i feltet må ikke sortere
+        inp.addEventListener('input', () => { colFilters[inp.dataset.col] = inp.value; syncUrlState(); render(); });
+      });
+      document.getElementById('btnClearFilters').onclick = () => {
+        FILTER_COLS.forEach(c => { delete colFilters[c]; });
+        document.querySelectorAll('.colFilter').forEach(i => { i.value = ''; });
+        syncUrlState(); render();
+      };
+      document.querySelectorAll('th.sortable').forEach(th => th.onclick = () => {
+        const nextKey = th.dataset.sort;
+        if (sortKey === nextKey) sortDir *= -1;
+        else { sortKey = nextKey; sortDir = 1; }
+        syncUrlState();
+        render();
+      });
+    }
+
+    // ── Kolonnegrupper (pr. afdeling) ──────────────────────────────────────
+    // Automatisk: gruppen for brugerens afdeling (eller standardgruppen).
+    // Brugeren kan vælge en anden gruppe i toolbaren – valget huskes i browseren.
+    let kolCfg = { afdeling: '', gruppeId: null, grupper: [] };
+    const KOL_KEY = 'kundeliste_kolonnegruppe';
+
+    async function loadKolonner() {
+      try {
+        const r = await fetch('/api/kundeliste-kolonner', { cache: 'no-store' });
+        kolCfg = await r.json();
+      } catch { kolCfg = { afdeling: '', gruppeId: null, grupper: [] }; }
+      renderKolSelect();
+      applyKolonner();
+    }
+
+    function renderKolSelect() {
+      const sel = document.getElementById('kolGruppe');
+      const auto = kolCfg.grupper.find(g => g.id === kolCfg.gruppeId);
+      sel.hidden = !kolCfg.grupper.length;
+      sel.innerHTML =
+        `<option value="">Automatisk${auto ? ` (${esc(auto.navn)})` : ''}</option>` +
+        kolCfg.grupper.map(g => `<option value="${esc(g.id)}">${esc(g.navn)}</option>`).join('');
+      let valgt = '';
+      try { valgt = localStorage.getItem(KOL_KEY) || ''; } catch {}
+      sel.value = kolCfg.grupper.some(g => g.id === valgt) ? valgt : '';
+      sel.title = `Kolonnevisning. Automatisk = ud fra din afdeling${kolCfg.afdeling ? ` (${kolCfg.afdeling})` : ''}`;
+    }
+
+    function applyKolonner() {
+      const valgt = document.getElementById('kolGruppe').value || kolCfg.gruppeId;
+      const g = kolCfg.grupper.find(x => x.id === valgt);
+      const cols = (g?.kolonner || []).filter(k => COLDEF[k]);
+      activeCols = cols.length ? cols : [...KL_STANDARD_KOLONNER];
+      buildHead();
+      render();
+    }
+
+    document.getElementById('kolGruppe').onchange = e => {
+      try {
+        if (e.target.value) localStorage.setItem(KOL_KEY, e.target.value);
+        else localStorage.removeItem(KOL_KEY);
+      } catch {}
+      applyKolonner();
+    };
 
     // Tooltip: antal produkter pr. kontrakttype
     function kontraktTitle(k) {
@@ -425,7 +520,7 @@
 
     function render() {
       const q = document.getElementById('q').value.trim().toLowerCase();
-      const active = FILTER_COLS.filter(c => (colFilters[c] || '').trim());
+      const active = activeCols.filter(c => (colFilters[c] || '').trim());
       filtered = rows.filter(k =>
         (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv',...(k.postnumre || [])].join(' ').toLowerCase().includes(q)) &&
         active.every(c => filterText(k, c).toLowerCase().includes(colFilters[c].trim().toLowerCase())) &&
@@ -446,14 +541,10 @@
       renderSnHint();
       document.getElementById('tbody').innerHTML = filtered.map(k => {
         return `<tr class="clickable-row" onclick="openKunde('${esc(k.kundenr)}')">
-        <td class="small muted${hasSal(k) ? ' kundenrSal' : ''}"${hasSal(k) ? ` title="${esc(salTitle(k))}"` : ''}>${esc(k.kundenr)}</td>
-        <td><a class="link" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">${esc(k.navn)}</a></td>
-        <td>${esc(k.omraade)}</td>
-        <td>${esc(k.kundestatus)}</td>
-        <td class="small" title="${esc(kontraktTitle(k))}">${kontraktChips(k)}</td>
+        ${activeCols.map(c => COLDEF[c].cell(k)).join('')}
         <td style="white-space:nowrap;"><a class="btn" href="/kundeinfo.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Info</a> <a class="btn" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">Åbn</a> <a class="btn" href="${esc(produktUrl(k.kundenr))}" onclick="event.stopPropagation()" title="Åbn kundens produktliste">Produkt</a></td>
       </tr>`;
-      }).join('') || '<tr><td colspan="6" class="muted">Ingen kunder</td></tr>';
+      }).join('') || `<tr><td colspan="${activeCols.length + 1}" class="muted">Ingen kunder</td></tr>`;
     }
     // ── Serviceaftaler: popup med liste over alle + opret ny ────────────────
     const SA_API = '/api/kundeliste-admin';
