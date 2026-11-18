@@ -200,6 +200,12 @@
       padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:7px; font-size:.88rem;
     }
     .editField input:focus { outline:2px solid #850c18; outline-offset:-1px; border-color:#850c18; }
+    .fdPicker { display:grid; grid-template-columns:4.5rem 1fr 5.5rem; gap:.4rem; }
+    .fdPicker select {
+      padding:.45rem .5rem; border:1px solid #d1d5db; border-radius:7px; font-size:.88rem;
+      font-family:inherit; background:#fff; color:#222; min-width:0;
+    }
+    .fdPicker select:focus { outline:2px solid #850c18; outline-offset:-1px; border-color:#850c18; }
     .editField textarea {
       padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:7px; font-size:.88rem;
       font-family:inherit; min-height:60px; resize:vertical;
@@ -619,7 +625,7 @@
 
       /* Input under 16px får iOS til at zoome ind ved fokus */
       input, select, textarea,
-      .editField input, .editField textarea, .noedRow input, .plField input { font-size:16px; }
+      .editField input, .editField textarea, .noedRow input, .plField input, .fdPicker select { font-size:16px; }
 
       /* ── Personkort: fuld skærm ── */
       .modal-backdrop { padding:0; align-items:stretch; }
@@ -2050,12 +2056,54 @@ if (window.updateHeaderStatus) {
       ]);
     }
 
+    // Fødselsdag som tre rullelister (dag / måned / år) i stedet for en
+    // datovælger - så man ikke skal bladre mange år tilbage på telefonen.
+    // Det skjulte felt #eFodselsdag holder værdien som "ÅÅÅÅ-MM-DD".
+    function renderFodselsdagPicker(value) {
+      const [y, m, dd] = /^\d{4}-\d{2}-\d{2}$/.test(value || "") ? value.split("-") : ["", "", ""];
+      const thisYear = new Date().getFullYear();
+      const opt = (v, text, sel) => `<option value="${v}"${sel ? " selected" : ""}>${text}</option>`;
+
+      let days = opt("", "Dag", !dd);
+      for (let i = 1; i <= 31; i++) days += opt(String(i).padStart(2, "0"), i + ".", +dd === i);
+
+      let months = opt("", "Måned", !m);
+      MONTHS_DA.forEach((name, i) => { months += opt(String(i + 1).padStart(2, "0"), name, +m === i + 1); });
+
+      // Nyeste år først; det gemte år er altid med, også hvis det ligger udenfor intervallet
+      let years = opt("", "År", !y);
+      const yearList = [];
+      for (let yr = thisYear - 15; yr >= thisYear - 80; yr--) yearList.push(yr);
+      if (y && !yearList.includes(+y)) yearList.push(+y), yearList.sort((a, b) => b - a);
+      yearList.forEach(yr => { years += opt(yr, yr, +y === yr); });
+
+      return `
+        <div class="fdPicker">
+          <select id="eFodselsdagDag" aria-label="Dag">${days}</select>
+          <select id="eFodselsdagMaaned" aria-label="Måned">${months}</select>
+          <select id="eFodselsdagAar" aria-label="År">${years}</select>
+        </div>
+        <input type="hidden" id="eFodselsdag" value="${escAttr(value || "")}" />`;
+    }
+
+    // Returnerer "ÅÅÅÅ-MM-DD", "" (intet valgt) eller null (ugyldig/halvt udfyldt)
+    function readFodselsdagPicker() {
+      const dd = document.getElementById("eFodselsdagDag")?.value || "";
+      const m  = document.getElementById("eFodselsdagMaaned")?.value || "";
+      const y  = document.getElementById("eFodselsdagAar")?.value || "";
+      if (!dd && !m && !y) return "";
+      if (!dd || !m || !y) return null;
+      const dt = new Date(Date.UTC(+y, +m - 1, +dd));
+      if (dt.getUTCMonth() !== +m - 1) return null;   // fx 31. april
+      return `${y}-${m}-${dd}`;
+    }
+
     function renderOvrigeEditForm(d) {
       document.getElementById("mOvrige").innerHTML = `
         <div class="editFormGrid">
           <div class="editField">
-            <label for="eFodselsdag">Fødselsdag</label>
-            <input type="date" id="eFodselsdag" value="${escAttr(d.fodselsdag || "")}" />
+            <label for="eFodselsdagDag">Fødselsdag</label>
+            ${renderFodselsdagPicker(d.fodselsdag)}
           </div>
           <div class="editField">
             <label for="eTechId">TechID</label>
@@ -2549,6 +2597,16 @@ if (window.updateHeaderStatus) {
           telefon:  (c.telefon || "").trim()
         }))
         .filter(c => c.navn || c.relation || c.telefon);
+
+      const fodselsdagValue = readFodselsdagPicker();
+      if (fodselsdagValue === null) {
+        msg.textContent = "Fødselsdag: vælg både dag, måned og år (eller lad alle tre stå tomme), og tjek at datoen findes.";
+        msg.classList.add("err");
+        btn.disabled = false;
+        document.getElementById("eFodselsdagDag")?.focus();
+        return;
+      }
+      document.getElementById("eFodselsdag").value = fodselsdagValue;
 
       const noedSynlighedInput = document.querySelector('input[name="noedSynlighed"]:checked');
 
