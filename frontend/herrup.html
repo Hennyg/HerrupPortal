@@ -858,6 +858,7 @@
           <span class="saveMsg" id="plMsg" style="margin-right:auto"></span>
           <button class="btn-edit cancel" onclick="closePlModal()">Annuller</button>
           <button class="btn-edit" id="plCopyBtn" onclick="plAskCopy()" title="Kopiér de valgte kolonner til udklipsholderen">📋 Kopiér</button>
+          <button class="btn-edit" id="plExcelBtn" onclick="runExcelPersonaleliste()" title="Hent listen som Excel-fil med de valgte kolonner i en tabel">📊 Åbn i Excel</button>
           <button class="btn-save-inline" id="plPrintBtn" onclick="runPrintPersonaleliste()">Udskriv</button>
           <div class="plCopyPop" id="plCopyPop" hidden>
             <div class="plCopyQ">Skal navn med?</div>
@@ -2413,6 +2414,127 @@ if (window.updateHeaderStatus) {
       if (!result) return;
       msg.className = "saveMsg ok";
       msg.textContent = `Kopieret ✓ (${result.count} ${result.count === 1 ? "person" : "personer"})`;
+    }
+
+    // ── Åbn i Excel ──
+    // Laver en rigtig .xlsx med de valgte kolonner som en Excel-tabel (filtre,
+    // stribede rækker, frosset overskrift). Browseren kan ikke starte Excel
+    // direkte, så filen hentes og åbnes i Excel med ét klik.
+    let excelJsPromise = null;
+    function loadExcelJs() {
+      if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+      if (!excelJsPromise) {
+        excelJsPromise = new Promise((resolve, reject) => {
+          const sc = document.createElement("script");
+          sc.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+          sc.onload = () => window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error("ExcelJS blev ikke indlæst"));
+          sc.onerror = () => reject(new Error("Kunne ikke hente Excel-biblioteket"));
+          document.head.appendChild(sc);
+        });
+        excelJsPromise.catch(() => { excelJsPromise = null; });
+      }
+      return excelJsPromise;
+    }
+
+    async function runExcelPersonaleliste() {
+      document.getElementById("plCopyPop").hidden = true;
+      const btn = document.getElementById("plExcelBtn");
+      const msg = document.getElementById("plMsg");
+      const libPromise = loadExcelJs();          // hentes samtidig med data
+      const built = await plBuild(btn);
+      if (!built) return;
+      const { cols, users, priv } = built;
+      const title = document.getElementById("plTitle").value.trim() || "Personaleliste";
+
+      btn.disabled = true;
+      msg.className = "saveMsg";
+      msg.textContent = "Laver Excel-fil…";
+      try {
+        const ExcelJS = await libPromise;
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "Herrup Portalen";
+        wb.created = new Date();
+
+        const sheetName = title.replace(/[\[\]:*?\/\\]/g, " ").trim().slice(0, 31) || "Personaleliste";
+        const ws = wb.addWorksheet(sheetName);
+        const fields = [{ label: "Navn", get: (u) => u.displayName }, ...cols];
+        const usesHealth = cols.some(c => c.health);
+
+        // Overskrift + dato over tabellen
+        ws.getCell("A1").value = title;
+        ws.getCell("A1").font = { bold: true, size: 14 };
+        ws.getCell("A2").value = `${new Date().toLocaleDateString("da-DK")} · ${users.length} person${users.length === 1 ? "" : "er"}`;
+        ws.getCell("A2").font = { color: { argb: "FF6B7280" } };
+
+        const value = (c, u, p) => {
+          if (c.blank) return "";
+          if (c.health && p && !p.helbredVisible) return "kun for ledere";
+          return String(c.get(u, p) || "").replace(/[\r\n]+/g, " ").trim();
+        };
+        const rows = users.map(u => { const p = priv(u); return fields.map(f => value(f, u, p)); });
+
+        // Kolonnenavne i en Excel-tabel skal være unikke
+        const seen = new Map();
+        const headers = fields.map(f => {
+          let h = f.key === "kryds" ? "Afkrydsning" : f.label;
+          const n = (seen.get(h) || 0) + 1;
+          seen.set(h, n);
+          return n > 1 ? `${h} ${n}` : h;
+        });
+
+        const headerRow = 4;
+        ws.addTable({
+          name: "Personaleliste",
+          ref: `A${headerRow}`,
+          headerRow: true,
+          style: { theme: "TableStyleMedium2", showRowStripes: true },
+          columns: headers.map(h => ({ name: h, filterButton: true })),
+          rows: rows.length ? rows : [headers.map(() => "")]
+        });
+
+        // Kolonnebredder efter indhold
+        fields.forEach((f, i) => {
+          const longest = Math.max(headers[i].length, ...rows.map(r => String(r[i] || "").length));
+          ws.getColumn(i + 1).width = f.blank ? (f.key === "kryds" ? 12 : 30) : Math.min(60, Math.max(10, longest + 2));
+          ws.getColumn(i + 1).alignment = { vertical: "top", wrapText: true };
+        });
+        ws.getCell("A1").alignment = { wrapText: false };
+        ws.getCell("A2").alignment = { wrapText: false };
+
+        if (usesHealth) {
+          const r = headerRow + rows.length + 2;
+          ws.getCell(`A${r}`).value = "Fortroligt: listen kan indeholde helbredsoplysninger. Del den kun med dem, der skal bruge den, og slet den efter brug.";
+          ws.getCell(`A${r}`).font = { italic: true, color: { argb: "FF850C18" } };
+          ws.getCell(`A${r}`).alignment = { wrapText: false };
+        }
+
+        ws.views = [{ state: "frozen", ySplit: headerRow }];
+        ws.pageSetup = {
+          orientation: fields.filter(f => !f.blank).length > 5 ? "landscape" : "portrait",
+          fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9,
+          printTitlesRow: `${headerRow}:${headerRow}`
+        };
+
+        const buf = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const fileName = `${title.replace(/[\\/:*?"<>|]/g, " ").trim() || "Personaleliste"} ${new Date().toISOString().slice(0, 10)}.xlsx`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+        msg.className = "saveMsg ok";
+        msg.textContent = `Excel-fil hentet ✓ – åbn "${fileName}" fra overførsler`;
+      } catch (e) {
+        msg.className = "saveMsg err";
+        msg.textContent = "Fejl: " + (e.message || e);
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     async function runPrintPersonaleliste() {
