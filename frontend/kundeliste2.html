@@ -16,6 +16,8 @@
       border:1px solid #d1d5db; border-radius:6px; padding:0 8px;
       font:inherit; font-size:13px; font-weight:400; background:#fff; cursor:text;
     }
+    .dataTable thead th select.colFilter { padding:0 4px; cursor:pointer; }
+    .dataTable thead th .colFilter.isSet { border-color:var(--red); background:#fdf2f2; font-weight:600; }
     .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
     /* Knap "Projekt": kun kunder med produkter, hvor installationsdato er xx-xx-xxxx */
     #btnSal.active { background:#fee2e2; border-color:#dc2626; color:#991b1b; font-weight:700; }
@@ -299,6 +301,7 @@
       await Promise.all([loadKunder(), loadLastImport(), loadFarver(), kolCfgLoaded || (kolCfgLoaded = loadKolonner())]);
       await ensureSa();
       setStatus('', '');
+      buildHead();                   // filter-rullelister bygges ud fra de hentede kunder
       render();
     }
 
@@ -344,11 +347,11 @@
       omraade:     { sort: k => k.omraade, text: k => k.omraade, cell: k => `<td>${esc(k.omraade)}</td>` },
       kundestatus: { sort: k => k.kundestatus, text: k => k.kundestatus, cell: k => `<td>${esc(k.kundestatus)}</td>` },
       kontrakt: {
-        sort: k => k.kontrakt, text: k => k.kontrakt,
+        sort: k => k.kontrakt, text: k => k.kontrakt, values: k => Object.keys(k.kontraktAntal || {}),
         cell: k => `<td class="small" title="${esc(kontraktTitle(k))}">${kontraktChips(k)}</td>`
       },
       postnr: {
-        sort: k => (k.postnumre || [])[0] || '', text: k => (k.postnumre || []).join(' '),
+        sort: k => (k.postnumre || [])[0] || '', text: k => (k.postnumre || []).join(' '), values: k => k.postnumre || [],
         cell: k => `<td class="small">${esc((k.postnumre || []).join(', '))}</td>`
       },
       adresser: {
@@ -360,7 +363,7 @@
         cell: k => `<td class="num">${(k.serier || []).length || ''}</td>`
       },
       aktiv: {
-        sort: k => k.aktiv ? '1' : '0', text: k => k.aktiv ? 'aktiv ja' : 'inaktiv nej',
+        sort: k => k.aktiv ? '1' : '0', text: k => k.aktiv ? 'aktiv ja' : 'inaktiv nej', values: k => [k.aktiv ? 'Ja' : 'Nej'],
         cell: k => `<td>${k.aktiv ? 'Ja' : '<span class="muted">Nej</span>'}</td>`
       },
       importeret: {
@@ -372,6 +375,7 @@
       sa_aftaler: {
         sort: k => saFor(k).map(a => a.servicetype || a.varenr).join(' '),
         text: k => saFor(k).map(a => `${a.servicetype} ${a.varenr}`).join(' '),
+        values: k => saFor(k).map(a => a.servicetype || a.varenr),
         cell: k => `<td>${saFor(k).map(a =>
           `<span class="saChip${saUdlobet(a) ? ' udlobet' : ''}" title="${esc(saTitle(a))}">${esc(a.servicetype || a.varenr || 'Aftale')}</span>`).join('')}</td>`
       },
@@ -403,6 +407,7 @@
       return {
         sort: k => saFor(k).map(a => (sortGet || get)(a) || '').join(' '),
         text: k => saFor(k).map(a => get(a) || '').join(' '),
+        values: k => saFor(k).map(a => get(a)),
         cell: k => `<td class="${cls}">${saFor(k).map(a =>
           `<div class="saLine${saUdlobet(a) ? ' udlobet' : ''}">${esc(get(a) || '–')}</div>`).join('')}</td>`
       };
@@ -444,19 +449,77 @@
     }
 
     // Overskriftslinjen med sortering + filterfelt pr. kolonne
+    // ── Kolonnefiltre ──
+    // Har en kolonne få forskellige værdier (fx Område: Nord, Syd, Øst …),
+    // bliver filteret en rulleliste med værdierne. Ellers et tekstfelt.
+    // Valg i rullelisten gemmes som "=værdi" (præcis match), "=" = tom.
+    const MAX_VALG = 40;
+    const NO_SELECT = new Set(['kundenr', 'navn', 'importeret', 'sa_note']);
+
+    // Værdierne i en kolonne for én kunde (flere ved fx kontrakter/aftaler)
+    function colValues(k, key) {
+      const d = COLDEF[key];
+      const v = d?.values ? d.values(k) : [d ? d.text(k) : k[key]];
+      return v.map(x => String(x ?? '').trim()).filter(Boolean);
+    }
+    // Forskellige værdier i kolonnen på tværs af alle hentede kunder – eller null
+    function distinctValues(key) {
+      if (!rows.length || NO_SELECT.has(key)) return null;   // (ingen kunder endnu = første buildHead)
+      if (key.startsWith('sa_') && !saByKunde) return null;
+      const set = new Map();
+      let tomme = false;
+      for (const k of rows) {
+        const vals = colValues(k, key);
+        if (!vals.length) tomme = true;
+        for (const v of vals) {
+          set.set(v.toLowerCase(), v);
+          if (set.size > MAX_VALG) return null;
+        }
+      }
+      if (!set.size) return null;
+      return { values: [...set.values()].sort((a, b) => a.localeCompare(b, 'da', { numeric: true })), tomme };
+    }
+    function matchFilter(k, key, f) {
+      f = String(f || '').trim();
+      if (f.startsWith('=')) {
+        const want = f.slice(1).toLowerCase();
+        const vals = colValues(k, key).map(v => v.toLowerCase());
+        return want === '' ? vals.length === 0 : vals.includes(want);
+      }
+      return filterText(k, key).toLowerCase().includes(f.toLowerCase());
+    }
+
+    function filterControl(key) {
+      const d = distinctValues(key);
+      const cur = colFilters[key] || '';
+      if (!d) return `<input class="colFilter" type="search" data-col="${key}" placeholder="Filtrér…" autocomplete="off">`;
+      // Et gammelt fritekst-filter (fx fra URL'en) bevares som valgmulighed
+      const fri = cur && !cur.startsWith('=') ? `<option value="${esc(cur)}" selected>Indeholder "${esc(cur)}"</option>` : '';
+      return `<select class="colFilter colSelect" data-col="${key}">
+        <option value="">Alle</option>${fri}
+        ${d.values.map(v => `<option value="=${esc(v)}"${cur.toLowerCase() === ('=' + v).toLowerCase() ? ' selected' : ''}>${esc(v)}</option>`).join('')}
+        ${d.tomme ? `<option value="="${cur === '=' ? ' selected' : ''}>– Tom –</option>` : ''}
+      </select>`;
+    }
+
     function buildHead() {
       document.getElementById('headRow').innerHTML =
-        activeCols.map(key => `<th class="sortable" data-sort="${key}"><span class="colLabel">${esc(colLabel(key))}</span><input class="colFilter" type="search" data-col="${key}" placeholder="Filtrér…" autocomplete="off"></th>`).join('') +
+        activeCols.map(key => `<th class="sortable" data-sort="${key}"><span class="colLabel">${esc(colLabel(key))}</span>${filterControl(key)}</th>`).join('') +
         `<th style="vertical-align:bottom;"><button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button></th>`;
 
       document.querySelectorAll('.colFilter').forEach(inp => {
-        inp.value = colFilters[inp.dataset.col] || '';
+        if (inp.tagName === 'INPUT') inp.value = colFilters[inp.dataset.col] || '';
+        inp.classList.toggle('isSet', !!(colFilters[inp.dataset.col] || '').trim());
         inp.addEventListener('click', e => e.stopPropagation()); // klik i feltet må ikke sortere
-        inp.addEventListener('input', () => { colFilters[inp.dataset.col] = inp.value; syncUrlState(); render(); });
+        inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
+          colFilters[inp.dataset.col] = inp.value;
+          inp.classList.toggle('isSet', !!inp.value.trim());
+          syncUrlState(); render();
+        });
       });
       document.getElementById('btnClearFilters').onclick = () => {
         FILTER_COLS.forEach(c => { delete colFilters[c]; });
-        document.querySelectorAll('.colFilter').forEach(i => { i.value = ''; });
+        document.querySelectorAll('.colFilter').forEach(i => { i.value = ''; i.classList.remove('isSet'); });
         syncUrlState(); render();
       };
       document.querySelectorAll('th.sortable').forEach(th => th.onclick = () => {
@@ -503,7 +566,7 @@
       activeCols = cols.length ? cols : [...KL_STANDARD_KOLONNER];
       buildHead();
       render();
-      if (usesSa() && !saByKunde) ensureSa().then(render);
+      if (usesSa() && !saByKunde) ensureSa().then(() => { buildHead(); render(); });
     }
 
     document.getElementById('kolGruppe').onchange = e => {
@@ -593,7 +656,7 @@
       filtered = rows.filter(k =>
         (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv',...(k.postnumre || []),
                 ...saFor(k).map(a => `${a.varenr} ${a.servicetype}`)].join(' ').toLowerCase().includes(q)) &&
-        active.every(c => filterText(k, c).toLowerCase().includes(colFilters[c].trim().toLowerCase())) &&
+        active.every(c => matchFilter(k, c, colFilters[c])) &&
         (!onlyXX || k.harXX) &&
         (!onlySal || hasSal(k))
       );
