@@ -163,6 +163,7 @@
           <button type="button" class="btn primary" id="saNew">＋ Serviceaftale</button>
           <input type="search" id="saSearch" placeholder="Søg kunde, varenr., servicetype…" autocomplete="off" />
           <span class="muted small" id="saCount"></span>
+          <span class="small" id="saListMsg" style="color:#15803d;font-weight:600"></span>
         </div>
         <div class="saTableWrap">
           <table class="saTable">
@@ -526,11 +527,22 @@
     }
 
     // ── Opret ──
+    // Tømmer alle felter i formularen
+    function saResetForm() {
+      ['saKunde', 'saAftale', 'saStart', 'saSlut', 'saNote'].forEach(id => { document.getElementById(id).value = ''; });
+      document.getElementById('saKundeNavn').textContent = '';
+      saKundenr = '';
+      saShowExisting();
+      saUpdateSlut();
+      saMsg('');
+    }
+
     async function saShowForm() {
       document.getElementById('saTitle').textContent = 'Ny serviceaftale';
       document.getElementById('saListView').hidden = true;
       document.getElementById('saFormView').hidden = false;
-      saMsg('');
+      document.getElementById('saListMsg').textContent = '';
+      saResetForm();
       document.getElementById('saKundeList').innerHTML = rows
         .map(k => `<option value="${esc(k.kundenr)} – ${esc(k.navn)}"></option>`).join('');
       document.getElementById('saKunde').focus();
@@ -628,13 +640,14 @@
           body: JSON.stringify(body)
         });
         saAlle = (await saApi('action=serviceaftaler')).items || [];
+        // Tilbage til listen med en tom formular til næste gang
+        const navn = kundeNavn(body.kundenr) || body.kundenr;
+        saResetForm();
+        saShowList();
         saRenderList();
-        saShowExisting();
-        saMsg('Serviceaftalen er oprettet ✓', 'ok');
-        // Klar til næste aftale på samme kunde
-        document.getElementById('saAftale').value = '';
-        document.getElementById('saNote').value = '';
-        saUpdateSlut();
+        const lm = document.getElementById('saListMsg');
+        lm.textContent = `✓ Serviceaftale oprettet for ${navn}`;
+        setTimeout(() => { if (lm.textContent.includes(navn)) lm.textContent = ''; }, 5000);
       } catch (e) {
         saMsg('Fejl: ' + e.message, 'err');
       } finally {
