@@ -19,7 +19,13 @@ const TASKS = {
   translate: "Oversæt brugerens tekst korrekt og naturligt. Bevar betydning, navne, tal og relevant formatering.",
   explain: "Forklar indholdet praktisk og letforståeligt på samme sprog som brugeren.",
   bullets: "Omskriv indholdet til en overskuelig punktliste uden at opfinde nye oplysninger.",
-  free: "Besvar brugerens spørgsmål hjælpsomt, konkret og på samme sprog som brugeren.",
+  free: "Besvar brugerens spørgsmål hjælpsomt, konkret og på samme sprog som brugeren. Hvis brugeren beder om at lave, tegne eller redigere et billede, så brug billedværktøjet.",
+  image: [
+    "Brugeren vil have lavet et nyt billede eller redigeret et vedhæftet billede. Brug billedværktøjet til at lave resultatet - beskriv ikke bare, hvordan brugeren selv kan gøre det.",
+    "Ved redigering skal alt, som brugeren ikke beder om at ændre, bevares så præcist som muligt: komposition, farver, tekst, logoer og proportioner.",
+    "Ved opfølgende beskeder skal du som udgangspunkt arbejde videre på det senest genererede billede.",
+    "Skriv kun en meget kort tekst sammen med billedet (højst et par sætninger), fx hvad der er ændret."
+  ].join(" "),
   referat: [
     "Lav et referat af det vedhæftede eller indsatte indhold. Det er typisk en automatisk transskription af et møde eller en samtale, men kan også være noter eller et dokument.",
     "Transskriptioner kan indeholde fejl i ord, navne og tal. Ret åbenlyse fejl ud fra sammenhængen, men opfind aldrig indhold, beslutninger, navne, datoer eller tal.",
@@ -161,6 +167,35 @@ function extractOutputText(data) {
   return parts.join("\n").trim();
 }
 
+// Billeder lavet af billedværktøjet (image_generation) i et Responses-svar
+function extractOutputImages(data) {
+  const out = [];
+  for (const item of (data?.output || [])) {
+    if (item?.type !== "image_generation_call" || !item.result) continue;
+    const fmt = String(item.output_format || IMAGE_OUTPUT_FORMAT).toLowerCase();
+    const mime = fmt === "jpg" || fmt === "jpeg" ? "image/jpeg" : fmt === "webp" ? "image/webp" : "image/png";
+    out.push(`data:${mime};base64,${item.result}`);
+  }
+  return out;
+}
+
+// Opgaver hvor AI må lave/redigere billeder
+const IMAGE_TASKS = new Set(["image", "free"]);
+const IMAGE_OUTPUT_FORMAT = "png";
+
+function imageTool() {
+  // OBS: input_fidelity må IKKE sendes til gpt-image-2 (giver 400) - den
+  // bruger altid høj gengivelse af input-billeder.
+  return {
+    type: "image_generation",
+    model: process.env.CHATGTP_IMAGE_MODEL || "gpt-image-2",
+    action: "auto",
+    quality: process.env.CHATGTP_IMAGE_QUALITY || "auto",
+    size: "auto",
+    output_format: IMAGE_OUTPUT_FORMAT
+  };
+}
+
 function validResponseId(value) {
   const id = String(value || "").trim();
   return /^resp_[A-Za-z0-9_-]+$/.test(id) ? id : null;
@@ -228,11 +263,12 @@ async function pollResponse(context, apiKey, id) {
 
   if (st === "completed" || st === "incomplete") {
     let answer = extractOutputText(data);
-    if (!answer) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget tekstsvar." });
+    const outImages = extractOutputImages(data);
+    if (!answer && !outImages.length) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget svar." });
     if (st === "incomplete") {
       answer += `\n\n(Svaret blev afbrudt: ${data?.incomplete_details?.reason || "ukendt årsag"})`;
     }
-    return json(context, 200, { answer, responseId: id });
+    return json(context, 200, { answer, images: outImages, responseId: id });
   }
 
   return json(context, 502, {
@@ -315,7 +351,9 @@ module.exports = async function (context, req) {
 
   // Store opgaver køres som baggrundskald og hentes med GET /api/ai?id=...
   // så de ikke rammer timeout på SWA managed functions.
+  const allowImages = IMAGE_TASKS.has(task);
   const useBackground =
+    allowImages ||                 // billedgenerering kan tage op til ~2 min
     task === "referat" ||
     attachmentInfo.content.length > 0 ||
     prompt.length + attachmentInfo.textTotal > 20000;
@@ -336,6 +374,7 @@ module.exports = async function (context, req) {
       input: [{ role: "user", content }],
       max_output_tokens: useBackground ? 16000 : 2500
     };
+    if (allowImages) requestBody.tools = [imageTool()];
     if (previousResponseId) requestBody.previous_response_id = previousResponseId;
     if (useBackground) {
       requestBody.background = true;
@@ -370,9 +409,10 @@ module.exports = async function (context, req) {
     }
 
     const answer = extractOutputText(data);
-    if (!answer) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget tekstsvar." });
+    const outImages = extractOutputImages(data);
+    if (!answer && !outImages.length) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget svar." });
 
-    return json(context, 200, { answer, responseId: data.id || null });
+    return json(context, 200, { answer, images: outImages, responseId: data.id || null });
   } catch (e) {
     context.log("AI endpoint fejl:", e.message);
     return json(context, 500, { error: "ai_failed", message: e.message });

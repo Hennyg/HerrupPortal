@@ -768,6 +768,9 @@
     if (task.value === "referat") {
       promptLabel.textContent = "Ekstra instruktion eller tekst (valgfrit)";
       prompt.placeholder = "Tilføj en lydfil eller et dokument – eller indsæt noter/transskription her.\nDu kan også skrive f.eks. deltagere, mødets formål eller hvad der skal fokuseres på.";
+    } else if (task.value === "image") {
+      promptLabel.textContent = "Beskriv billedet eller ændringen";
+      prompt.placeholder = "Beskriv det billede du vil have lavet – eller tilføj/indsæt et billede og skriv hvad der skal ændres.\nFx: Skift alle hvide elementer i logoet til lys grå (#D9D9D9), baggrunden skal forblive hvid.";
     } else {
       promptLabel.textContent = "Tekst eller spørgsmål";
       prompt.placeholder = "Indsæt f.eks. teksten fra en PowerPoint her …";
@@ -811,7 +814,9 @@
     bubble.className = "aiMessageBubble";
     bubble.textContent = text || (attachedImages.length ? "Billede vedhæftet" : (attachedFiles.length ? "Fil vedhæftet" : ""));
 
-    msg.append(roleEl, bubble);
+    msg.append(roleEl);
+    // Et rent billedsvar fra AI vises uden tom tekstboble
+    if (!(role === "assistant" && !text && attachedImages.length)) msg.appendChild(bubble);
 
     if (attachedFiles.length) {
       const files = document.createElement("div");
@@ -827,7 +832,9 @@
       msg.appendChild(texts);
     }
 
-    if (attachedImages.length) {
+    if (role === "assistant" && attachedImages.length) {
+      msg.appendChild(renderGeneratedImages(attachedImages));
+    } else if (attachedImages.length) {
       const imgs = document.createElement("div");
       imgs.className = "aiMessageImages";
       attachedImages.forEach(img => {
@@ -858,6 +865,75 @@
 
     conversationEl.appendChild(msg);
   }
+
+  // Billeder lavet af AI: vises i fuld bredde med Download / Kopiér
+  function renderGeneratedImages(imgs) {
+    const wrap = document.createElement("div");
+    wrap.className = "aiGenImages";
+
+    imgs.forEach(img => {
+      const box = document.createElement("div");
+      box.className = "aiGenImage";
+
+      const el = document.createElement("img");
+      el.src = img.dataUrl;
+      el.alt = img.name || "Billede lavet af AI";
+      el.title = "Klik for at åbne i fuld størrelse";
+      el.addEventListener("click", async () => {
+        const blob = await (await fetch(img.dataUrl)).blob();
+        window.open(URL.createObjectURL(blob), "_blank", "noopener");
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "aiGenImageActions";
+
+      const dl = document.createElement("a");
+      dl.className = "aiCopyMessage";
+      dl.href = img.dataUrl;
+      dl.download = img.name || "AI-billede.png";
+      dl.textContent = "Download";
+
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "aiCopyMessage";
+      copy.textContent = "Kopiér billede";
+      copy.addEventListener("click", async () => {
+        try {
+          const blob = await (await fetch(img.dataUrl)).blob();
+          // Udklipsholderen tager kun imod PNG
+          const png = blob.type === "image/png" ? blob : await toPngBlob(img.dataUrl);
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+          copy.textContent = "Kopieret ✓";
+          setTimeout(() => copy.textContent = "Kopiér billede", 1400);
+        } catch {
+          setStatus("Kunne ikke kopiere billedet – brug Download i stedet.");
+        }
+      });
+
+      actions.append(dl, copy);
+      box.append(el, actions);
+      wrap.appendChild(box);
+    });
+
+    return wrap;
+  }
+
+  function toPngBlob(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = im.naturalWidth;
+        c.height = im.naturalHeight;
+        c.getContext("2d").drawImage(im, 0, 0);
+        c.toBlob(b => b ? resolve(b) : reject(new Error("PNG fejl")), "image/png");
+      };
+      im.onerror = reject;
+      im.src = dataUrl;
+    });
+  }
+
+  let generatedImageSeq = 0;
 
   function switchToFollowupMode() {
     if (conversationStarted) return;
@@ -1276,7 +1352,7 @@
     savePdfBottomBtn.disabled = true;
     redoBtn.disabled = true;
     redoBottomBtn.disabled = true;
-    setStatus("AI arbejder …", true);
+    setStatus(sentTask === "image" ? "AI arbejder … billeder kan tage op til et par minutter" : "AI arbejder …", true);
 
     try {
       const response = await fetch("/api/ai", {
@@ -1317,9 +1393,16 @@
         addMessage("user", text, sentImages, sentFiles, sentAttachmentObjs);
       }
 
-      const answerText = data.answer || "Der kom ikke noget svar.";
-      conversationHistory.push({ role: "assistant", text: answerText, images: [], isOriginal: false });
-      addMessage("assistant", answerText);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const answerImages = (Array.isArray(data.images) ? data.images : [])
+        .filter(d => typeof d === "string" && d.startsWith("data:image/"))
+        .map(dataUrl => ({
+          name: `Herrup-AI-billede-${stamp}-${++generatedImageSeq}.${dataUrl.startsWith("data:image/jpeg") ? "jpg" : dataUrl.startsWith("data:image/webp") ? "webp" : "png"}`,
+          dataUrl
+        }));
+      const answerText = data.answer || (answerImages.length ? "" : "Der kom ikke noget svar.");
+      conversationHistory.push({ role: "assistant", text: answerText, images: answerImages, isOriginal: false });
+      addMessage("assistant", answerText, answerImages);
 
       previousResponseId = data.responseId || null;
       switchToFollowupMode();
