@@ -186,14 +186,14 @@ const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const bad = msg => Object.assign(new Error(msg), { status: 400 });
 
+// Uden kundenr. hentes alle serviceaftaler
 async function listServiceaftaler(kundenr) {
   kundenr = String(kundenr || "").trim();
-  if (!kundenr) throw bad("Kundenr. mangler");
   const set = await entitySet(T.serviceaftale);
-  const filter = encodeURIComponent(`cr1eb_lch_kundenr eq '${kundenr.replace(/'/g, "''")}'`);
+  const filter = kundenr ? `&$filter=${encodeURIComponent(`cr1eb_lch_kundenr eq '${kundenr.replace(/'/g, "''")}'`)}` : "";
   const sel = [T.serviceaftale.id, "cr1eb_lch_kundenr", "cr1eb_lch_varenr", "cr1eb_lch_startdato",
                "cr1eb_lch_enddato", "cr1eb_lch_note", `_${VAREOPSLAG_NAV}_value`].join(",");
-  const rows = await fetchAll(`${set}?$select=${sel}&$filter=${filter}`);
+  const rows = await fetchAll(`${set}?$select=${sel}${filter}`);
 
   // Vis servicetype/afdeling fra aftaleteksten
   const tekster = new Map((await listAftaler()).map(a => [a.id, a]));

@@ -8,7 +8,7 @@
 //   POST   ?action=aftaletekster           body { varenr, navn, servicetype, afdeling }
 //   PATCH  ?action=aftaletekster&id=<guid> body { ...felter der ændres }
 //   DELETE ?action=aftaletekster&id=<guid>
-//   GET    ?action=serviceaftaler&kundenr=<nr> → { items: [...] }
+//   GET    ?action=serviceaftaler[&kundenr=<nr>] → { items: [...] }  (uden kundenr = alle)
 //   POST   ?action=serviceaftaler          body { kundenr, aftaleId, startdato, enddato, note }
 
 const N = require("../_news");
