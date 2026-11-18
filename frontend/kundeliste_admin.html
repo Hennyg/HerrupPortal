@@ -1,385 +1,178 @@
-<!doctype html>
-<html lang="da">
-<head>
-  <meta charset="utf-8" />
-  <title>Kundeliste – Admin</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/assets/kundeliste/app.css" />
-  <style>
-    .pageWrap { overflow:auto; }
-    .adminWrap { max-width:1200px; width:100%; margin:0 auto; display:grid; gap:12px; }
-    .adminWrap[hidden], .noAccess[hidden] { display:none; }
-    .linkTiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; }
-    .linkTile { display:flex; align-items:center; gap:12px; background:#fff; border:1px solid var(--border); border-radius:10px;
-                padding:14px 16px; text-decoration:none; color:inherit; box-shadow:0 1px 3px rgba(0,0,0,.04); }
-    .linkTile:hover { border-color:var(--red); background:#fdf7f7; }
-    .linkTile .ico { font-size:26px; }
-    .linkTile b { display:block; }
-    .linkTile span.muted { font-size:12px; }
-    .panelHead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
-    .panelHead h2 { margin:0; flex:1; }
-    .panel p.muted { margin:0 0 10px; font-size:13px; }
-    .admTable { width:100%; border-collapse:collapse; font-size:14px; }
-    .admTable th { text-align:left; font-size:13px; color:#374151; padding:8px; border-bottom:1px solid #d1d5db; background:#f9fafb; white-space:nowrap; }
-    .admTable td { padding:6px 8px; border-bottom:1px solid #eee; vertical-align:middle; }
-    .admTable tbody tr { cursor:default; }
-    .admTable tr.dirty td { background:#fffbeb; }
-    .admTable input[type=text] { width:100%; height:32px; border:1px solid #d1d5db; border-radius:6px; padding:0 8px; font:inherit; font-size:14px; }
-    .admTable input[type=text]:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
-    .admTable input[type=color] { width:44px; height:32px; padding:2px; border:1px solid #d1d5db; border-radius:6px; background:#fff; cursor:pointer; }
-    .kChip { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600;
-             border:1px solid rgba(0,0,0,.08); white-space:nowrap; background:#eef0f2; color:#333; }
-    .btn.primary { background:var(--red); border-color:var(--red); color:#fff; }
-    .btn.primary:hover { background:var(--red-dark); }
-    .btn.danger { color:#991b1b; }
-    .btn:disabled { opacity:.5; cursor:default; }
-    .rowBtns { white-space:nowrap; text-align:right; }
-    .msg { font-size:13px; }
-    .msg.ok { color:#15803d; } .msg.err { color:#991b1b; }
-    .search { height:34px; border:1px solid #d1d5db; border-radius:8px; padding:0 10px; font:inherit; font-size:14px; min-width:220px; }
-    /* Farvepalet til kontraktfarver */
-    .farveCell { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-    .swatchBtn { width:32px; height:32px; border-radius:6px; border:1px solid #d1d5db; cursor:pointer; padding:0; }
-    .swatchBtn:hover, .swatchBtn:focus-visible { outline:2px solid var(--red); outline-offset:1px; }
-    .palPop { position:fixed; z-index:100; background:#fff; border:1px solid var(--border); border-radius:10px;
-              box-shadow:0 10px 30px rgba(0,0,0,.18); padding:10px 12px; }
-    .palPop[hidden] { display:none; }
-    .palRow { display:grid; grid-template-columns:62px repeat(3, 30px); gap:6px; align-items:center; margin:3px 0; }
-    .palRow span { font-size:12px; color:#4b5563; }
-    .palRow button { width:30px; height:30px; border-radius:6px; border:1px solid rgba(0,0,0,.12); cursor:pointer; padding:0; }
-    .palRow button:hover { transform:scale(1.12); }
-    .palRow button.sel { outline:2px solid #111827; outline-offset:1px; }
-    .palHint { font-size:11px; color:#6b7280; margin-top:6px; }
-    .noAccess { background:#fff; border:1px solid var(--border); border-radius:10px; padding:24px; }
-    @media (max-width: 640px) { .navExtra { display:none !important; } }
-  </style>
-</head>
-<body>
-  <div class="navbar">
-    <div class="navbar-inner">
-      <div class="brand">
-        <div class="logo" aria-label="Herrup Portal"></div>
-        <div>Kundeliste – Admin</div>
-      </div>
-      <div class="nav">
-        <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
-        <span class="sep">|</span>
-        <a href="/kundeliste.html">Kundeliste</a>
-        <a class="navExtra" href="/importlog.html">Importlog</a>
-        <a href="/logout">Log ud</a>
-      </div>
-    </div>
-    <div class="nav-accent"></div>
-  </div>
+// api/_kundelisteAdmin.js
+// Fælles hjælpefunktioner til Kundeliste-admin (kundeliste_admin.html):
+//   - adgangstjek (portal_admin / portal_kundeliste_admin)
+//   - kontraktfarver  (tabel lch_serviceaftaler_kontraktfarve)
+//   - aftaletekster   (tabel lch_serviceaftaler_aftalertekst)
+// Alle tabeller ligger i Kundeliste-miljøet (KL_DV_URL) – samme som kunder/produkter.
 
-  <main class="pageWrap">
-    <div id="status" class="status loading"><div class="spinner"></div> Tjekker adgang...</div>
+const N = require("./_news");
+const crypto = require("crypto");
+const { dvFetch, fetchAll } = require("./_dvKunde");
 
-    <div id="noAccess" class="noAccess" hidden>
-      <h2 style="margin-top:0">Ingen adgang</h2>
-      <p>Siden kræver rollen <b>portal_admin</b> eller <b>portal_kundeliste_admin</b>.</p>
-      <a class="link" href="/kundeliste.html">← Tilbage til kundelisten</a>
-    </div>
+const ADMIN_ROLES = ["portal_admin", "portal_kundeliste_admin"];
 
-    <div id="adminWrap" class="adminWrap" hidden>
-      <!-- Links -->
-      <div class="linkTiles">
-        <a class="linkTile" href="/kundeliste2.html">
-          <div class="ico">🧪</div>
-          <div><b>Kundeliste 2 (test)</b><span class="muted">Ny version med farvede kontrakter – til godkendelse</span></div>
-        </a>
-        <a class="linkTile" href="/kundeliste.html">
-          <div class="ico">📋</div>
-          <div><b>Kundeliste</b><span class="muted">Den nuværende kundeliste</span></div>
-        </a>
-        <a class="linkTile" href="/importlog.html">
-          <div class="ico">🗂️</div>
-          <div><b>Importlog</b><span class="muted">Status på kundeimporten</span></div>
-        </a>
-      </div>
+// Tabeller i Kundeliste-miljøet. "set" er sætnavnet (EntitySetName), som
+// bruges i URL'en. Mangler det, slås det op i Dataverse-metadata.
+const T = {
+  farve: {
+    logical: "cr1eb_lch_serviceaftaler_kontraktfarve",
+    set:     "cr1eb_lch_serviceaftaler_kontraktfarves",
+    id:      "cr1eb_lch_serviceaftaler_kontraktfarveid"
+  },
+  aftaletekst: {
+    logical: "cr1eb_lch_serviceaftaler_aftalertekst",
+    set:     "cr1eb_lch_serviceaftaler_aftalerteksts",
+    id:      "cr1eb_lch_serviceaftaler_aftalertekstid"
+  },
+  produkt: { set: "cr1eb_lch_kundeprodukts" }
+};
 
-      <!-- Aftaletekster -->
-      <section class="panel">
-        <div class="panelHead">
-          <h2>📄 Aftaletekster (serviceaftaler)</h2>
-          <span id="aftaleMsg" class="msg"></span>
-          <input type="search" id="aftaleSearch" class="search" placeholder="Søg varenr., navn, servicetype…" autocomplete="off" />
-          <button type="button" class="btn primary" id="btnNyAftale">＋ Ny aftaletekst</button>
-        </div>
-        <p class="muted">Tabellen <code>lch_serviceaftaler_aftalertekst</code>. Ret direkte i felterne og tryk Gem på rækken.</p>
-        <table class="admTable">
-          <thead><tr><th style="width:14%">Varenr.</th><th>Navn</th><th style="width:18%">Servicetype</th><th style="width:16%">Afdeling</th><th></th></tr></thead>
-          <tbody id="aftaleBody"><tr><td colspan="5" class="muted">Henter…</td></tr></tbody>
-        </table>
-      </section>
-      <!-- Kontraktfarver -->
-      <section class="panel">
-        <div class="panelHead">
-          <h2>🎨 Kontraktfarver</h2>
-          <span id="farveMsg" class="msg"></span>
-          <button type="button" class="btn" id="btnAddKontrakt">＋ Tilføj kontrakttype</button>
-          <button type="button" class="btn primary" id="btnSaveFarver" disabled>Gem farver</button>
-        </div>
-        <p class="muted">Kontrakttyperne hentes fra produkterne i Dataverse. Vælg en baggrundsfarve til hver type – den bruges i Kontrakt-kolonnen i kundelisten. Typer, der ikke findes på produkter endnu, kan tilføjes på forhånd.</p>
-        <table class="admTable">
-          <thead><tr><th>Visning</th><th>Kontrakttype</th><th>Produkter</th><th>Farve</th><th></th></tr></thead>
-          <tbody id="farveBody"><tr><td colspan="5" class="muted">Henter…</td></tr></tbody>
-        </table>
-      </section>
+const setCache = new Map();
+async function entitySet(t) {
+  if (t.set) return t.set;
+  if (setCache.has(t.logical)) return setCache.get(t.logical);
+  let set = `${t.logical}s`;
+  try {
+    const j = await dvFetch(`EntityDefinitions(LogicalName='${t.logical}')?$select=EntitySetName`);
+    if (j?.EntitySetName) set = j.EntitySetName;
+  } catch { /* fald tilbage til <logisk navn>s */ }
+  setCache.set(t.logical, set);
+  return set;
+}
 
-    </div>
-  </main>
+// ── Adgang ──────────────────────────────────────────────────────────────────
+async function isKundelisteAdmin(req) {
+  const me = N.getPrincipal(req);
+  if (!me) return { me: null, admin: false };
+  let roles = me.roles || [];
+  try { roles = await N.lookupRoles(me); } catch { /* brug rollerne fra login */ }
+  return { me, admin: roles.some(r => ADMIN_ROLES.includes(String(r).toLowerCase())) };
+}
 
-  <!-- Farvepalet (deles af alle rækker) -->
-  <div class="palPop" id="palPop" hidden role="dialog" aria-label="Vælg farve"></div>
+// ── Kontraktfarver ──────────────────────────────────────────────────────────
+const HEX = /^#[0-9a-f]{6}$/i;
 
-  <script src="/assets/kundeliste/common.js"></script>
-  <script>
-    const API = '/api/kundeliste-admin';
+async function loadFarver() {
+  const set = await entitySet(T.farve);
+  const rows = await fetchAll(`${set}?$select=${T.farve.id},cr1eb_lch_name,cr1eb_lch_farve`);
+  return rows
+    .map(r => ({
+      id: r[T.farve.id],
+      kontrakt: String(r.cr1eb_lch_name || "").trim(),
+      farve: HEX.test(String(r.cr1eb_lch_farve || "").trim()) ? String(r.cr1eb_lch_farve).trim().toLowerCase() : ""
+    }))
+    .filter(r => r.kontrakt);
+}
 
-    async function api(action, { method = 'GET', id = '', body = null } = {}) {
-      const url = `${API}?action=${action}${id ? `&id=${encodeURIComponent(id)}` : ''}`;
-      const r = await fetch(url, {
-        method, cache: 'no-store',
-        headers: body ? { 'Content-Type': 'application/json' } : {},
-        body: body ? JSON.stringify(body) : undefined
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-      return j;
-    }
+// Kontrakttyper, der findes på aktive produkter, med antal produkter
+async function kontraktTyper() {
+  const rows = await fetchAll(`${T.produkt.set}?$select=cr1eb_lch_kontrakt&$filter=${encodeURIComponent("cr1eb_lch_aktiv eq true")}`);
+  const antal = new Map();
+  for (const r of rows) {
+    const k = String(r.cr1eb_lch_kontrakt || "").trim();
+    if (k) antal.set(k, (antal.get(k) || 0) + 1);
+  }
+  return antal;
+}
 
-    function setStatus(cls, html) {
-      const el = document.getElementById('status');
-      el.className = 'status ' + cls; el.innerHTML = html; el.style.display = html ? 'flex' : 'none';
-    }
-    function setMsg(id, text, cls = '') {
-      const el = document.getElementById(id);
-      el.className = 'msg ' + cls; el.textContent = text;
-      if (cls === 'ok') setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 3000);
-    }
-    function textOn(hex) {
-      const n = parseInt(String(hex).slice(1), 16);
-      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-      return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? '#111827' : '#ffffff';
-    }
-    function chip(name, farve) {
-      return `<span class="kChip"${farve ? ` style="background:${farve};color:${textOn(farve)}"` : ''}>${esc(name)}</span>`;
-    }
+async function saveFarve(kontrakt, farve) {
+  kontrakt = String(kontrakt || "").trim();
+  farve = String(farve || "").trim().toLowerCase();
+  if (!kontrakt) throw Object.assign(new Error("Kontrakttype mangler"), { status: 400 });
+  if (farve && !HEX.test(farve)) throw Object.assign(new Error(`Ugyldig farve: ${farve}`), { status: 400 });
 
-    // ── Standardfarver: grundfarver i 3 nyancer (lys / mellem / mørk) ──────
-    const PALETTE = [
-      { navn: 'Grøn',   farver: ['#bbf7d0', '#4ade80', '#15803d'] },
-      { navn: 'Orange', farver: ['#fed7aa', '#fb923c', '#c2410c'] },
-      { navn: 'Blå',    farver: ['#bfdbfe', '#60a5fa', '#1d4ed8'] },
-      { navn: 'Rød',    farver: ['#fecaca', '#f87171', '#b91c1c'] },
-      { navn: 'Gul',    farver: ['#fef08a', '#facc15', '#a16207'] },
-      { navn: 'Lilla',  farver: ['#e9d5ff', '#c084fc', '#7e22ce'] },
-      { navn: 'Turkis', farver: ['#a5f3fc', '#22d3ee', '#0e7490'] },
-      { navn: 'Grå',    farver: ['#e5e7eb', '#9ca3af', '#4b5563'] }
-    ];
-    const NYANCE = ['lys', 'mellem', 'mørk'];
+  const set = await entitySet(T.farve);
+  const existing = (await loadFarver()).find(r => r.kontrakt.toLowerCase() === kontrakt.toLowerCase());
 
-    // "#4ade80" → "Grøn mellem" (tom, hvis det ikke er en standardfarve)
-    function paletteName(hex) {
-      hex = String(hex || '').toLowerCase();
-      for (const p of PALETTE) {
-        const i = p.farver.indexOf(hex);
-        if (i >= 0) return `${p.navn} ${NYANCE[i]}`;
-      }
-      return '';
-    }
+  if (!farve) {                                        // tom farve = brug standard
+    if (existing) await dvFetch(`${set}(${existing.id})`, { method: "DELETE" });
+    return null;
+  }
+  if (existing) {
+    await dvFetch(`${set}(${existing.id})`, { method: "PATCH", body: { cr1eb_lch_farve: farve } });
+    return existing.id;
+  }
+  const created = await dvFetch(set, {
+    method: "POST",
+    body: { cr1eb_lch_name: kontrakt, cr1eb_lch_farve: farve },
+    headers: { Prefer: "return=representation" }
+  });
+  return created?.[T.farve.id] || null;
+}
 
-    let palIndex = -1;
-    function openPalette(btn, i) {
-      const pop = document.getElementById('palPop');
-      palIndex = i;
-      const cur = kontrakter[i]?.farve || '';
-      pop.innerHTML = PALETTE.map(p => `
-        <div class="palRow"><span>${p.navn}</span>${p.farver.map((c, n) =>
-          `<button type="button" data-c="${c}" style="background:${c}" title="${p.navn} ${NYANCE[n]}"${c === cur ? ' class="sel"' : ''}></button>`).join('')}</div>`
-      ).join('') + '<div class="palHint">Lys · mellem · mørk – eller vælg en egen farve i feltet ved siden af</div>';
-      pop.querySelectorAll('button[data-c]').forEach(b => b.onclick = () => {
-        kontrakter[palIndex].farve = b.dataset.c;
-        closePalette();
-        renderKontrakter();
-      });
-      pop.hidden = false;
-      // Placér under knappen, men inden for skærmen
-      const r = btn.getBoundingClientRect();
-      const w = pop.offsetWidth, h = pop.offsetHeight;
-      pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
-      pop.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + 'px';
-    }
-    function closePalette() { document.getElementById('palPop').hidden = true; palIndex = -1; }
-    document.addEventListener('click', e => { if (!e.target.closest('#palPop')) closePalette(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePalette(); });
-    document.querySelector('.pageWrap').addEventListener('scroll', closePalette);
+// ── Aftaletekster ───────────────────────────────────────────────────────────
+// cr1eb_lch_name (primær kolonne) er kun en teknisk nøgle. Den udfyldes
+// automatisk ved oprettelse og vises/rettes ikke af brugeren.
+const AFTALE_FIELDS = {
+  varenr:      "cr1eb_lch_varenr",
+  servicetype: "cr1eb_lch_servicetype",
+  afdeling:    "cr1eb_lch_afdeling"
+};
 
-    // ── Kontraktfarver ──────────────────────────────────────────────────────
-    let kontrakter = [];             // [{ kontrakt, antal, farve, orig }]
+// Fx "AT-20261118-3f9a2c" – unik og læsbar i Dataverse
+function aftaleKey() {
+  const d = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return `AT-${d}-${crypto.randomBytes(3).toString("hex")}`;
+}
 
-    async function loadKontrakter() {
-      const j = await api('kontrakter');
-      kontrakter = (j.items || []).map(k => ({ ...k, orig: k.farve }));
-      renderKontrakter();
-    }
+function mapAftale(r) {
+  const o = { id: r[T.aftaletekst.id] };
+  for (const [k, f] of Object.entries(AFTALE_FIELDS)) o[k] = r[f] || "";
+  return o;
+}
 
-    function renderKontrakter() {
-      const tb = document.getElementById('farveBody');
-      if (!kontrakter.length) { tb.innerHTML = '<tr><td colspan="5" class="muted">Ingen kontrakttyper fundet</td></tr>'; }
-      else tb.innerHTML = kontrakter.map((k, i) => `
-        <tr class="${k.farve !== k.orig ? 'dirty' : ''}">
-          <td>${chip(k.kontrakt, k.farve)}</td>
-          <td><b>${esc(k.kontrakt)}</b></td>
-          <td class="muted">${k.antal || '–'}</td>
-          <td><div class="farveCell">
-            <button type="button" class="swatchBtn" data-pal="${i}" style="background:${esc(k.farve || '#eef0f2')}" title="Vælg standardfarve"></button>
-            <input type="color" value="${esc(k.farve || '#eef0f2')}" data-i="${i}" title="Egen farve">
-            <span class="small muted">${esc(paletteName(k.farve) || k.farve || 'standard')}</span>
-          </div></td>
-          <td class="rowBtns">${k.farve ? `<button type="button" class="btn" data-reset="${i}" title="Brug standardfarven (grå)">Nulstil</button>` : ''}</td>
-        </tr>`).join('');
-      tb.querySelectorAll('input[type=color]').forEach(inp => inp.addEventListener('input', () => {
-        kontrakter[+inp.dataset.i].farve = inp.value.toLowerCase();
-        renderKontrakter();
-      }));
-      tb.querySelectorAll('[data-pal]').forEach(b => b.onclick = e => { e.stopPropagation(); openPalette(b, +b.dataset.pal); });
-      tb.querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { kontrakter[+b.dataset.reset].farve = ''; renderKontrakter(); });
-      document.getElementById('btnSaveFarver').disabled = !kontrakter.some(k => k.farve !== k.orig);
-    }
+function aftaleBody(input) {
+  const body = {};
+  for (const [k, f] of Object.entries(AFTALE_FIELDS)) {
+    if (k in (input || {})) body[f] = String(input[k] ?? "").trim().slice(0, 400);
+  }
+  return body;
+}
 
-    document.getElementById('btnAddKontrakt').onclick = () => {
-      const name = (prompt('Navn på kontrakttype (skal staves som i Dataverse):') || '').trim();
-      if (!name) return;
-      if (kontrakter.some(k => k.kontrakt.toLowerCase() === name.toLowerCase())) { setMsg('farveMsg', 'Typen findes allerede', 'err'); return; }
-      kontrakter.push({ kontrakt: name, antal: 0, farve: '#4ade80', orig: '' });
-      renderKontrakter();
-    };
+async function listAftaler() {
+  const set = await entitySet(T.aftaletekst);
+  const rows = await fetchAll(`${set}?$select=${[T.aftaletekst.id, "cr1eb_lch_name", ...Object.values(AFTALE_FIELDS)].join(",")}`);
 
-    document.getElementById('btnSaveFarver').onclick = async () => {
-      const changed = kontrakter.filter(k => k.farve !== k.orig).map(k => ({ kontrakt: k.kontrakt, farve: k.farve }));
-      if (!changed.length) return;
-      const btn = document.getElementById('btnSaveFarver');
-      btn.disabled = true;
-      setMsg('farveMsg', 'Gemmer…');
-      try {
-        await api('kontrakter', { method: 'POST', body: { items: changed } });
-        await loadKontrakter();
-        setMsg('farveMsg', 'Gemt ✓ (kan gå op til 2 min, før kundelisten viser det)', 'ok');
-      } catch (e) {
-        setMsg('farveMsg', 'Fejl: ' + e.message, 'err');
-        btn.disabled = false;
-      }
-    };
+  // Rækker uden nøgle (fx oprettet før lch_name blev automatisk) får en nu.
+  // Fejler det, vises listen alligevel.
+  for (const r of rows.filter(r => !String(r.cr1eb_lch_name || "").trim())) {
+    try {
+      await dvFetch(`${set}(${r[T.aftaletekst.id]})`, { method: "PATCH", body: { cr1eb_lch_name: aftaleKey() } });
+    } catch { /* ignoreres */ }
+  }
 
-    // ── Aftaletekster ───────────────────────────────────────────────────────
-    const AF = ['varenr', 'navn', 'servicetype', 'afdeling'];
-    let aftaler = [];                // [{ id, varenr, navn, servicetype, afdeling }]
-    let nyAftale = null;             // række under oprettelse
+  return rows.map(mapAftale)
+    .sort((a, b) =>
+      a.varenr.localeCompare(b.varenr, "da", { numeric: true }) ||
+      a.servicetype.localeCompare(b.servicetype, "da") ||
+      a.afdeling.localeCompare(b.afdeling, "da"));
+}
 
-    async function loadAftaler() {
-      const j = await api('aftaletekster');
-      aftaler = j.items || [];
-      renderAftaler();
-    }
+async function createAftale(input) {
+  const body = aftaleBody(input);
+  if (!Object.values(body).some(Boolean)) {
+    throw Object.assign(new Error("Udfyld mindst ét felt"), { status: 400 });
+  }
+  body.cr1eb_lch_name = aftaleKey();
+  const set = await entitySet(T.aftaletekst);
+  const created = await dvFetch(set, { method: "POST", body, headers: { Prefer: "return=representation" } });
+  return mapAftale(created || {});
+}
 
-    function aftaleRow(a, isNew) {
-      return `<tr data-id="${esc(a.id || '')}"${isNew ? ' class="dirty"' : ''}>
-        ${AF.map(f => `<td><input type="text" data-f="${f}" value="${esc(a[f] || '')}" maxlength="400"></td>`).join('')}
-        <td class="rowBtns">
-          <button type="button" class="btn primary" data-act="save"${isNew ? '' : ' disabled'}>Gem</button>
-          <button type="button" class="btn ${isNew ? '' : 'danger'}" data-act="${isNew ? 'cancel' : 'delete'}">${isNew ? 'Annuller' : 'Slet'}</button>
-        </td>
-      </tr>`;
-    }
+async function updateAftale(id, input) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(id || ""))) throw Object.assign(new Error("Ugyldigt id"), { status: 400 });
+  const set = await entitySet(T.aftaletekst);
+  await dvFetch(`${set}(${id})`, { method: "PATCH", body: aftaleBody(input) });
+}
 
-    function renderAftaler() {
-      const q = document.getElementById('aftaleSearch').value.trim().toLowerCase();
-      const list = aftaler.filter(a => !q || AF.map(f => a[f]).join(' ').toLowerCase().includes(q));
-      const tb = document.getElementById('aftaleBody');
-      tb.innerHTML = (nyAftale ? aftaleRow(nyAftale, true) : '') +
-        (list.map(a => aftaleRow(a, false)).join('') ||
-         (nyAftale ? '' : `<tr><td colspan="5" class="muted">${q ? 'Ingen match' : 'Ingen aftaletekster endnu'}</td></tr>`));
+async function deleteAftale(id) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(id || ""))) throw Object.assign(new Error("Ugyldigt id"), { status: 400 });
+  const set = await entitySet(T.aftaletekst);
+  await dvFetch(`${set}(${id})`, { method: "DELETE" });
+}
 
-      tb.querySelectorAll('tr[data-id]').forEach(tr => {
-        const isNew = !tr.dataset.id;
-        const saveBtn = tr.querySelector('[data-act=save]');
-        tr.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
-          tr.classList.add('dirty'); saveBtn.disabled = false;
-        }));
-        tr.querySelectorAll('input').forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter') saveBtn.click(); }));
-        saveBtn.onclick = () => saveAftale(tr, isNew);
-        const other = tr.querySelector('[data-act=delete],[data-act=cancel]');
-        other.onclick = () => isNew ? (nyAftale = null, renderAftaler()) : deleteAftale(tr.dataset.id);
-      });
-      if (nyAftale) tb.querySelector('tr.dirty input')?.focus();
-    }
-
-    function rowValues(tr) {
-      const o = {};
-      tr.querySelectorAll('input[data-f]').forEach(inp => { o[inp.dataset.f] = inp.value.trim(); });
-      return o;
-    }
-
-    async function saveAftale(tr, isNew) {
-      const v = rowValues(tr);
-      if (!v.varenr && !v.navn) { setMsg('aftaleMsg', 'Udfyld mindst varenr. eller navn', 'err'); return; }
-      tr.querySelectorAll('button').forEach(b => b.disabled = true);
-      setMsg('aftaleMsg', 'Gemmer…');
-      try {
-        if (isNew) {
-          await api('aftaletekster', { method: 'POST', body: v });
-          nyAftale = null;
-        } else {
-          await api('aftaletekster', { method: 'PATCH', id: tr.dataset.id, body: v });
-        }
-        await loadAftaler();
-        setMsg('aftaleMsg', 'Gemt ✓', 'ok');
-      } catch (e) {
-        setMsg('aftaleMsg', 'Fejl: ' + e.message, 'err');
-        tr.querySelectorAll('button').forEach(b => b.disabled = false);
-      }
-    }
-
-    async function deleteAftale(id) {
-      const a = aftaler.find(x => x.id === id);
-      if (!confirm(`Slet aftaleteksten "${a?.navn || a?.varenr || ''}"?`)) return;
-      setMsg('aftaleMsg', 'Sletter…');
-      try {
-        await api('aftaletekster', { method: 'DELETE', id });
-        await loadAftaler();
-        setMsg('aftaleMsg', 'Slettet ✓', 'ok');
-      } catch (e) {
-        setMsg('aftaleMsg', 'Fejl: ' + e.message, 'err');
-      }
-    }
-
-    document.getElementById('btnNyAftale').onclick = () => {
-      if (nyAftale) return;
-      nyAftale = { varenr: '', navn: '', servicetype: '', afdeling: '' };
-      renderAftaler();
-    };
-    document.getElementById('aftaleSearch').oninput = renderAftaler;
-
-    // ── Start ───────────────────────────────────────────────────────────────
-    (async function init() {
-      initUser();
-      try {
-        const me = await api('me');
-        if (!me.admin) { setStatus('', ''); document.getElementById('noAccess').hidden = false; return; }
-      } catch (e) {
-        setStatus('error', 'Fejl: ' + esc(e.message)); return;
-      }
-      setStatus('', '');
-      document.getElementById('adminWrap').hidden = false;
-      loadKontrakter().catch(e => {
-        document.getElementById('farveBody').innerHTML = `<tr><td colspan="5" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;
-      });
-      loadAftaler().catch(e => {
-        document.getElementById('aftaleBody').innerHTML = `<tr><td colspan="5" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;
-      });
-    })();
-  </script>
-</body>
-</html>
+module.exports = {
+  ADMIN_ROLES, isKundelisteAdmin,
+  loadFarver, kontraktTyper, saveFarve,
+  listAftaler, createAftale, updateAftale, deleteAftale
+};
