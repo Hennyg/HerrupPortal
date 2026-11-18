@@ -20,6 +20,7 @@
 .aiPasteZone { margin-top:.75rem; padding:.85rem 1rem; min-height:2.9rem; border:2px dashed #d1d5db; border-radius:9px; background:#fafafa; color:transparent; caret-color:transparent; cursor:pointer; outline:none; overflow:hidden; white-space:nowrap; transition:border-color .15s, background .15s; }
 .aiPasteZone:empty::before { content:attr(data-placeholder); color:#6b7280; font-size:.92rem; white-space:normal; pointer-events:none; }
 .aiPasteZone:focus { border-color:var(--nav-accent); background:#fff; }
+.aiPasteZone.is-dragover { border-color:var(--nav-accent); border-style:solid; background:#fef2f2; }
 .aiPasteZone.is-flash { border-color:#16a34a; background:#f0fdf4; }
 .aiImagePreview { display:flex; flex-wrap:wrap; gap:.65rem; margin-top:.75rem; }
 .aiThumb { position:relative; width:110px; height:86px; border:1px solid #e5e7eb; border-radius:9px; overflow:hidden; background:#f3f4f6; }

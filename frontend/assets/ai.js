@@ -1112,12 +1112,50 @@
         setTimeout(() => pasteZone.classList.remove("is-flash"), 600);
       }
     });
-    // Ingen tekst må skrives eller trækkes ind i feltet
+    // Ingen tekst må skrives i feltet
     pasteZone.addEventListener("beforeinput", e => {
-      if (e.inputType !== "insertFromPaste") e.preventDefault();
+      if (e.inputType !== "insertFromPaste" && e.inputType !== "insertFromDrop") e.preventDefault();
     });
-    pasteZone.addEventListener("drop", e => e.preventDefault());
     pasteZone.addEventListener("input", () => { pasteZone.innerHTML = ""; });
+
+    // Drag-and-drop af billedfiler (fra Stifinder, skrivebordet m.m.)
+    let dragDepth = 0;
+    const hasFiles = e => Array.from(e.dataTransfer?.types || []).includes("Files");
+
+    pasteZone.addEventListener("dragenter", e => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth++;
+      pasteZone.classList.add("is-dragover");
+    });
+    pasteZone.addEventListener("dragover", e => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = hasFiles(e) ? "copy" : "none";
+    });
+    pasteZone.addEventListener("dragleave", () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (!dragDepth) pasteZone.classList.remove("is-dragover");
+    });
+    pasteZone.addEventListener("drop", async e => {
+      e.preventDefault();
+      dragDepth = 0;
+      pasteZone.classList.remove("is-dragover");
+      const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/"));
+      if (!files.length) {
+        setStatus("Det du trak ind, er ikke et billede. Brug \"Tilføj dokument\" til andre filer.");
+        return;
+      }
+      if (await addImageFiles(files)) {
+        setStatus(files.length === 1 ? "Billede tilføjet." : `${files.length} billeder tilføjet.`);
+        pasteZone.classList.add("is-flash");
+        setTimeout(() => pasteZone.classList.remove("is-flash"), 600);
+      }
+    });
+
+    // Slipper man et billede ved siden af feltet, må browseren ikke åbne
+    // det i stedet for siden
+    window.addEventListener("dragover", e => { if (hasFiles(e)) e.preventDefault(); });
+    window.addEventListener("drop", e => { if (hasFiles(e) && !pasteZone.contains(e.target)) e.preventDefault(); });
   }
 
   // Paste i tekstfeltet: et rent billede (fx skærmklip) bliver vedhæftet.
