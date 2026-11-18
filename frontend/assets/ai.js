@@ -1030,19 +1030,106 @@
     }
   }
 
-  imageInput.addEventListener("change", async () => {
-    const files = Array.from(imageInput.files || []);
+  /* ================= Billeder: vælg fil eller indsæt (paste) ================= */
+
+  // Store billeder (fx skærmbilleder fra en 4K-skærm) skaleres ned til JPEG,
+  // så de holder sig under grænsen i stedet for at blive afvist.
+  function shrinkImage(file, maxSide = 2048, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Billedet kunne ikke læses")); };
+      img.src = url;
+    });
+  }
+
+  let pastedImageSeq = 0;
+
+  async function addImageFiles(files, fromPaste = false) {
+    let added = 0;
     for (const file of files) {
-      if (images.length >= MAX_IMAGES) break;
-      if (!file.type.startsWith("image/")) continue;
-      if (file.size > MAX_FILE_BYTES) {
-        setStatus(`${file.name} er større end 4 MB.`);
-        continue;
+      if (!file || !file.type.startsWith("image/")) continue;
+      if (images.length >= MAX_IMAGES) {
+        setStatus(`Du kan højst tilføje ${MAX_IMAGES} billeder.`);
+        break;
       }
-      images.push({ name: file.name, dataUrl: await fileToDataUrl(file) });
+      const name = fromPaste
+        ? `Indsat billede ${++pastedImageSeq}.${(file.type.split("/")[1] || "png").replace("jpeg", "jpg")}`
+        : file.name;
+      try {
+        let dataUrl = file.size > MAX_FILE_BYTES ? await shrinkImage(file) : await fileToDataUrl(file);
+        if (dataUrl.length > MAX_FILE_BYTES * 1.37) dataUrl = await shrinkImage(file, 1600, 0.75);
+        images.push({ name, dataUrl });
+        added++;
+      } catch (err) {
+        setStatus(`${name}: ${err.message || err}`);
+      }
     }
+    if (added) {
+      renderImages();
+      if (fromPaste) setStatus(added === 1 ? "Billede indsat." : `${added} billeder indsat.`);
+    }
+    return added;
+  }
+
+  function imageFilesFromClipboard(e) {
+    const items = Array.from(e.clipboardData?.items || []);
+    return items
+      .filter(item => item.kind === "file" && item.type.startsWith("image/"))
+      .map(item => item.getAsFile())
+      .filter(Boolean);
+  }
+
+  imageInput.addEventListener("change", async () => {
+    await addImageFiles(Array.from(imageInput.files || []));
     imageInput.value = "";
-    renderImages();
+  });
+
+  // Indsæt-feltet: tager kun imod billeder og forbliver altid tomt
+  const pasteZone = document.getElementById("aiPasteZone");
+  if (pasteZone) {
+    pasteZone.addEventListener("paste", async e => {
+      e.preventDefault();
+      const files = imageFilesFromClipboard(e);
+      if (!files.length) {
+        setStatus("Udklipsholderen indeholder ikke et billede.");
+        return;
+      }
+      if (await addImageFiles(files, true)) {
+        pasteZone.classList.add("is-flash");
+        setTimeout(() => pasteZone.classList.remove("is-flash"), 600);
+      }
+    });
+    // Ingen tekst må skrives eller trækkes ind i feltet
+    pasteZone.addEventListener("beforeinput", e => {
+      if (e.inputType !== "insertFromPaste") e.preventDefault();
+    });
+    pasteZone.addEventListener("drop", e => e.preventDefault());
+    pasteZone.addEventListener("input", () => { pasteZone.innerHTML = ""; });
+  }
+
+  // Paste i tekstfeltet: et rent billede (fx skærmklip) bliver vedhæftet.
+  // Indeholder udklipsholderen også tekst (fx kopieret fra Word), indsættes
+  // teksten som normalt.
+  prompt.addEventListener("paste", async e => {
+    const files = imageFilesFromClipboard(e);
+    if (!files.length) return;
+    const hasText = (e.clipboardData.getData("text/plain") || "").trim().length > 0;
+    if (hasText) return;
+    e.preventDefault();
+    await addImageFiles(files, true);
   });
 
   docInput.addEventListener("change", async () => {
