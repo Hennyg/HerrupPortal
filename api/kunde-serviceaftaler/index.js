@@ -1,5 +1,7 @@
 // api/kunde-serviceaftaler/index.js
-// GET /api/kunde-serviceaftaler → { items: [{ kundenr, varenr, servicetype, afdeling, startdato, enddato, note }] }
+// GET /api/kunde-serviceaftaler[?kundenr=<nr>]
+//   → { items: [{ kundenr, varenr, servicetype, afdeling, startdato, enddato, note }] }
+//   Uden kundenr = alle (kundelisten), med kundenr = kun den kunde (kunde.html).
 // Alle serviceaftaler (lch_serviceaftaler + aftaletekst) til kundelistens
 // serviceaftale-kolonner. Kan læses af alle indloggede; oprettelse sker via
 // /api/kundeliste-admin (kun admin). Caches 1 min.
@@ -16,7 +18,9 @@ module.exports = async function (context, req) {
       const items = (await A.listServiceaftaler()).map(({ id, ...rest }) => rest);
       cache = { at: Date.now(), items };
     }
-    return N.json(context, 200, { items: cache.items });
+    const nr = String(req.query.kundenr || "").trim();
+    const items = nr ? cache.items.filter(a => String(a.kundenr).trim() === nr) : cache.items;
+    return N.json(context, 200, { items });
   } catch (e) {
     context.log("kunde-serviceaftaler ERROR:", e.message);
     return N.json(context, 500, { error: e.message, items: [] });

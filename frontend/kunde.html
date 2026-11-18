@@ -113,6 +113,39 @@
     #prodDetailView[hidden], #prodListView[hidden] { display:none; }
     #prodListView { flex:1; min-height:0; display:flex; flex-direction:column; }
 
+    /* Anden række tiles: Kontrakter + Serviceaftaler */
+    .detailGrid.detailGrid2 { grid-template-columns:1fr 1fr; }
+    @media (max-width: 900px) { .detailGrid.detailGrid2 { grid-template-columns:1fr; } }
+    /* Kontrakt-"piller" med farverne fra kundeliste_admin.html */
+    .kChip { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; font-weight:600;
+             margin:0 0 0 6px; border:1px solid rgba(0,0,0,.08); white-space:nowrap; background:#eef0f2; color:#333; vertical-align:1px; }
+    .kChip.first { margin-left:0; }
+    .kChip.none { background:#fff; color:#9ca3af; border-style:dashed; font-weight:400; }
+    /* Produkter-tile: trekant ved forskellige kontrakter */
+    .pcToggle { border:0; background:none; cursor:pointer; padding:0 4px 0 0; color:#6b7280; font-size:12px; width:16px; transition:transform .15s; }
+    .pcToggle.open { transform:rotate(90deg); }
+    .pcName { display:flex; align-items:center; flex-wrap:wrap; gap:2px; }
+    .pcName.clickable { cursor:pointer; }
+    .pcIndent { display:inline-block; width:16px; }
+    .productCountTable tr.pcSub td { background:#fafafa; padding:6px 0 8px 20px; text-align:left !important; font-weight:400 !important; }
+    .pcK { display:flex; align-items:baseline; gap:8px; margin:3px 0; font-size:13px; }
+    .pcK .kChip { margin-left:0; }
+    .pcK .pcAnt { font-weight:700; }
+    .pcSn { font-size:12px; color:#6b7280; overflow-wrap:anywhere; }
+    /* Kontrakter-tile */
+    .kTable { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+    .kTable td { border-bottom:1px solid #eee; padding:6px 0; vertical-align:top; }
+    .kTable td.num { text-align:right; font-weight:700; white-space:nowrap; }
+    .kTable .kProd { font-size:12px; color:#6b7280; margin-top:2px; }
+    /* Serviceaftaler-tile */
+    .saTable { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+    .saTable th { text-align:left; color:#6b7280; font-weight:600; font-size:12px; padding:4px 6px 4px 0; border-bottom:1px solid #e5e7eb; }
+    .saTable td { border-bottom:1px solid #eee; padding:6px 6px 6px 0; vertical-align:top; }
+    .saTable tr.udlobet td { color:#9ca3af; }
+    .saType { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; background:#e0f2fe; color:#075985; white-space:nowrap; }
+    .saTable tr.udlobet .saType { background:#f3f4f6; color:#9ca3af; text-decoration:line-through; }
+    .saNote { font-size:12px; color:#6b7280; }
+
     /* Produkter med "xx" i installationsdato = ikke aktive */
     .dataTable tr.inactiveXX td { color:#b91c1c; background:#fef2f2; }
     .dataTable tr.inactiveXX:hover td { background:#fde8e8; }
@@ -142,6 +175,10 @@
       <div class="panel"><h2>Kunde</h2><div id="kundeInfo"></div></div>
       <div class="panel"><h2>Adresser</h2><div id="adresseInfo"></div></div>
       <div class="panel"><div class="panelTitleLine"><h2>Produkter</h2><span id="produktTopCounts" class="muted small"></span></div><div id="produktInfo"></div></div>
+    </div>
+    <div class="detailGrid detailGrid2">
+      <div class="panel"><div class="panelTitleLine"><h2>Kontrakter</h2><span id="kontraktTopCounts" class="muted small"></span></div><div id="kontraktInfo"></div></div>
+      <div class="panel"><div class="panelTitleLine"><h2>Serviceaftaler</h2><span id="saTopCounts" class="muted small"></span></div><div id="saInfo"><p class="muted">Henter…</p></div></div>
     </div>
   </section>
 </main>
@@ -265,6 +302,8 @@ async function load(){
  state = { kunde:j.kunde, adresser:j.adresser||[], produkter:j.produkter||[], selectedAdresseKey:'' };
  setStatus('',''); document.getElementById('content').style.display='block'; render();
  loadSalmonella(j.kunde?.chr, j.adresser || []);
+ loadKontraktFarver().then(render);
+ loadServiceaftaler(j.kunde?.kundenr || kundenr);
  if (snFilter || openProductsOnLoad) openProdukter();
 }
 
@@ -386,6 +425,7 @@ function render(){
  document.getElementById('adresseInfo').innerHTML = renderAdresser(adresser);
  document.getElementById('produktTopCounts').innerHTML = `Aktive: ${activeCount}${xxCount ? ` · <span style="color:#b91c1c">Ikke aktive: ${xxCount}</span>` : ''}`;
  document.getElementById('produktInfo').innerHTML = renderProduktCounts(visibleProducts);
+ document.getElementById('kontraktInfo').innerHTML = renderKontrakter(visibleProducts);
  addrMap = Object.fromEntries(adresser.map(a=>[a.adressekey, addressText(a)]));
  renderProductTable(visibleProducts);
 }
@@ -447,10 +487,124 @@ function salAdrLegend(adresser){
   </div>`;
 }
 
+// ── Kontraktfarver (styres på kundeliste_admin.html) ──
+let kontraktFarver = {};
+async function loadKontraktFarver(){
+  try {
+    const r = await fetch('/api/kontrakt-farver', { cache:'no-store' });
+    const j = await r.json();
+    kontraktFarver = Object.fromEntries(Object.entries(j.farver || {}).map(([k, v]) => [k.toLowerCase(), v]));
+  } catch { kontraktFarver = {}; }
+}
+function textOn(hex){
+  const n = parseInt(String(hex).slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.6 ? '#111827' : '#ffffff';
+}
+function kChip(name, extraCls = ''){
+  if (!name) return `<span class="kChip none ${extraCls}">Ingen kontrakt</span>`;
+  const c = kontraktFarver[String(name).toLowerCase()];
+  return `<span class="kChip ${extraCls}"${c ? ` style="background:${c};color:${textOn(c)}"` : ''}>${esc(name)}</span>`;
+}
+
+// ── Produkter-tile ──
+// Samme kontrakt på alle produkter af en slags → kontrakten står efter navnet.
+// Forskellige kontrakter → trekant til venstre, der folder kontrakterne ud
+// med antal og serienumre.
+const openProd = new Set();          // udfoldede produktgrupper
+let lastTileProducts = [];
+function toggleProd(key){
+  openProd.has(key) ? openProd.delete(key) : openProd.add(key);
+  document.getElementById('produktInfo').innerHTML = renderProduktCounts(lastTileProducts);
+}
+
 function renderProduktCounts(products){
-  const counts = countByProduct(products);
-  if (!counts.length) return '<p class="muted">Ingen produkter</p>';
-  return `<table class="productCountTable">${counts.map(c=>`<tr class="${c.xx?'inactiveXX':''}"><td>${esc(c.name)}</td><td>${c.count}</td></tr>`).join('')}</table>`;
+  lastTileProducts = products;
+  const groups = new Map();
+  for (const p of products) {
+    const name = p.produkt || p.navn || 'Ukendt produkt';
+    const key = `${name}|${isXX(p) ? 1 : 0}`;
+    if (!groups.has(key)) groups.set(key, { key, name, xx:isXX(p), items:[] });
+    groups.get(key).items.push(p);
+  }
+  const list = [...groups.values()].sort((a,b)=>a.name.localeCompare(b.name,'da') || (a.xx - b.xx));
+  if (!list.length) return '<p class="muted">Ingen produkter</p>';
+
+  return `<table class="productCountTable">${list.map(g => {
+    const byK = new Map();
+    for (const p of g.items) {
+      const k = String(p.kontrakt || '').trim();
+      if (!byK.has(k)) byK.set(k, []);
+      byK.get(k).push(p);
+    }
+    const kontrakter = [...byK.entries()].sort((a,b)=>b[1].length - a[1].length || a[0].localeCompare(b[0],'da'));
+    const multi = kontrakter.length > 1;
+    const open = multi && openProd.has(g.key);
+    const single = !multi && kontrakter[0][0] ? kChip(kontrakter[0][0]) : '';
+    const toggle = multi
+      ? `<button type="button" class="pcToggle${open ? ' open' : ''}" title="Vis kontrakter og serienumre">▶</button>`
+      : '<span class="pcIndent"></span>';
+    const click = multi ? ` onclick="toggleProd('${escAttr(g.key)}')"` : '';
+    const nameCell = `<td><div class="pcName${multi ? ' clickable' : ''}"${click}>${toggle}${esc(g.name)}${single}${multi && !open ? `<span class="muted small" style="margin-left:6px">${kontrakter.length} kontrakter</span>` : ''}</div></td>`;
+    const sub = open ? `<tr class="pcSub"><td colspan="2">${kontrakter.map(([k, items]) => {
+      const sn = items.map(p => p.serienr).filter(Boolean);
+      return `<div class="pcK">${kChip(k, 'first')}<span class="pcAnt">${items.length}</span></div>${sn.length ? `<div class="pcSn">S/N: ${sn.map(esc).join(', ')}</div>` : ''}`;
+    }).join('')}</td></tr>` : '';
+    return `<tr class="${g.xx ? 'inactiveXX' : ''}">${nameCell}<td>${g.items.length}</td></tr>${sub}`;
+  }).join('')}</table>`;
+}
+
+// ── Kontrakter-tile: antal produkter pr. kontrakttype ──
+function renderKontrakter(products){
+  const byK = new Map();
+  for (const p of products) {
+    const k = String(p.kontrakt || '').trim();
+    if (!byK.has(k)) byK.set(k, []);
+    byK.get(k).push(p);
+  }
+  // Uden kontrakt sidst, ellers flest produkter først
+  const list = [...byK.entries()].sort((a,b)=>(!a[0]) - (!b[0]) || b[1].length - a[1].length || a[0].localeCompare(b[0],'da'));
+  const typer = list.filter(([k]) => k).length;
+  document.getElementById('kontraktTopCounts').textContent = typer ? `${typer} type${typer === 1 ? '' : 'r'}` : '';
+  if (!list.length) return '<p class="muted">Ingen produkter</p>';
+  return `<table class="kTable">${list.map(([k, items]) => {
+    const navne = new Map();
+    items.forEach(p => { const n = p.produkt || p.navn || 'Ukendt'; navne.set(n, (navne.get(n) || 0) + 1); });
+    return `<tr><td>${kChip(k, 'first')}<div class="kProd">${[...navne.entries()].map(([n, c]) => `${esc(n)} × ${c}`).join(' · ')}</div></td><td class="num">${items.length}</td></tr>`;
+  }).join('')}</table>`;
+}
+
+// ── Serviceaftaler-tile ──
+let kundeSa = { state:'loading', items:[] };
+async function loadServiceaftaler(nr){
+  try {
+    const r = await fetch('/api/kunde-serviceaftaler?kundenr=' + encodeURIComponent(nr), { cache:'no-store' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    kundeSa = { state:'ok', items:(j.items || []).sort((a,b)=>(b.startdato || '').localeCompare(a.startdato || '')) };
+  } catch (e) {
+    kundeSa = { state:'error', items:[], error:e.message };
+  }
+  renderServiceaftaler();
+}
+function renderServiceaftaler(){
+  const el = document.getElementById('saInfo');
+  const top = document.getElementById('saTopCounts');
+  if (kundeSa.state === 'loading') { el.innerHTML = '<p class="muted">Henter…</p>'; return; }
+  if (kundeSa.state === 'error') { el.innerHTML = `<p class="muted">Kunne ikke hente serviceaftaler: ${esc(kundeSa.error)}</p>`; top.textContent = ''; return; }
+  const today = new Date().toISOString().slice(0, 10);
+  const udl = a => !!a.enddato && a.enddato < today;
+  const aktive = kundeSa.items.filter(a => !udl(a)).length;
+  top.textContent = kundeSa.items.length ? `Aktive: ${aktive}${kundeSa.items.length > aktive ? ` · Udløbet: ${kundeSa.items.length - aktive}` : ''}` : '';
+  if (!kundeSa.items.length) { el.innerHTML = '<p class="muted">Ingen serviceaftaler</p>'; return; }
+  el.innerHTML = `<table class="saTable"><tr><th>Aftale</th><th>Varenr.</th><th>Afdeling</th><th>Start</th><th>Slut</th></tr>${kundeSa.items.map(a => `
+    <tr class="${udl(a) ? 'udlobet' : ''}"${udl(a) ? ' title="Udløbet"' : ''}>
+      <td><span class="saType">${esc(a.servicetype || 'Aftale')}</span>${a.note ? `<div class="saNote">${esc(a.note)}</div>` : ''}</td>
+      <td>${esc(a.varenr)}</td>
+      <td>${esc(a.afdeling)}</td>
+      <td style="white-space:nowrap">${esc(dateText(a.startdato))}</td>
+      <td style="white-space:nowrap">${esc(dateText(a.enddato))}</td>
+    </tr>`).join('')}</table>`;
 }
 
 // ── Produkttabel: visning, filtre og sortering ──────────────────────────────
@@ -617,6 +771,3 @@ load();
 </script>
 </body>
 </html>
-
-
-
