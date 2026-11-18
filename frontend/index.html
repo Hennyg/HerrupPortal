@@ -57,6 +57,27 @@
     .helpFoot { margin-top:1rem; color:#6b7280; font-size:.9rem; }
     body.helpLocked { overflow:hidden; }
 
+    /* ── Status: personlige oplysninger (under nyheder) ──────────────────── */
+    .heroCenter { display:flex; flex-direction:column; gap:.5rem; min-width:0; }
+    .profileStatus {
+      display:flex; align-items:center; gap:.85rem; text-decoration:none; color:inherit;
+      border:1px solid #e5e7eb; border-radius:10px; background:#fff; padding:.55rem .9rem;
+    }
+    .profileStatus:hover { background:#f9fafb; }
+    .profileStatus[hidden] { display:none; }
+    .psMain { flex:1; min-width:0; }
+    .psText { font-size:.88rem; color:#374151; }
+    .psText b { color:#111827; }
+    .psBar { height:7px; border-radius:99px; background:#f3f4f6; overflow:hidden; margin-top:.35rem; }
+    .psBar > span { display:block; height:100%; background:#16a34a; border-radius:99px; transition:width .6s ease; }
+    .psMe { font-size:.8rem; font-weight:700; white-space:nowrap; padding:.3rem .6rem; border-radius:99px; }
+    .psMe.ok { color:#166534; background:#dcfce7; }
+    .psMe.todo { color:#fff; background:#850c18; }
+    @media (max-width:520px) {
+      .profileStatus { flex-direction:column; align-items:stretch; gap:.45rem; }
+      .psMe { align-self:flex-start; }
+    }
+
     @media (max-width:640px) {
       .helpBackdrop { padding:0; align-items:stretch; }
       .helpModal { width:100%; max-height:none; height:100%; border-radius:0; }
@@ -91,6 +112,7 @@
 <div class="container">
 <div class="hero">
 <div id="primaryBoxLeft" class="primaryBox"></div>
+<div class="heroCenter">
 <div class="newsTile" id="newsTile">
 <button type="button" class="newsArrow off" id="newsPrev" aria-label="Forrige nyhed" title="Forrige">&#8249;</button>
 <div class="newsTileBody">
@@ -98,6 +120,9 @@
 <div class="muted" id="newsTip" style="text-align:center">Din hub til Web Apps, favoritter og værktøjer</div>
 </div>
 <button type="button" class="newsArrow off" id="newsNext" aria-label="Næste nyhed" title="Næste">&#8250;</button>
+</div>
+<!-- Status: hvor mange har udfyldt personlige oplysninger (fyldes af /api/private-status) -->
+<a class="profileStatus" id="profileStatus" href="/herrup.html?person=me&amp;tab=privat" hidden></a>
 </div>
 <div id="primaryBoxRight" class="primaryBox"></div>
 </div>
@@ -222,6 +247,46 @@
 <script src="/assets/app.js?v=20261002-stat"></script>
 
 <script>
+// ── Status: personlige oplysninger ───────────────────────────────────────────
+// Viser hvor mange der har udfyldt privat adresse, privat telefon og
+// nødkontakter – og om man selv mangler. Klik åbner egne oplysninger.
+(async function profileStatus() {
+  const el = document.getElementById("profileStatus");
+  if (!el) return;
+  try {
+    const r = await fetch("/api/private-status", { cache: "no-store" });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.total) return;
+
+    const pct = Math.round((d.complete / d.total) * 100);
+    const missing = [];
+    if (d.me && !d.me.adresse) missing.push("adresse");
+    if (d.me && !d.me.telefon) missing.push("telefon");
+    if (d.me && !d.me.noed) missing.push("nødkontakt");
+
+    let meHtml = "";
+    if (d.me?.member) {
+      meHtml = d.me.complete
+        ? `<span class="psMe ok" title="Du har udfyldt dine oplysninger">✓ Du er med</span>`
+        : `<span class="psMe todo" title="Du mangler: ${missing.join(", ")}">Udfyld dine →</span>`;
+    }
+
+    el.innerHTML = `
+      <div class="psMain">
+        <div class="psText">📋 <b>${d.complete} af ${d.total}</b> har udfyldt deres personlige oplysninger (${pct} %)</div>
+        <div class="psBar" role="progressbar" aria-valuemin="0" aria-valuemax="${d.total}" aria-valuenow="${d.complete}"
+             aria-label="${d.complete} af ${d.total} har udfyldt"><span style="width:0%"></span></div>
+      </div>
+      ${meHtml}`;
+    el.title = "Privat adresse, privat telefon og nødkontakter – klik for at se eller udfylde dine egne";
+    el.hidden = false;
+    requestAnimationFrame(() => { el.querySelector(".psBar > span").style.width = pct + "%"; });
+  } catch {
+    // Status er kun til information – ingen fejl på forsiden
+  }
+})();
+
 // Hent medarbejderliste og vagt/ferieplan i baggrunden, når forsiden er
 // tegnet, så søgefeltet på Personaleliste-tile'n og herrup.html kan bruge
 // lokale data uden at vente.
