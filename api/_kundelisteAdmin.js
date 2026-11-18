@@ -6,6 +6,7 @@
 // Alle tabeller ligger i Kundeliste-miljøet (KL_DV_URL) – samme som kunder/produkter.
 
 const N = require("./_news");
+const crypto = require("crypto");
 const { dvFetch, fetchAll } = require("./_dvKunde");
 
 const ADMIN_ROLES = ["portal_admin", "portal_kundeliste_admin"];
@@ -100,12 +101,19 @@ async function saveFarve(kontrakt, farve) {
 }
 
 // ── Aftaletekster ───────────────────────────────────────────────────────────
+// cr1eb_lch_name (primær kolonne) er kun en teknisk nøgle. Den udfyldes
+// automatisk ved oprettelse og vises/rettes ikke af brugeren.
 const AFTALE_FIELDS = {
   varenr:      "cr1eb_lch_varenr",
-  navn:        "cr1eb_lch_name",
   servicetype: "cr1eb_lch_servicetype",
   afdeling:    "cr1eb_lch_afdeling"
 };
+
+// Fx "AT-20261118-3f9a2c" – unik og læsbar i Dataverse
+function aftaleKey() {
+  const d = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return `AT-${d}-${crypto.randomBytes(3).toString("hex")}`;
+}
 
 function mapAftale(r) {
   const o = { id: r[T.aftaletekst.id] };
@@ -123,16 +131,29 @@ function aftaleBody(input) {
 
 async function listAftaler() {
   const set = await entitySet(T.aftaletekst);
-  const rows = await fetchAll(`${set}?$select=${[T.aftaletekst.id, ...Object.values(AFTALE_FIELDS)].join(",")}`);
+  const rows = await fetchAll(`${set}?$select=${[T.aftaletekst.id, "cr1eb_lch_name", ...Object.values(AFTALE_FIELDS)].join(",")}`);
+
+  // Rækker uden nøgle (fx oprettet før lch_name blev automatisk) får en nu.
+  // Fejler det, vises listen alligevel.
+  for (const r of rows.filter(r => !String(r.cr1eb_lch_name || "").trim())) {
+    try {
+      await dvFetch(`${set}(${r[T.aftaletekst.id]})`, { method: "PATCH", body: { cr1eb_lch_name: aftaleKey() } });
+    } catch { /* ignoreres */ }
+  }
+
   return rows.map(mapAftale)
-    .sort((a, b) => a.varenr.localeCompare(b.varenr, "da", { numeric: true }) || a.navn.localeCompare(b.navn, "da"));
+    .sort((a, b) =>
+      a.varenr.localeCompare(b.varenr, "da", { numeric: true }) ||
+      a.servicetype.localeCompare(b.servicetype, "da") ||
+      a.afdeling.localeCompare(b.afdeling, "da"));
 }
 
 async function createAftale(input) {
   const body = aftaleBody(input);
-  if (!body.cr1eb_lch_varenr && !body.cr1eb_lch_name) {
-    throw Object.assign(new Error("Udfyld mindst varenr. eller navn"), { status: 400 });
+  if (!Object.values(body).some(Boolean)) {
+    throw Object.assign(new Error("Udfyld mindst ét felt"), { status: 400 });
   }
+  body.cr1eb_lch_name = aftaleKey();
   const set = await entitySet(T.aftaletekst);
   const created = await dvFetch(set, { method: "POST", body, headers: { Prefer: "return=representation" } });
   return mapAftale(created || {});
