@@ -3,6 +3,7 @@
 //   - adgangstjek (portal_admin / portal_kundeliste_admin)
 //   - kontraktfarver  (tabel lch_serviceaftaler_kontraktfarve)
 //   - aftaletekster   (tabel lch_serviceaftaler_aftalertekst)
+//   - serviceaftaler  (tabel lch_serviceaftaler) – oprettes fra kundeliste2.html
 // Alle tabeller ligger i Kundeliste-miljøet (KL_DV_URL) – samme som kunder/produkter.
 
 const N = require("./_news");
@@ -24,8 +25,16 @@ const T = {
     set:     "cr1eb_lch_serviceaftaler_aftalerteksts",
     id:      "cr1eb_lch_serviceaftaler_aftalertekstid"
   },
+  serviceaftale: {
+    logical: "cr1eb_lch_serviceaftaler",
+    set:     "cr1eb_lch_serviceaftalers",
+    id:      "cr1eb_lch_serviceaftalerid"
+  },
   produkt: { set: "cr1eb_lch_kundeprodukts" }
 };
+
+// Navigationsegenskab for opslaget lch_vareopslag (→ aftaletekst)
+const VAREOPSLAG_NAV = "cr1eb_lch_vareopslag";
 
 const setCache = new Map();
 async function entitySet(t) {
@@ -110,10 +119,11 @@ const AFTALE_FIELDS = {
 };
 
 // Fx "AT-20261118-3f9a2c" – unik og læsbar i Dataverse
-function aftaleKey() {
+function makeKey(prefix) {
   const d = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  return `AT-${d}-${crypto.randomBytes(3).toString("hex")}`;
+  return `${prefix}-${d}-${crypto.randomBytes(3).toString("hex")}`;
 }
+const aftaleKey = () => makeKey("AT");
 
 function mapAftale(r) {
   const o = { id: r[T.aftaletekst.id] };
@@ -171,8 +181,86 @@ async function deleteAftale(id) {
   await dvFetch(`${set}(${id})`, { method: "DELETE" });
 }
 
+// ── Serviceaftaler (pr. kunde) ──────────────────────────────────────────────
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const bad = msg => Object.assign(new Error(msg), { status: 400 });
+
+async function listServiceaftaler(kundenr) {
+  kundenr = String(kundenr || "").trim();
+  if (!kundenr) throw bad("Kundenr. mangler");
+  const set = await entitySet(T.serviceaftale);
+  const filter = encodeURIComponent(`cr1eb_lch_kundenr eq '${kundenr.replace(/'/g, "''")}'`);
+  const sel = [T.serviceaftale.id, "cr1eb_lch_kundenr", "cr1eb_lch_varenr", "cr1eb_lch_startdato",
+               "cr1eb_lch_enddato", "cr1eb_lch_note", `_${VAREOPSLAG_NAV}_value`].join(",");
+  const rows = await fetchAll(`${set}?$select=${sel}&$filter=${filter}`);
+
+  // Vis servicetype/afdeling fra aftaleteksten
+  const tekster = new Map((await listAftaler()).map(a => [a.id, a]));
+  return rows.map(r => {
+    const a = tekster.get(r[`_${VAREOPSLAG_NAV}_value`]) || null;
+    return {
+      id: r[T.serviceaftale.id],
+      kundenr: r.cr1eb_lch_kundenr || "",
+      varenr: r.cr1eb_lch_varenr || a?.varenr || "",
+      servicetype: a?.servicetype || "",
+      afdeling: a?.afdeling || "",
+      startdato: String(r.cr1eb_lch_startdato || "").slice(0, 10),
+      enddato: String(r.cr1eb_lch_enddato || "").slice(0, 10),
+      note: r.cr1eb_lch_note || ""
+    };
+  }).sort((a, b) => (b.startdato || "").localeCompare(a.startdato || ""));
+}
+
+// Dato-kolonnerne kan være "kun dato" (Edm.Date) eller "dato og klokkeslæt"
+// (Edm.DateTimeOffset). Vi prøver først kun dato; afviser Dataverse det,
+// sendes kl. 12:00 UTC, så datoen ikke flytter sig pga. tidszone.
+async function postWithDates(set, body, dateFields) {
+  try {
+    return await dvFetch(set, { method: "POST", body, headers: { Prefer: "return=representation" } });
+  } catch (e) {
+    if (e.status !== 400 || !dateFields.some(f => body[f])) throw e;
+    const b2 = { ...body };
+    for (const f of dateFields) if (b2[f]) b2[f] = `${b2[f]}T12:00:00Z`;
+    return await dvFetch(set, { method: "POST", body: b2, headers: { Prefer: "return=representation" } });
+  }
+}
+
+async function createServiceaftale(input) {
+  const kundenr   = String(input?.kundenr || "").trim();
+  const aftaleId  = String(input?.aftaleId || "").trim();
+  const startdato = String(input?.startdato || "").trim();
+  const enddato   = String(input?.enddato || "").trim();
+  const note      = String(input?.note || "").trim().slice(0, 2000);
+
+  if (!kundenr) throw bad("Vælg en kunde");
+  if (!GUID.test(aftaleId)) throw bad("Vælg en aftale");
+  if (startdato && !ISO_DATE.test(startdato)) throw bad("Ugyldig startdato");
+  if (enddato && !ISO_DATE.test(enddato)) throw bad("Ugyldig slutdato");
+  if (startdato && enddato && enddato < startdato) throw bad("Slutdato ligger før startdato");
+
+  const aftale = (await listAftaler()).find(a => a.id === aftaleId);
+  if (!aftale) throw bad("Aftaleteksten findes ikke");
+
+  const set = await entitySet(T.serviceaftale);
+  const tekstSet = await entitySet(T.aftaletekst);
+  const body = {
+    cr1eb_lch_name: makeKey("SA"),
+    cr1eb_lch_kundenr: kundenr,
+    cr1eb_lch_varenr: aftale.varenr,
+    [`${VAREOPSLAG_NAV}@odata.bind`]: `/${tekstSet}(${aftaleId})`
+  };
+  if (startdato) body.cr1eb_lch_startdato = startdato;
+  if (enddato)   body.cr1eb_lch_enddato = enddato;
+  if (note)      body.cr1eb_lch_note = note;
+
+  const created = await postWithDates(set, body, ["cr1eb_lch_startdato", "cr1eb_lch_enddato"]);
+  return { id: created?.[T.serviceaftale.id] || null };
+}
+
 module.exports = {
   ADMIN_ROLES, isKundelisteAdmin,
   loadFarver, kontraktTyper, saveFarve,
-  listAftaler, createAftale, updateAftale, deleteAftale
+  listAftaler, createAftale, updateAftale, deleteAftale,
+  listServiceaftaler, createServiceaftale
 };

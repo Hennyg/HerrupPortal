@@ -8,6 +8,8 @@
 //   POST   ?action=aftaletekster           body { varenr, navn, servicetype, afdeling }
 //   PATCH  ?action=aftaletekster&id=<guid> body { ...felter der ændres }
 //   DELETE ?action=aftaletekster&id=<guid>
+//   GET    ?action=serviceaftaler&kundenr=<nr> → { items: [...] }
+//   POST   ?action=serviceaftaler          body { kundenr, aftaleId, startdato, enddato, note }
 
 const N = require("../_news");
 const A = require("../_kundelisteAdmin");
@@ -53,6 +55,12 @@ module.exports = async function (context, req) {
       if (method === "POST")   return N.json(context, 200, { item: await A.createAftale(req.body || {}) });
       if (method === "PATCH")  { await A.updateAftale(id, req.body || {}); return N.json(context, 200, { ok: true }); }
       if (method === "DELETE") { await A.deleteAftale(id); return N.json(context, 200, { ok: true }); }
+    }
+
+    // ── Serviceaftaler ──
+    if (action === "serviceaftaler") {
+      if (method === "GET")  return N.json(context, 200, { items: await A.listServiceaftaler(req.query.kundenr) });
+      if (method === "POST") return N.json(context, 200, await A.createServiceaftale(req.body || {}));
     }
 
     return N.json(context, 400, { error: `Ukendt handling: ${method} ${action || "(ingen)"}` });

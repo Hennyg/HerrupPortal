@@ -17,7 +17,7 @@
       font:inherit; font-size:13px; font-weight:400; background:#fff; cursor:text;
     }
     .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
-    /* Knap: kun kunder med produkter, hvor installationsdato er xx-xx-xxxx */
+    /* Knap "Projekt": kun kunder med produkter, hvor installationsdato er xx-xx-xxxx */
     #btnSal.active { background:#fee2e2; border-color:#dc2626; color:#991b1b; font-weight:700; }
     #btnXX.active { background:#fdf2f2; border-color:var(--red); color:var(--red); font-weight:700; }
     /* Salmonella på mindst én af kundens adresser */
@@ -35,6 +35,36 @@
     @media (max-width: 640px) {
       .navExtra { display: none !important; }
     }
+    /* Admin-linje under navbar */
+    .adminBar { flex:0 0 auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff;
+                border-bottom:1px solid var(--border); padding:8px 12px; }
+    .adminBar[hidden] { display:none; }
+    .adminBarLabel { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+    /* Popup: opret serviceaftale */
+    .saBackdrop { position:fixed; inset:0; z-index:200; background:rgba(17,24,39,.5); display:flex; align-items:center; justify-content:center; padding:16px; }
+    .saBackdrop[hidden] { display:none; }
+    .saModal { background:#fff; border-radius:12px; width:min(640px, 100%); max-height:92vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.3); }
+    .saHead { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:4px solid var(--red); }
+    .saHead h2 { margin:0; font-size:18px; }
+    .saClose { border:0; background:none; font-size:26px; line-height:1; cursor:pointer; color:#6b7280; }
+    .saBody { padding:14px 18px; overflow:auto; display:grid; gap:12px; }
+    .saBody label { display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:4px; }
+    .saBody input, .saBody select, .saBody textarea { width:100%; height:36px; border:1px solid #d1d5db; border-radius:8px; padding:0 10px; font:inherit; font-size:14px; background:#fff; }
+    .saBody textarea { height:70px; padding:8px 10px; resize:vertical; }
+    .saBody input:focus, .saBody select:focus, .saBody textarea:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
+    .saRow2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .saKundeNavn { font-size:13px; margin-top:4px; min-height:1em; }
+    .saExisting { border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:#fafafa; font-size:13px; }
+    .saExisting table { width:100%; border-collapse:collapse; }
+    .saExisting td, .saExisting th { padding:4px 6px; text-align:left; border-bottom:1px solid #eee; }
+    .saExisting tr { cursor:default; }
+    .saFoot { display:flex; align-items:center; gap:10px; padding:12px 18px; border-top:1px solid var(--border); }
+    .saFoot .msg { flex:1; font-size:13px; }
+    .saFoot .msg.ok { color:#15803d; } .saFoot .msg.err { color:#991b1b; }
+    .btn.primary { background:var(--red); border-color:var(--red); color:#fff; }
+    .btn.primary:hover { background:var(--red-dark); }
+    .btn:disabled { opacity:.5; cursor:default; }
+    @media (max-width:560px) { .saRow2 { grid-template-columns:1fr; } }
     /* Kontrakt: én farvet "pille" pr. kontrakttype (farver styres på kundeliste_admin.html) */
     .kChip { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600;
              margin:1px 4px 1px 0; border:1px solid rgba(0,0,0,.08); white-space:nowrap; background:#eef0f2; color:#333; }
@@ -58,6 +88,12 @@
   </div>
   <div class="nav-accent"></div>
 </div>
+  <!-- Admin-linje: kun portal_admin / portal_kundeliste_admin -->
+  <div class="adminBar" id="adminBar" hidden>
+    <span class="adminBarLabel">Admin</span>
+    <button type="button" class="btn" id="btnServiceaftaler">＋ Serviceaftaler</button>
+  </div>
+
   <main class="pageWrap">
     <section class="toolbar">
       <input id="q" type="search" placeholder="Søg kundenr, navn, postnr., område, status, kontrakt – eller serienr. for at gå til produktet" style="min-width:320px" autocomplete="off" />
@@ -68,7 +104,7 @@
         <option value="flereadresser">Flere adresser</option>
       </select>
       <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
-      <button type="button" class="btn" id="btnXX" title="Vis kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (fx planlagte projekter, der ikke er aktive endnu)">xx-xx-xxxx</button>
+      <button type="button" class="btn" id="btnXX" title="Vis kun projekter: kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (planlagte projekter, der ikke er aktive endnu)">Projekt</button>
       <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
       <div class="toolbarSpacer"></div>
       <div id="countText" class="muted small"></div>
@@ -78,7 +114,7 @@
     <div class="listLegend">
       <span id="activeFilter" class="activeFilter" hidden></span>
       <span><span class="lg lgSal"></span>Rød baggrund på kundenr. = salmonella (ikke "Fri") på mindst én af kundens adresser. Hold musen over for CHR-nr. <span id="salStatus" class="muted"></span></span>
-      <span><b>xx-xx-xxxx</b> = kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (markeres ikke i listen)</span>
+      <span><b>Projekt</b> = kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (markeres ikke i listen)</span>
     </div>
     <div id="status" class="status loading"><div class="spinner"></div> Henter kunder...</div>
     <section class="tableWrap">
@@ -95,10 +131,46 @@
       </table>
     </section>
   </main>
+
+  <!-- Popup: ny serviceaftale -->
+  <div class="saBackdrop" id="saBackdrop" hidden>
+    <div class="saModal" role="dialog" aria-modal="true" aria-labelledby="saTitle">
+      <div class="saHead">
+        <h2 id="saTitle">Ny serviceaftale</h2>
+        <button type="button" class="saClose" id="saClose" aria-label="Luk">×</button>
+      </div>
+      <div class="saBody">
+        <div>
+          <label for="saKunde">Kunde</label>
+          <input id="saKunde" list="saKundeList" placeholder="Skriv kundenr. eller navn…" autocomplete="off" />
+          <datalist id="saKundeList"></datalist>
+          <div class="saKundeNavn muted" id="saKundeNavn"></div>
+        </div>
+        <div>
+          <label for="saAftale">Aftale</label>
+          <select id="saAftale"><option value="">Henter aftaletekster…</option></select>
+        </div>
+        <div class="saRow2">
+          <div><label for="saStart">Startdato</label><input type="date" id="saStart" /></div>
+          <div><label for="saSlut">Slutdato</label><input type="date" id="saSlut" /></div>
+        </div>
+        <div>
+          <label for="saNote">Note</label>
+          <textarea id="saNote" maxlength="2000"></textarea>
+        </div>
+        <div class="saExisting" id="saExisting" hidden></div>
+      </div>
+      <div class="saFoot">
+        <span class="msg" id="saMsg"></span>
+        <button type="button" class="btn" id="saCancel">Luk</button>
+        <button type="button" class="btn primary" id="saSave">Opret</button>
+      </div>
+    </div>
+  </div>
   <script src="/assets/kundeliste/common.js"></script>
   <script>
     let rows = [], filtered = [], sortKey = 'navn', sortDir = 1;
-    let onlyXX = false;            // knappen "xx-xx-xxxx"
+    let onlyXX = false;            // knappen "Projekt" (installationsdato xx-xx-xxxx)
     let onlySal = false;           // knappen "Salmonella"
     let salOk = true;              // kunne salmonella hentes?
     const FILTER_COLS = ['kundenr', 'navn', 'omraade', 'kundestatus', 'kontrakt'];
@@ -108,7 +180,11 @@
     // Admin-link i navbar: kun portal_admin / portal_kundeliste_admin
     fetch('/api/kundeliste-admin?action=me', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
-      .then(j => { if (j?.admin) document.getElementById('adminNavLink').hidden = false; })
+      .then(j => {
+        if (!j?.admin) return;
+        document.getElementById('adminNavLink').hidden = false;
+        document.getElementById('adminBar').hidden = false;
+      })
       .catch(() => {});
     document.getElementById('btnRefresh').onclick = load;
     document.getElementById('q').oninput = () => { syncUrlState(); render(); scheduleSnJump(); };
@@ -318,7 +394,7 @@
       document.getElementById('btnXX').classList.toggle('active', onlyXX);
       document.getElementById('btnSal').classList.toggle('active', onlySal);
       // Vis i den grå linje, hvilken filtrering der er aktiv
-      const aktive = [onlySal ? 'Salmonella' : '', onlyXX ? 'xx-xx-xxxx i inst.dato' : ''].filter(Boolean);
+      const aktive = [onlySal ? 'Salmonella' : '', onlyXX ? 'Projekt' : ''].filter(Boolean);
       const af = document.getElementById('activeFilter');
       af.hidden = !aktive.length;
       af.textContent = aktive.length ? `Aktiv filtrering: ${aktive.join(' + ')}` : '';
@@ -338,6 +414,109 @@
       </tr>`;
       }).join('') || '<tr><td colspan="6" class="muted">Ingen kunder</td></tr>';
     }
+    // ── Serviceaftaler: popup til at oprette records i lch_serviceaftaler ──
+    const SA_API = '/api/kundeliste-admin';
+    let saAftaler = null;            // aftaletekster (hentes første gang)
+    let saKundenr = '';
+
+    async function saApi(qs, opts = {}) {
+      const r = await fetch(`${SA_API}?${qs}`, { cache: 'no-store', ...opts });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      return j;
+    }
+    function saMsg(text, cls = '') { const el = document.getElementById('saMsg'); el.className = 'msg ' + cls; el.textContent = text; }
+
+    // "12345 – Kundenavn" → kunden (eller et rent kundenr.)
+    function saFindKunde(v) {
+      v = String(v || '').trim();
+      if (!v) return null;
+      const nr = v.split(' – ')[0].trim().toLowerCase();
+      return rows.find(k => String(k.kundenr).toLowerCase() === nr) || null;
+    }
+
+    async function saOpen() {
+      document.getElementById('saBackdrop').hidden = false;
+      saMsg('');
+      document.getElementById('saKundeList').innerHTML = rows
+        .map(k => `<option value="${esc(k.kundenr)} – ${esc(k.navn)}"></option>`).join('');
+      document.getElementById('saKunde').focus();
+      if (!saAftaler) {
+        try {
+          saAftaler = (await saApi('action=aftaletekster')).items || [];
+        } catch (e) { saMsg('Kunne ikke hente aftaletekster: ' + e.message, 'err'); return; }
+      }
+      const sel = document.getElementById('saAftale');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Vælg aftale…</option>' + saAftaler.map(a =>
+        `<option value="${esc(a.id)}">${esc([a.varenr, a.servicetype, a.afdeling].filter(Boolean).join(' · ') || '(tom)')}</option>`).join('');
+      sel.value = cur;
+    }
+    function saClose() { document.getElementById('saBackdrop').hidden = true; }
+
+    async function saShowExisting() {
+      const box = document.getElementById('saExisting');
+      if (!saKundenr) { box.hidden = true; return; }
+      box.hidden = false;
+      box.innerHTML = '<span class="muted">Henter kundens serviceaftaler…</span>';
+      try {
+        const items = (await saApi(`action=serviceaftaler&kundenr=${encodeURIComponent(saKundenr)}`)).items || [];
+        box.innerHTML = items.length
+          ? `<b>Kundens serviceaftaler (${items.length})</b><table><tr><th>Varenr.</th><th>Servicetype</th><th>Start</th><th>Slut</th></tr>${
+              items.map(a => `<tr><td>${esc(a.varenr)}</td><td>${esc(a.servicetype)}</td><td>${fmtDate(a.startdato)}</td><td>${fmtDate(a.enddato)}</td></tr>`).join('')}</table>`
+          : '<span class="muted">Kunden har ingen serviceaftaler endnu.</span>';
+      } catch (e) {
+        box.innerHTML = `<span class="muted">Kunne ikke hente kundens aftaler: ${esc(e.message)}</span>`;
+      }
+    }
+
+    document.getElementById('btnServiceaftaler').onclick = saOpen;
+    document.getElementById('saClose').onclick = saClose;
+    document.getElementById('saCancel').onclick = saClose;
+    document.getElementById('saBackdrop').addEventListener('click', e => { if (e.target.id === 'saBackdrop') saClose(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('saBackdrop').hidden) saClose(); });
+
+    document.getElementById('saKunde').addEventListener('input', () => {
+      const k = saFindKunde(document.getElementById('saKunde').value);
+      const nr = k ? k.kundenr : '';
+      document.getElementById('saKundeNavn').textContent = k ? `${k.navn}${k.omraade ? ' · ' + k.omraade : ''}` : '';
+      if (nr !== saKundenr) { saKundenr = nr; saShowExisting(); }
+    });
+
+    document.getElementById('saSave').onclick = async () => {
+      const k = saFindKunde(document.getElementById('saKunde').value);
+      const body = {
+        kundenr: k ? k.kundenr : '',
+        aftaleId: document.getElementById('saAftale').value,
+        startdato: document.getElementById('saStart').value,
+        enddato: document.getElementById('saSlut').value,
+        note: document.getElementById('saNote').value.trim()
+      };
+      if (!body.kundenr) { saMsg('Vælg en kunde fra listen', 'err'); return; }
+      if (!body.aftaleId) { saMsg('Vælg en aftale', 'err'); return; }
+      if (body.startdato && body.enddato && body.enddato < body.startdato) { saMsg('Slutdato ligger før startdato', 'err'); return; }
+
+      const btn = document.getElementById('saSave');
+      btn.disabled = true;
+      saMsg('Opretter…');
+      try {
+        await saApi('action=serviceaftaler', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        saMsg('Serviceaftalen er oprettet ✓', 'ok');
+        // Klar til næste aftale på samme kunde
+        document.getElementById('saAftale').value = '';
+        document.getElementById('saNote').value = '';
+        saShowExisting();
+      } catch (e) {
+        saMsg('Fejl: ' + e.message, 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
     load().catch(e => setStatus('error', e.message));
   </script>
 </body>
