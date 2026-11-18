@@ -131,6 +131,7 @@
       <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
       <div class="toolbarSpacer"></div>
       <div id="countText" class="muted small"></div>
+      <button type="button" id="btnEksport" title="Udskriv, kopiér eller hent de viste kunder som Excel – med valgfri kolonner, produkter og options">🖨️ Udskriv liste</button>
       <button id="btnRefresh">Opdater</button>
     </section>
     <div class="snHint" id="snHint" hidden></div>
@@ -819,5 +820,8 @@
 
     load().catch(e => setStatus('error', e.message));
   </script>
+  <script src="/assets/kundeliste/udstyr.js"></script>
+  <script src="/assets/kundeliste/eksport.js"></script>
+  <script>document.getElementById('btnEksport').onclick = () => openEksport();</script>
 </body>
 </html>
