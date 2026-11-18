@@ -62,13 +62,15 @@
     .saHead { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:4px solid var(--red); }
     .saHead h2 { margin:0; font-size:18px; }
     .saClose { border:0; background:none; font-size:26px; line-height:1; cursor:pointer; color:#6b7280; }
-    .saBody { padding:14px 18px; overflow:auto; display:grid; gap:12px; }
-    .saBody label { display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:4px; }
-    .saBody input, .saBody select, .saBody textarea { width:100%; height:36px; border:1px solid #d1d5db; border-radius:8px; padding:0 10px; font:inherit; font-size:14px; background:#fff; }
-    .saBody textarea { height:70px; padding:8px 10px; resize:vertical; }
+    .saBody { padding:10px 18px; overflow:auto; display:grid; gap:6px; align-content:start; }
+    .saBody label { display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:2px; }
+    .saBody input, .saBody select, .saBody textarea { width:100%; height:32px; border:1px solid #d1d5db; border-radius:7px; padding:0 9px; font:inherit; font-size:14px; background:#fff; }
+    .saBody textarea { height:48px; padding:6px 9px; resize:vertical; }
+    .saBody .saHint { font-size:12px; margin-top:2px; }
     .saBody input:focus, .saBody select:focus, .saBody textarea:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
-    .saRow2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-    .saKundeNavn { font-size:13px; margin-top:4px; min-height:1em; }
+    .saRow2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .saRow2 > [hidden] { display:none; }
+    .saKundeNavn { font-size:12px; margin-top:2px; min-height:1em; }
     .saExisting { border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:#fafafa; font-size:13px; }
     .saExisting table { width:100%; border-collapse:collapse; }
     .saExisting td, .saExisting th { padding:4px 6px; text-align:left; border-bottom:1px solid #eee; }
@@ -185,7 +187,10 @@
           </div>
           <div class="saRow2">
             <div><label for="saStart">Startdato</label><input type="date" id="saStart" /></div>
-            <div><label for="saSlut">Slutdato</label><input type="date" id="saSlut" /></div>
+            <div id="saSlutWrap" hidden>
+              <label for="saSlut">Slutdato</label><input type="date" id="saSlut" />
+              <div class="saHint muted" id="saSlutHint"></div>
+            </div>
           </div>
           <div>
             <label for="saNote">Note</label>
@@ -537,8 +542,38 @@
       const sel = document.getElementById('saAftale');
       const cur = sel.value;
       sel.innerHTML = '<option value="">Vælg aftale…</option>' + saAftaler.map(a =>
-        `<option value="${esc(a.id)}">${esc([a.varenr, a.servicetype, a.afdeling].filter(Boolean).join(' · ') || '(tom)')}</option>`).join('');
+        `<option value="${esc(a.id)}">${esc([a.varenr, a.servicetype, a.afdeling, a.varighed !== '' ? `${a.varighed} år` : ''].filter(Boolean).join(' · ') || '(tom)')}</option>`).join('');
       sel.value = cur;
+      saUpdateSlut();
+    }
+
+    // ── Slutdato ud fra aftalens varighed (antal år) ──
+    // Tom varighed → slutdato skjules og sendes ikke.
+    // Ellers: startdato + varighed × 12 måneder (kan rettes bagefter).
+    function saAddYears(iso, years) {
+      const [y, m, d] = iso.split('-').map(Number);
+      const ty = y + years;
+      const last = new Date(Date.UTC(ty, m, 0)).getUTCDate();
+      return `${ty}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+    }
+    function saValgtAftale() {
+      const id = document.getElementById('saAftale').value;
+      return (saAftaler || []).find(a => a.id === id) || null;
+    }
+    function saUpdateSlut() {
+      const a = saValgtAftale();
+      const wrap = document.getElementById('saSlutWrap');
+      const slut = document.getElementById('saSlut');
+      const hint = document.getElementById('saSlutHint');
+      const v = a && a.varighed !== '' ? Number(a.varighed) : null;
+      if (v === null || !Number.isFinite(v)) {
+        wrap.hidden = true; slut.value = ''; hint.textContent = '';
+        return;
+      }
+      wrap.hidden = false;
+      const start = document.getElementById('saStart').value;
+      if (start) slut.value = saAddYears(start, v);
+      hint.textContent = `${v} år${v ? ` (${v * 12} mdr.)` : ''} efter startdato`;
     }
 
     function saShowExisting() {
@@ -560,6 +595,9 @@
     document.getElementById('saBackdrop').addEventListener('click', e => { if (e.target.id === 'saBackdrop') saClose(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('saBackdrop').hidden) saClose(); });
 
+    document.getElementById('saAftale').addEventListener('change', saUpdateSlut);
+    document.getElementById('saStart').addEventListener('change', saUpdateSlut);
+
     document.getElementById('saKunde').addEventListener('input', () => {
       const k = saFindKunde(document.getElementById('saKunde').value);
       const nr = k ? k.kundenr : '';
@@ -573,7 +611,7 @@
         kundenr: k ? k.kundenr : '',
         aftaleId: document.getElementById('saAftale').value,
         startdato: document.getElementById('saStart').value,
-        enddato: document.getElementById('saSlut').value,
+        enddato: document.getElementById('saSlutWrap').hidden ? '' : document.getElementById('saSlut').value,
         note: document.getElementById('saNote').value.trim()
       };
       if (!body.kundenr) { saMsg('Vælg en kunde fra listen', 'err'); return; }
@@ -596,6 +634,7 @@
         // Klar til næste aftale på samme kunde
         document.getElementById('saAftale').value = '';
         document.getElementById('saNote').value = '';
+        saUpdateSlut();
       } catch (e) {
         saMsg('Fejl: ' + e.message, 'err');
       } finally {

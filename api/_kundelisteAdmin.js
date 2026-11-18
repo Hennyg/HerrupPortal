@@ -115,8 +115,33 @@ async function saveFarve(kontrakt, farve) {
 const AFTALE_FIELDS = {
   varenr:      "cr1eb_lch_varenr",
   servicetype: "cr1eb_lch_servicetype",
-  afdeling:    "cr1eb_lch_afdeling"
+  afdeling:    "cr1eb_lch_afdeling",
+  varighed:    "cr1eb_lch_varighed"     // antal år aftalen løber (tom = ingen slutdato)
 };
+const VARIGHED_FIELD = AFTALE_FIELDS.varighed;
+
+// lch_varighed kan være oprettet som tal eller tekst. Typen slås op i
+// metadata én gang, så vi sender værdien i det format, kolonnen forventer.
+let varighedIsText = null;
+async function varighedErTekst() {
+  if (varighedIsText !== null) return varighedIsText;
+  try {
+    const j = await dvFetch(`EntityDefinitions(LogicalName='${T.aftaletekst.logical}')/Attributes(LogicalName='${VARIGHED_FIELD}')?$select=AttributeType`);
+    varighedIsText = ["String", "Memo"].includes(j?.AttributeType);
+  } catch {
+    varighedIsText = false;   // antag heltal
+  }
+  return varighedIsText;
+}
+
+// "", "2", 2 → null eller heltal 0-50
+function parseVarighed(v) {
+  const s = String(v ?? "").trim().replace(",", ".");
+  if (!s) return null;
+  const n = Number(s);
+  if (!Number.isInteger(n) || n < 0 || n > 50) throw Object.assign(new Error("Varighed skal være et helt antal år (0-50)"), { status: 400 });
+  return n;
+}
 
 // Fx "AT-20261118-3f9a2c" – unik og læsbar i Dataverse
 function makeKey(prefix) {
@@ -127,14 +152,21 @@ const aftaleKey = () => makeKey("AT");
 
 function mapAftale(r) {
   const o = { id: r[T.aftaletekst.id] };
-  for (const [k, f] of Object.entries(AFTALE_FIELDS)) o[k] = r[f] || "";
+  for (const [k, f] of Object.entries(AFTALE_FIELDS)) o[k] = r[f] ?? "";
+  o.varighed = o.varighed === "" || o.varighed === null ? "" : String(o.varighed).trim();
   return o;
 }
 
-function aftaleBody(input) {
+async function aftaleBody(input) {
   const body = {};
   for (const [k, f] of Object.entries(AFTALE_FIELDS)) {
-    if (k in (input || {})) body[f] = String(input[k] ?? "").trim().slice(0, 400);
+    if (!(k in (input || {}))) continue;
+    if (k === "varighed") {
+      const n = parseVarighed(input[k]);
+      body[f] = n === null ? null : (await varighedErTekst() ? String(n) : n);
+    } else {
+      body[f] = String(input[k] ?? "").trim().slice(0, 400);
+    }
   }
   return body;
 }
@@ -159,8 +191,8 @@ async function listAftaler() {
 }
 
 async function createAftale(input) {
-  const body = aftaleBody(input);
-  if (!Object.values(body).some(Boolean)) {
+  const body = await aftaleBody(input);
+  if (!Object.values(body).some(v => v !== null && v !== "")) {
     throw Object.assign(new Error("Udfyld mindst ét felt"), { status: 400 });
   }
   body.cr1eb_lch_name = aftaleKey();
@@ -172,7 +204,7 @@ async function createAftale(input) {
 async function updateAftale(id, input) {
   if (!/^[0-9a-f-]{36}$/i.test(String(id || ""))) throw Object.assign(new Error("Ugyldigt id"), { status: 400 });
   const set = await entitySet(T.aftaletekst);
-  await dvFetch(`${set}(${id})`, { method: "PATCH", body: aftaleBody(input) });
+  await dvFetch(`${set}(${id})`, { method: "PATCH", body: await aftaleBody(input) });
 }
 
 async function deleteAftale(id) {
@@ -185,6 +217,14 @@ async function deleteAftale(id) {
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const bad = msg => Object.assign(new Error(msg), { status: 400 });
+
+// "2026-02-29" + 1 år → "2027-02-28" (sidste dag i måneden, hvis datoen ikke findes)
+function addYears(iso, years) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const ty = y + years;
+  const last = new Date(Date.UTC(ty, m, 0)).getUTCDate();
+  return `${ty}-${String(m).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
+}
 
 // Uden kundenr. hentes alle serviceaftaler
 async function listServiceaftaler(kundenr) {
@@ -230,7 +270,7 @@ async function createServiceaftale(input) {
   const kundenr   = String(input?.kundenr || "").trim();
   const aftaleId  = String(input?.aftaleId || "").trim();
   const startdato = String(input?.startdato || "").trim();
-  const enddato   = String(input?.enddato || "").trim();
+  let   enddato   = String(input?.enddato || "").trim();
   const note      = String(input?.note || "").trim().slice(0, 2000);
 
   if (!kundenr) throw bad("Vælg en kunde");
@@ -241,6 +281,12 @@ async function createServiceaftale(input) {
 
   const aftale = (await listAftaler()).find(a => a.id === aftaleId);
   if (!aftale) throw bad("Aftaleteksten findes ikke");
+
+  // Ingen varighed på aftalen → ingen slutdato. Har den varighed, og er der
+  // ingen slutdato med, beregnes den: startdato + varighed × 12 måneder.
+  const varighed = aftale.varighed === "" ? null : Number(aftale.varighed);
+  if (varighed === null || !Number.isFinite(varighed)) enddato = "";
+  else if (!enddato && startdato) enddato = addYears(startdato, varighed);
 
   const set = await entitySet(T.serviceaftale);
   const tekstSet = await entitySet(T.aftaletekst);

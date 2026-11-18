@@ -25,6 +25,8 @@
     .admTable tbody tr { cursor:default; }
     .admTable tr.dirty td { background:#fffbeb; }
     .admTable input[type=text] { width:100%; height:32px; border:1px solid #d1d5db; border-radius:6px; padding:0 8px; font:inherit; font-size:14px; }
+    .admTable input[type=number] { width:100%; height:32px; border:1px solid #d1d5db; border-radius:6px; padding:0 8px; font:inherit; font-size:14px; }
+    .admTable input[type=number]:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
     .admTable input[type=text]:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
     .admTable input[type=color] { width:44px; height:32px; padding:2px; border:1px solid #d1d5db; border-radius:6px; background:#fff; cursor:pointer; }
     .kChip { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600;
@@ -106,10 +108,10 @@
           <input type="search" id="aftaleSearch" class="search" placeholder="Søg varenr., servicetype, afdeling…" autocomplete="off" />
           <button type="button" class="btn primary" id="btnNyAftale">＋ Ny aftaletekst</button>
         </div>
-        <p class="muted">Tabellen <code>lch_serviceaftaler_aftalertekst</code>. Ret direkte i felterne og tryk Gem på rækken. Alle felter må være tomme, men mindst ét skal udfyldes.</p>
+        <p class="muted">Tabellen <code>lch_serviceaftaler_aftalertekst</code>. Ret direkte i felterne og tryk Gem på rækken. Alle felter må være tomme, men mindst ét skal udfyldes. <b>Varighed</b> er antal år aftalen løber – fx 1 giver slutdato 12 måneder efter startdato. Tom varighed = ingen slutdato.</p>
         <table class="admTable">
-          <thead><tr><th style="width:22%">Varenr.</th><th>Servicetype</th><th style="width:26%">Afdeling</th><th></th></tr></thead>
-          <tbody id="aftaleBody"><tr><td colspan="4" class="muted">Henter…</td></tr></tbody>
+          <thead><tr><th style="width:20%">Varenr.</th><th>Servicetype</th><th style="width:22%">Afdeling</th><th style="width:110px" title="Antal år aftalen løber. Tom = ingen slutdato">Varighed (år)</th><th></th></tr></thead>
+          <tbody id="aftaleBody"><tr><td colspan="5" class="muted">Henter…</td></tr></tbody>
         </table>
       </section>
       <!-- Kontraktfarver -->
@@ -274,8 +276,8 @@
     };
 
     // ── Aftaletekster ───────────────────────────────────────────────────────
-    const AF = ['varenr', 'servicetype', 'afdeling'];
-    let aftaler = [];                // [{ id, varenr, servicetype, afdeling }]
+    const AF = ['varenr', 'servicetype', 'afdeling', 'varighed'];
+    let aftaler = [];                // [{ id, varenr, servicetype, afdeling, varighed }]
     let nyAftale = null;             // række under oprettelse
 
     async function loadAftaler() {
@@ -286,7 +288,9 @@
 
     function aftaleRow(a, isNew) {
       return `<tr data-id="${esc(a.id || '')}"${isNew ? ' class="dirty"' : ''}>
-        ${AF.map(f => `<td><input type="text" data-f="${f}" value="${esc(a[f] || '')}" maxlength="400"></td>`).join('')}
+        ${AF.map(f => f === 'varighed'
+          ? `<td><input type="number" data-f="varighed" value="${esc(a.varighed ?? '')}" min="0" max="50" step="1" placeholder="–"></td>`
+          : `<td><input type="text" data-f="${f}" value="${esc(a[f] || '')}" maxlength="400"></td>`).join('')}
         <td class="rowBtns">
           <button type="button" class="btn primary" data-act="save"${isNew ? '' : ' disabled'}>Gem</button>
           <button type="button" class="btn ${isNew ? '' : 'danger'}" data-act="${isNew ? 'cancel' : 'delete'}">${isNew ? 'Annuller' : 'Slet'}</button>
@@ -300,7 +304,7 @@
       const tb = document.getElementById('aftaleBody');
       tb.innerHTML = (nyAftale ? aftaleRow(nyAftale, true) : '') +
         (list.map(a => aftaleRow(a, false)).join('') ||
-         (nyAftale ? '' : `<tr><td colspan="4" class="muted">${q ? 'Ingen match' : 'Ingen aftaletekster endnu'}</td></tr>`));
+         (nyAftale ? '' : `<tr><td colspan="5" class="muted">${q ? 'Ingen match' : 'Ingen aftaletekster endnu'}</td></tr>`));
 
       tb.querySelectorAll('tr[data-id]').forEach(tr => {
         const isNew = !tr.dataset.id;
@@ -325,6 +329,7 @@
     async function saveAftale(tr, isNew) {
       const v = rowValues(tr);
       if (!AF.some(f => v[f])) { setMsg('aftaleMsg', 'Udfyld mindst ét felt', 'err'); return; }
+      if (v.varighed && !/^\d{1,2}$/.test(v.varighed)) { setMsg('aftaleMsg', 'Varighed skal være et helt antal år', 'err'); return; }
       tr.querySelectorAll('button').forEach(b => b.disabled = true);
       setMsg('aftaleMsg', 'Gemmer…');
       try {
@@ -358,7 +363,7 @@
 
     document.getElementById('btnNyAftale').onclick = () => {
       if (nyAftale) return;
-      nyAftale = { varenr: '', servicetype: '', afdeling: '' };
+      nyAftale = { varenr: '', servicetype: '', afdeling: '', varighed: '' };
       renderAftaler();
     };
     document.getElementById('aftaleSearch').oninput = renderAftaler;
@@ -378,7 +383,7 @@
         document.getElementById('farveBody').innerHTML = `<tr><td colspan="5" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;
       });
       loadAftaler().catch(e => {
-        document.getElementById('aftaleBody').innerHTML = `<tr><td colspan="4" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;
+        document.getElementById('aftaleBody').innerHTML = `<tr><td colspan="5" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;
       });
     })();
   </script>
