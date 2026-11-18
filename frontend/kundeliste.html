@@ -48,6 +48,7 @@
       <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
       <span class="sep">|</span>
       <a class="navExtra" href="/importlog.html">Importlog</a>
+      <a class="navExtra" id="adminNavLink" href="/kundeliste_admin.html" hidden>Admin</a>
       <a href="/logout">Log ud</a>
     </div>
   </div>
@@ -100,6 +101,11 @@
     const colFilters = {}; // kolonne -> filtertekst (gemmes i URL'en som f_<kolonne>)
     restoreStateFromUrl();
     initUser();
+    // Admin-link i navbar: kun portal_admin / portal_kundeliste_admin
+    fetch('/api/kundeliste-admin?action=me', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.admin) document.getElementById('adminNavLink').hidden = false; })
+      .catch(() => {});
     document.getElementById('btnRefresh').onclick = load;
     document.getElementById('q').oninput = () => { syncUrlState(); render(); scheduleSnJump(); };
     // Enter: findes søgningen i serienumrene hos præcis én kunde, hoppes der til produktet

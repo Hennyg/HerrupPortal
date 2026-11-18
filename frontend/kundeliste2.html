@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <title>Kundeliste 2 (test)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/assets/kundeliste/app.css" />
+  <style>
+    #tbody tr.clickable-row {
+      cursor: pointer;
+    }
+    /* Filterfelt under hver kolonneoverskrift */
+    .dataTable thead th .colLabel { display:block; margin-bottom:6px; }
+    .dataTable thead th .colFilter {
+      width:100%; min-width:70px; box-sizing:border-box; height:30px;
+      border:1px solid #d1d5db; border-radius:6px; padding:0 8px;
+      font:inherit; font-size:13px; font-weight:400; background:#fff; cursor:text;
+    }
+    .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
+    /* Knap: kun kunder med produkter, hvor installationsdato er xx-xx-xxxx */
+    #btnSal.active { background:#fee2e2; border-color:#dc2626; color:#991b1b; font-weight:700; }
+    #btnXX.active { background:#fdf2f2; border-color:var(--red); color:var(--red); font-weight:700; }
+    /* Salmonella på mindst én af kundens adresser */
+    .dataTable td.kundenrSal { background:#fee2e2; color:#991b1b !important; font-weight:700; }
+    .listLegend { font-size:13px; color:#4b5563; margin:-4px 0 10px; display:flex; align-items:center; gap:6px 18px; flex-wrap:wrap; }
+    .listLegend .lg { display:inline-block; width:14px; height:14px; border-radius:3px; margin-right:6px; vertical-align:-3px; }
+    .listLegend .activeFilter { color:var(--red); font-weight:700; }
+    .listLegend .activeFilter[hidden] { display:none; }
+    .listLegend .lgSal { background:#fee2e2; border:1px solid #fca5a5; }
+    /* Søgning på serienummer: link direkte til produktet */
+    .snHint { display:flex; align-items:center; gap:6px 12px; flex-wrap:wrap; background:#fdf2f2; border:1px solid #f5c2c2;
+              border-radius:8px; padding:8px 12px; margin:0 0 10px; font-size:14px; }
+    .snHint[hidden] { display:none; }
+    .snHint a { color:var(--red); font-weight:600; }
+    @media (max-width: 640px) {
+      .navExtra { display: none !important; }
+    }
+    /* Kontrakt: én farvet "pille" pr. kontrakttype (farver styres på kundeliste_admin.html) */
+    .kChip { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600;
+             margin:1px 4px 1px 0; border:1px solid rgba(0,0,0,.08); white-space:nowrap; background:#eef0f2; color:#333; }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Kundeliste 2 <span style="font-size:.8rem;font-weight:400;opacity:.85">(test)</span></div>
+    </div>
+    <div class="nav">
+      <span id="userDisplay" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a class="navExtra" href="/kundeliste.html">Nuværende kundeliste</a>
+      <a class="navExtra" href="/importlog.html">Importlog</a>
+      <a class="navExtra" id="adminNavLink" href="/kundeliste_admin.html" hidden>Admin</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+  <main class="pageWrap">
+    <section class="toolbar">
+      <input id="q" type="search" placeholder="Søg kundenr, navn, postnr., område, status, kontrakt – eller serienr. for at gå til produktet" style="min-width:320px" autocomplete="off" />
+      <select id="aktiv">
+        <option value="true">Aktive</option>
+        <option value="">Alle</option>
+        <option value="false">Inaktive</option>
+        <option value="flereadresser">Flere adresser</option>
+      </select>
+      <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
+      <button type="button" class="btn" id="btnXX" title="Vis kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (fx planlagte projekter, der ikke er aktive endnu)">xx-xx-xxxx</button>
+      <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
+      <div class="toolbarSpacer"></div>
+      <div id="countText" class="muted small"></div>
+      <button id="btnRefresh">Opdater</button>
+    </section>
+    <div class="snHint" id="snHint" hidden></div>
+    <div class="listLegend">
+      <span id="activeFilter" class="activeFilter" hidden></span>
+      <span><span class="lg lgSal"></span>Rød baggrund på kundenr. = salmonella (ikke "Fri") på mindst én af kundens adresser. Hold musen over for CHR-nr. <span id="salStatus" class="muted"></span></span>
+      <span><b>xx-xx-xxxx</b> = kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (markeres ikke i listen)</span>
+    </div>
+    <div id="status" class="status loading"><div class="spinner"></div> Henter kunder...</div>
+    <section class="tableWrap">
+      <table class="dataTable">
+        <thead><tr>
+          <th class="sortable" data-sort="kundenr"><span class="colLabel">Kundenr.</span><input class="colFilter" type="search" data-col="kundenr" placeholder="Filtrér…" autocomplete="off"></th>
+          <th class="sortable" data-sort="navn"><span class="colLabel">Navn</span><input class="colFilter" type="search" data-col="navn" placeholder="Filtrér…" autocomplete="off"></th>
+          <th class="sortable" data-sort="omraade"><span class="colLabel">Område</span><input class="colFilter" type="search" data-col="omraade" placeholder="Filtrér…" autocomplete="off"></th>
+          <th class="sortable" data-sort="kundestatus"><span class="colLabel">Kundestatus</span><input class="colFilter" type="search" data-col="kundestatus" placeholder="Filtrér…" autocomplete="off"></th>
+          <th class="sortable" data-sort="kontrakt"><span class="colLabel">Kontrakt</span><input class="colFilter" type="search" data-col="kontrakt" placeholder="Filtrér…" autocomplete="off"></th>
+          <th style="vertical-align:bottom;"><button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button></th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </section>
+  </main>
+  <script src="/assets/kundeliste/common.js"></script>
+  <script>
+    let rows = [], filtered = [], sortKey = 'navn', sortDir = 1;
+    let onlyXX = false;            // knappen "xx-xx-xxxx"
+    let onlySal = false;           // knappen "Salmonella"
+    let salOk = true;              // kunne salmonella hentes?
+    const FILTER_COLS = ['kundenr', 'navn', 'omraade', 'kundestatus', 'kontrakt'];
+    const colFilters = {}; // kolonne -> filtertekst (gemmes i URL'en som f_<kolonne>)
+    restoreStateFromUrl();
+    initUser();
+    // Admin-link i navbar: kun portal_admin / portal_kundeliste_admin
+    fetch('/api/kundeliste-admin?action=me', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.admin) document.getElementById('adminNavLink').hidden = false; })
+      .catch(() => {});
+    document.getElementById('btnRefresh').onclick = load;
+    document.getElementById('q').oninput = () => { syncUrlState(); render(); scheduleSnJump(); };
+    // Enter: findes søgningen i serienumrene hos præcis én kunde, hoppes der til produktet
+    document.getElementById('q').addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const hits = snSearch(document.getElementById('q').value);
+      if (hits.length === 1) { e.preventDefault(); jumpToSn(hits[0]); }
+    });
+    document.getElementById('aktiv').onchange = () => { syncUrlState(); load(); };
+    document.getElementById('btnXX').onclick = () => { onlyXX = !onlyXX; syncUrlState(); render(); };
+    document.getElementById('btnSal').onclick = () => { onlySal = !onlySal; syncUrlState(); render(); };
+    document.querySelectorAll('.colFilter').forEach(inp => {
+      inp.value = colFilters[inp.dataset.col] || '';
+      inp.addEventListener('click', e => e.stopPropagation()); // klik i feltet må ikke sortere
+      inp.addEventListener('input', () => { colFilters[inp.dataset.col] = inp.value; syncUrlState(); render(); });
+    });
+    document.getElementById('btnClearFilters').onclick = () => {
+      FILTER_COLS.forEach(c => { delete colFilters[c]; });
+      document.querySelectorAll('.colFilter').forEach(i => { i.value = ''; });
+      syncUrlState(); render();
+    };
+    document.querySelectorAll('th.sortable').forEach(th => th.onclick = () => {
+      const nextKey = th.dataset.sort;
+      if (sortKey === nextKey) sortDir *= -1;
+      else { sortKey = nextKey; sortDir = 1; }
+      syncUrlState();
+      render();
+    });
+
+    function restoreStateFromUrl() {
+      const p = new URLSearchParams(location.search);
+      if (p.has('q')) document.getElementById('q').value = p.get('q');
+      if (p.has('aktiv')) document.getElementById('aktiv').value = p.get('aktiv');
+      if (p.has('sort')) sortKey = p.get('sort');
+      if (p.has('dir')) sortDir = p.get('dir') === '-1' ? -1 : 1;
+      onlyXX = p.get('xx') === '1';
+      onlySal = p.get('sal') === '1';
+      FILTER_COLS.forEach(c => { if (p.get('f_' + c)) colFilters[c] = p.get('f_' + c); });
+    }
+
+    function syncUrlState() {
+      const p = new URLSearchParams();
+      const q = document.getElementById('q').value;
+      const aktiv = document.getElementById('aktiv').value;
+      if (q) p.set('q', q);
+      if (aktiv !== 'true') p.set('aktiv', aktiv);
+      if (sortKey !== 'navn') p.set('sort', sortKey);
+      if (sortDir !== 1) p.set('dir', String(sortDir));
+      if (onlyXX) p.set('xx', '1');
+      if (onlySal) p.set('sal', '1');
+      FILTER_COLS.forEach(c => { if ((colFilters[c] || '').trim()) p.set('f_' + c, colFilters[c]); });
+      const qs = p.toString();
+      history.replaceState(null, '', qs ? `${location.pathname}?${qs}` : location.pathname);
+    }
+
+    // Farver til Kontrakt-kolonnen: { "<kontrakttype>": "#rrggbb" }
+    let kontraktFarver = {};
+    async function loadFarver() {
+      try {
+        const r = await fetch('/api/kontrakt-farver', { cache: 'no-store' });
+        const j = await r.json();
+        kontraktFarver = Object.fromEntries(Object.entries(j.farver || {}).map(([k, v]) => [k.toLowerCase(), v]));
+      } catch { kontraktFarver = {}; }
+    }
+    // Sort eller hvid tekst afhængigt af hvor lys baggrunden er
+    function textOn(hex) {
+      const n = parseInt(String(hex).slice(1), 16);
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? '#111827' : '#ffffff';
+    }
+    // Én pille pr. kontrakttype, flest produkter først
+    function kontraktChips(k) {
+      const typer = Object.entries(k.kontraktAntal || {}).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'da')).map(([n]) => n);
+      return typer.map(t => {
+        const c = kontraktFarver[t.toLowerCase()];
+        return `<span class="kChip"${c ? ` style="background:${c};color:${textOn(c)}"` : ''}>${esc(t)}</span>`;
+      }).join('');
+    }
+
+    async function load() {
+      setStatus('loading','<div class="spinner"></div> Henter kunder...');
+      await Promise.all([loadKunder(), loadLastImport(), loadFarver()]);
+      setStatus('', '');
+      render();
+    }
+
+    async function loadKunder() {
+      const aktiv = document.getElementById('aktiv').value;
+      const r = await fetch('/api/kunder?aktiv=' + encodeURIComponent(aktiv));
+      const j = await r.json();
+      if (!r.ok || j.error) throwStatus('Fejl: ' + esc(j.error || r.status));
+      rows = j.kunder || [];
+      // Salmonella kommer med kundelisten (k.salmonella = besætninger, der ikke er fri)
+      salOk = j.salmonellaOk !== false;
+      document.getElementById('salStatus').textContent = salOk ? '' : '(kunne ikke hentes lige nu)';
+    }
+
+    async function loadLastImport() {
+      const el = document.getElementById('lastImportText');
+      try {
+        const r = await fetch('/api/importlog');
+        const j = await r.json();
+        const latest = (j.logs || [])[0];
+        const txt = latest ? `Sidste import kørt: ${fmtDateTime(latest.starttid || latest.createdon)}` : 'Sidste import kørt: ingen log';
+        el.innerHTML = `<a class="link" href="/importlog.html" title="Se importlog">${esc(txt)}</a>`;
+      } catch {
+        el.textContent = 'Sidste import kørt: ukendt';
+      }
+    }
+
+    function throwStatus(msg) { setStatus('error', msg); throw new Error(msg); }
+    function setStatus(cls, html) { const el=document.getElementById('status'); el.className='status '+cls; el.innerHTML=html; el.style.display=html?'flex':'none'; }
+
+    function sortValue(row, key) {
+      if (key === 'aktiv') return row.aktiv ? '1' : '0';
+      return row[key] || '';
+    }
+
+    // Den tekst en kolonne filtreres på (samme som der vises)
+    function filterText(row, col) {
+      return String(row[col] || '');
+    }
+
+    // Tooltip: antal produkter pr. kontrakttype
+    function kontraktTitle(k) {
+      return Object.entries(k.kontraktAntal || {})
+        .sort((a, b) => b[1] - a[1])
+        .map(([n, c]) => `${n}: ${c} produkt${c === 1 ? '' : 'er'}`)
+        .join('\n');
+    }
+
+    function kundeUrl(kundenr, sn) {
+      return `/kunde.html?kundenr=${encodeURIComponent(kundenr)}${sn ? `&sn=${encodeURIComponent(sn)}` : ''}`;
+    }
+    function openKunde(kundenr) {
+      location.href = kundeUrl(kundenr);
+    }
+    const hasSal = k => Array.isArray(k.salmonella) && k.salmonella.length > 0;
+    function salTitle(k) {
+      return 'Salmonella på kundens adresse:\n' + k.salmonella.map(h => `CHR ${h.chr} · ${h.status} – ${h.adresse}`).join('\n');
+    }
+
+    // Kundesiden med produktlisten åben med det samme
+    function produktUrl(kundenr) {
+      return `/kunde.html?kundenr=${encodeURIComponent(kundenr)}&vis=produkter`;
+    }
+
+    // ── Søgning på serienummer ──────────────────────────────────────────────
+    // Serienumre filtrerer IKKE kundelisten. I stedet:
+    //  - søgningen er præcis et serienummer (fx indsat/scannet) → hop direkte
+    //    til produktlisten på kunde.html med kun det produkt (sn=...)
+    //  - Enter, og søgningen findes i serienumre hos præcis én kunde → hop
+    //  - ellers vises de fundne serienumre som links over listen
+    // Returnerer [{ k, sn, exact, count }], ét pr. kunde
+    function snSearch(raw) {
+      const q = String(raw || '').trim().toLowerCase();
+      if (q.length < 3) return [];
+      const hits = [];
+      for (const k of rows) {
+        const all = (k.serier || []).filter(s => String(s).toLowerCase().includes(q));
+        if (!all.length) continue;
+        const exact = all.find(s => String(s).toLowerCase() === q);
+        hits.push({ k, sn: exact || all[0], exact: !!exact, count: all.length });
+      }
+      return hits;
+    }
+
+    function jumpToSn(hit) {
+      if (!hit) return;
+      // Ryd søgningen i URL'en, så "Tilbage" viser hele kundelisten
+      document.getElementById('q').value = '';
+      syncUrlState();
+      location.href = kundeUrl(hit.k.kundenr, hit.sn);
+    }
+
+    let snJumpTimer = null;
+    function scheduleSnJump() {
+      clearTimeout(snJumpTimer);
+      snJumpTimer = setTimeout(() => {
+        const exact = snSearch(document.getElementById('q').value).filter(h => h.exact);
+        if (exact.length === 1) jumpToSn(exact[0]);
+      }, 500);
+    }
+
+    let snHits = [];
+    function renderSnHint() {
+      const el = document.getElementById('snHint');
+      snHits = snSearch(document.getElementById('q').value);
+      if (!snHits.length) { el.hidden = true; el.innerHTML = ''; return; }
+      const shown = snHits.slice(0, 8);
+      el.hidden = false;
+      el.innerHTML = `<span>Serienr. fundet hos:</span>${shown.map((h, i) =>
+        `<a href="${esc(kundeUrl(h.k.kundenr, h.sn))}" onclick="event.preventDefault(); jumpToSn(snHits[${i}])">${esc(h.k.navn)} <span class="muted">(SN ${esc(h.sn)}${h.count > 1 ? ` +${h.count - 1}` : ''})</span></a>`
+      ).join('')}${snHits.length > shown.length ? `<span class="muted">+${snHits.length - shown.length} flere – skriv mere</span>` : ''}${snHits.length === 1 ? '<span class="muted">Tryk Enter for at åbne</span>' : ''}`;
+    }
+
+    function render() {
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const active = FILTER_COLS.filter(c => (colFilters[c] || '').trim());
+      filtered = rows.filter(k =>
+        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv',...(k.postnumre || [])].join(' ').toLowerCase().includes(q)) &&
+        active.every(c => filterText(k, c).toLowerCase().includes(colFilters[c].trim().toLowerCase())) &&
+        (!onlyXX || k.harXX) &&
+        (!onlySal || hasSal(k))
+      );
+      document.getElementById('btnXX').classList.toggle('active', onlyXX);
+      document.getElementById('btnSal').classList.toggle('active', onlySal);
+      // Vis i den grå linje, hvilken filtrering der er aktiv
+      const aktive = [onlySal ? 'Salmonella' : '', onlyXX ? 'xx-xx-xxxx i inst.dato' : ''].filter(Boolean);
+      const af = document.getElementById('activeFilter');
+      af.hidden = !aktive.length;
+      af.textContent = aktive.length ? `Aktiv filtrering: ${aktive.join(' + ')}` : '';
+      document.getElementById('btnClearFilters').style.display = active.length ? '' : 'none';
+      filtered.sort((a,b)=>String(sortValue(a, sortKey)).localeCompare(String(sortValue(b, sortKey)),'da',{numeric:true})*sortDir);
+      document.querySelectorAll('th.sortable').forEach(th => th.classList.toggle('sort-active', th.dataset.sort === sortKey));
+      document.getElementById('countText').textContent = `${filtered.length} af ${rows.length} kunder${onlySal || onlyXX ? ' (filtreret)' : ''}`;
+      renderSnHint();
+      document.getElementById('tbody').innerHTML = filtered.map(k => {
+        return `<tr class="clickable-row" onclick="openKunde('${esc(k.kundenr)}')">
+        <td class="small muted${hasSal(k) ? ' kundenrSal' : ''}"${hasSal(k) ? ` title="${esc(salTitle(k))}"` : ''}>${esc(k.kundenr)}</td>
+        <td><a class="link" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">${esc(k.navn)}</a></td>
+        <td>${esc(k.omraade)}</td>
+        <td>${esc(k.kundestatus)}</td>
+        <td class="small" title="${esc(kontraktTitle(k))}">${kontraktChips(k)}</td>
+        <td style="white-space:nowrap;"><a class="btn" href="/kundeinfo.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Info</a> <a class="btn" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">Åbn</a> <a class="btn" href="${esc(produktUrl(k.kundenr))}" onclick="event.stopPropagation()" title="Åbn kundens produktliste">Produkt</a></td>
+      </tr>`;
+      }).join('') || '<tr><td colspan="6" class="muted">Ingen kunder</td></tr>';
+    }
+    load().catch(e => setStatus('error', e.message));
+  </script>
+</body>
+</html>
