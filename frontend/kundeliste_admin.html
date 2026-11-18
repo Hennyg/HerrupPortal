@@ -518,8 +518,13 @@
           <button type="button" data-down="${i}" title="Flyt ned"${i === k.length - 1 ? ' disabled' : ''}>↓</button>
           <button type="button" data-rm="${i}" title="Fjern">✕</button>
         </div>`).join('') || '<span class="muted small">Ingen kolonner valgt</span>';
-      mulige.innerHTML = KL_KOLONNER.filter(c => !k.includes(c.key)).map(c => `
-        <div class="kgRow"><span>${esc(c.label)}</span><button type="button" data-add="${c.key}" title="Tilføj">＋</button></div>`).join('')
+      // Grupperet efter kilde (Kunde / Serviceaftale)
+      const ledige = KL_KOLONNER.filter(c => !k.includes(c.key));
+      const kilder = [...new Set(ledige.map(c => c.gruppe || 'Øvrige'))];
+      mulige.innerHTML = kilder.map(src => `
+        <div class="small muted" style="margin:6px 6px 2px;font-weight:700">${esc(src)}</div>
+        ${ledige.filter(c => (c.gruppe || 'Øvrige') === src).map(c => `
+          <div class="kgRow"><span>${esc(c.label)}</span><button type="button" data-add="${c.key}" title="Tilføj">＋</button></div>`).join('')}`).join('')
         || '<span class="muted small">Alle kolonner er valgt</span>';
 
       valgte.querySelectorAll('[data-up]').forEach(b => b.onclick = () => { const i = +b.dataset.up; [k[i - 1], k[i]] = [k[i], k[i - 1]]; renderKolonneValg(); });

@@ -82,6 +82,11 @@
     .btn.primary:hover { background:var(--red-dark); }
     .btn:disabled { opacity:.5; cursor:default; }
     @media (max-width:560px) { .saRow2 { grid-template-columns:1fr; } }
+    /* Serviceaftale-kolonner: én linje pr. aftale */
+    .saLine { white-space:nowrap; line-height:1.55; }
+    .saLine.udlobet { color:#9ca3af; }
+    .saChip { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; margin:1px 4px 1px 0; background:#e0f2fe; color:#075985; white-space:nowrap; }
+    .saChip.udlobet { background:#f3f4f6; color:#9ca3af; text-decoration:line-through; }
     /* Kontrakt: én farvet "pille" pr. kontrakttype (farver styres på kundeliste_admin.html) */
     .kChip { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600;
              margin:1px 4px 1px 0; border:1px solid rgba(0,0,0,.08); white-space:nowrap; background:#eef0f2; color:#333; }
@@ -291,6 +296,7 @@
     async function load() {
       setStatus('loading','<div class="spinner"></div> Henter kunder...');
       await Promise.all([loadKunder(), loadLastImport(), loadFarver(), kolCfgLoaded || (kolCfgLoaded = loadKolonner())]);
+      await ensureSa();
       setStatus('', '');
       render();
     }
@@ -359,8 +365,69 @@
       importeret: {
         sort: k => k.sidstImporteret || '', text: k => fmtDate(k.sidstImporteret),
         cell: k => `<td class="small" style="white-space:nowrap">${fmtDate(k.sidstImporteret)}</td>`
-      }
+      },
+
+      // ── Serviceaftaler (fra lch_serviceaftaler) ──
+      sa_aftaler: {
+        sort: k => saFor(k).map(a => a.servicetype || a.varenr).join(' '),
+        text: k => saFor(k).map(a => `${a.servicetype} ${a.varenr}`).join(' '),
+        cell: k => `<td>${saFor(k).map(a =>
+          `<span class="saChip${saUdlobet(a) ? ' udlobet' : ''}" title="${esc(saTitle(a))}">${esc(a.servicetype || a.varenr || 'Aftale')}</span>`).join('')}</td>`
+      },
+      sa_antal: {
+        sort: k => String(saFor(k).length).padStart(4, '0'), text: k => String(saFor(k).length || ''),
+        cell: k => `<td class="num">${saFor(k).length || ''}</td>`
+      },
+      sa_varenr:      saLines(a => a.varenr),
+      sa_servicetype: saLines(a => a.servicetype),
+      sa_afdeling:    saLines(a => a.afdeling),
+      sa_start:       saLines(a => fmtDate(a.startdato), a => a.startdato),
+      sa_slut:        saLines(a => fmtDate(a.enddato), a => a.enddato),
+      sa_note:        saLines(a => a.note, null, 'small')
     };
+
+    // ── Serviceaftale-data ─────────────────────────────────────────────────
+    // Hentes kun, når en serviceaftale-kolonne vises (eller efter oprettelse).
+    let saByKunde = null;            // kundenr -> [aftaler], nyeste start først
+    let saLoading = null;
+    const usesSa = () => activeCols.some(c => c.startsWith('sa_'));
+    const saFor = k => (saByKunde && saByKunde.get(String(k.kundenr))) || [];
+    const saUdlobet = a => !!a.enddato && a.enddato < new Date().toISOString().slice(0, 10);
+    function saTitle(a) {
+      return [a.varenr && `Varenr. ${a.varenr}`, a.afdeling, a.startdato && `Start ${fmtDate(a.startdato)}`,
+              a.enddato && `Slut ${fmtDate(a.enddato)}`, saUdlobet(a) && 'UDLØBET', a.note].filter(Boolean).join('\n');
+    }
+    // Celle med én linje pr. aftale (samme rækkefølge i alle sa_-kolonner)
+    function saLines(get, sortGet, cls = '') {
+      return {
+        sort: k => saFor(k).map(a => (sortGet || get)(a) || '').join(' '),
+        text: k => saFor(k).map(a => get(a) || '').join(' '),
+        cell: k => `<td class="${cls}">${saFor(k).map(a =>
+          `<div class="saLine${saUdlobet(a) ? ' udlobet' : ''}">${esc(get(a) || '–')}</div>`).join('')}</td>`
+      };
+    }
+    function buildSaMap(items) {
+      const m = new Map();
+      for (const a of items || []) {
+        const nr = String(a.kundenr || '').trim();
+        if (!nr) continue;
+        if (!m.has(nr)) m.set(nr, []);
+        m.get(nr).push(a);
+      }
+      for (const list of m.values()) list.sort((a, b) => (b.startdato || '').localeCompare(a.startdato || ''));
+      saByKunde = m;
+    }
+    async function ensureSa() {
+      if (saByKunde || !usesSa()) return;
+      if (!saLoading) {
+        saLoading = fetch('/api/kunde-serviceaftaler', { cache: 'no-store' })
+          .then(r => r.json())
+          .then(j => buildSaMap(j.items))
+          .catch(() => { saByKunde = new Map(); })
+          .finally(() => { saLoading = null; });
+      }
+      await saLoading;
+    }
     // (funktion, ikke const – buildHead() kaldes tidligt i scriptet)
     function colLabel(key) { return KL_KOLONNER.find(c => c.key === key)?.label || key; }
 
@@ -435,6 +502,7 @@
       activeCols = cols.length ? cols : [...KL_STANDARD_KOLONNER];
       buildHead();
       render();
+      if (usesSa() && !saByKunde) ensureSa().then(render);
     }
 
     document.getElementById('kolGruppe').onchange = e => {
@@ -522,7 +590,8 @@
       const q = document.getElementById('q').value.trim().toLowerCase();
       const active = activeCols.filter(c => (colFilters[c] || '').trim());
       filtered = rows.filter(k =>
-        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv',...(k.postnumre || [])].join(' ').toLowerCase().includes(q)) &&
+        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv',...(k.postnumre || []),
+                ...saFor(k).map(a => `${a.varenr} ${a.servicetype}`)].join(' ').toLowerCase().includes(q)) &&
         active.every(c => filterText(k, c).toLowerCase().includes(colFilters[c].trim().toLowerCase())) &&
         (!onlyXX || k.harXX) &&
         (!onlySal || hasSal(k))
@@ -731,6 +800,8 @@
           body: JSON.stringify(body)
         });
         saAlle = (await saApi('action=serviceaftaler')).items || [];
+        buildSaMap(saAlle);        // kundelistens serviceaftale-kolonner opdateres med det samme
+        render();
         // Tilbage til listen med en tom formular til næste gang
         const navn = kundeNavn(body.kundenr) || body.kundenr;
         saResetForm();
