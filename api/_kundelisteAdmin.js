@@ -1,7 +1,7 @@
 // api/_kundelisteAdmin.js
 // Fælles hjælpefunktioner til Kundeliste-admin (kundeliste_admin.html):
 //   - adgangstjek (portal_admin / portal_kundeliste_admin)
-//   - kontraktfarver  (tabel lch_kontraktfarve)
+//   - kontraktfarver  (tabel lch_serviceaftaler_kontraktfarve)
 //   - aftaletekster   (tabel lch_serviceaftaler_aftalertekst)
 // Alle tabeller ligger i Kundeliste-miljøet (KL_DV_URL) – samme som kunder/produkter.
 
@@ -10,12 +10,20 @@ const { dvFetch, fetchAll } = require("./_dvKunde");
 
 const ADMIN_ROLES = ["portal_admin", "portal_kundeliste_admin"];
 
-// Logiske tabelnavne. EntitySetName (det navn der bruges i URL'en) slås op i
-// Dataverse-metadata første gang, så vi ikke skal gætte flertalsformen.
+// Tabeller i Kundeliste-miljøet. "set" er sætnavnet (EntitySetName), som
+// bruges i URL'en. Mangler det, slås det op i Dataverse-metadata.
 const T = {
-  farve:       { logical: "cr1eb_lch_kontraktfarve",               id: "cr1eb_lch_kontraktfarveid" },
-  aftaletekst: { logical: "cr1eb_lch_serviceaftaler_aftalertekst", id: "cr1eb_lch_serviceaftaler_aftalertekstid" },
-  produkt:     { set: "cr1eb_lch_kundeprodukts" }
+  farve: {
+    logical: "cr1eb_lch_serviceaftaler_kontraktfarve",
+    set:     "cr1eb_lch_serviceaftaler_kontraktfarves",
+    id:      "cr1eb_lch_serviceaftaler_kontraktfarveid"
+  },
+  aftaletekst: {
+    logical: "cr1eb_lch_serviceaftaler_aftalertekst",
+    set:     "cr1eb_lch_serviceaftaler_aftalerteksts",
+    id:      "cr1eb_lch_serviceaftaler_aftalertekstid"
+  },
+  produkt: { set: "cr1eb_lch_kundeprodukts" }
 };
 
 const setCache = new Map();
