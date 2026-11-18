@@ -351,7 +351,10 @@ module.exports = async function (context, req) {
 
   // Store opgaver køres som baggrundskald og hentes med GET /api/ai?id=...
   // så de ikke rammer timeout på SWA managed functions.
-  const allowImages = IMAGE_TASKS.has(task);
+  // Billedværktøjet er altid med ved "image"/"free" - og ved alle andre
+  // opgaver, når der er et billede i beskeden eller tidligere i samtalen.
+  const imageContext = images.length > 0 || body.imageContext === true;
+  const allowImages = IMAGE_TASKS.has(task) || imageContext;
   const useBackground =
     allowImages ||                 // billedgenerering kan tage op til ~2 min
     task === "referat" ||
@@ -364,7 +367,11 @@ module.exports = async function (context, req) {
     "Vær konkret og brugbar. Opfind ikke fakta, hvis information mangler.",
     "Når dette er en opfølgning, skal du bruge den tidligere samtale som kontekst og forstå henvisninger som 'den', 'det', 'ovenstående' og lignende ud fra samtalen.",
     TASKS[task],
-    ...optionInstructions(task, options)
+    ...optionInstructions(task, options),
+    ...(allowImages && !IMAGE_TASKS.has(task) ? [
+      "Du har adgang til et billedværktøj. Hvis brugeren beder om at ændre et vedhæftet billede, eller resultatet skal indeholde et billede, så brug billedværktøjet og lav selve billedet - beskriv ikke bare, hvordan brugeren kan gøre det.",
+      "Løs samtidig resten af opgaven som tekst. Hvis billedet kun er kontekst for en tekstopgave, så lav ikke et nyt billede."
+    ] : [])
   ].join(" ");
 
   try {

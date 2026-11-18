@@ -1364,6 +1364,9 @@
           images: sentImages.map(x => x.dataUrl),
           attachments: sentAttachments,
           options: sentOptions,
+          // Er der billeder i beskeden eller tidligere i samtalen, må AI
+          // redigere/lave billeder uanset hvilken opgave der er valgt
+          imageContext: sentImages.length > 0 || conversationHistory.some(h => h.images?.length > 0),
           previousResponseId: currentPreviousResponseId
         })
       });
