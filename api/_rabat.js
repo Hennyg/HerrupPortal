@@ -30,7 +30,7 @@ const KUNDE_NAV = "cr1eb_lch_kundenr";       // opslag → kunde
 const KUNDE_VAL = "_cr1eb_lch_kundenr_value";
 const HIST_NAV  = "cr1eb_lch_rabatgruppe";   // opslag → rabatgruppe (i historikken)
 const YDELSER = ["robot", "yverpleje", "tank"];
-const LABEL = { gruppe: "Kemi rabat gr.", robot: "Robot rengøring", yverpleje: "Yverpleje", tank: "Tank rengøring", kommentar: "Kommentar" };
+const LABEL = { gruppe: "Kemi rabat gr.", robot: "Robot rengøring", yverpleje: "Yverpleje", tank: "Tank rengøring", kommentar: "Kommentar", rabatchange: "Rabat ændring" };
 
 const bad = msg => Object.assign(new Error(msg), { status: 400 });
 const key = prefix => `${prefix}-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${crypto.randomBytes(3).toString("hex")}`;
@@ -168,25 +168,17 @@ async function gemRabat(input, opts) {
   }
   for (const y of YDELSER) if (y in input) next[y] = truthy(input[y]);
   if ("kommentar" in input && hasKommentar(types)) next.kommentar = String(input.kommentar ?? "").trim().slice(0, 4000);
+  // Rabat ændring er et almindeligt tekstfelt (fra Excel eller rettet i portalen)
+  if ("rabatchange" in input) next.rabatchange = String(input.rabatchange ?? "").trim().slice(0, 200);
 
-  // Hvad er ændret?
+  // Hvad er ændret? Kun de felter, der er sendt med, skrives – hvert i sin egen kolonne
   const old = existing || { gruppe: null, robot: false, yverpleje: false, tank: false, kommentar: "", rabatchange: "" };
   const changed = Object.keys(next).filter(f => vis(f, old[f]) !== vis(f, next[f]));
 
-  // Rabat ændring: fra Excel som den står; i portalen beregnes den ud fra ydelserne
-  let rabatchange;
-  if ("rabatchange" in input) rabatchange = String(input.rabatchange ?? "").trim().slice(0, 200);
-  else if (opts.kilde !== "Import") {
-    const yd = changed.filter(f => YDELSER.includes(f)).map(f => `${next[f] ? "+" : "-"} ${LABEL[f].toLowerCase()}`);
-    if (yd.length) rabatchange = yd.join(", ");
-  }
-  const changeRabat = rabatchange !== undefined && rabatchange !== (old.rabatchange || "");
-
-  if (existing && !changed.length && !changeRabat) return { kundenr, status: "uændret", changes: 0 };
+  if (existing && !changed.length) return { kundenr, status: "uændret", changes: 0 };
 
   const body = {};
   for (const f of changed) body[F[f]] = toDv(f, next[f], types);
-  if (changeRabat) body[F.rabatchange] = rabatchange;
 
   let id = existing?.id;
   if (!existing) {

@@ -66,6 +66,7 @@
     .rbTable input[type=checkbox] { width:18px; height:18px; cursor:pointer; }
     .rbTable input[type=text], .rbTable input[type=number], .rbTable select { height:30px; border:1px solid #d1d5db; border-radius:6px; padding:0 6px; font:inherit; font-size:13px; }
     .rbTable input.komm { width:100%; min-width:160px; }
+    .rbTable input.aendr { width:100%; min-width:130px; }
     .rbTable tr.hist td { background:#fafafa; padding:6px 8px 10px 28px; }
     .rbHist { font-size:12px; border-collapse:collapse; }
     .rbHist td { padding:2px 10px 2px 0; border:0; }
@@ -246,7 +247,7 @@
           ${grupper.map(n => `<option value="${n}"${Number(g) === n ? ' selected' : ''}>${n}</option>`).join('')}
         </select></td>
       ${YD.map(([f]) => `<td class="c"><input type="checkbox" data-f="${f}"${vaerdi(r, f) ? ' checked' : ''}></td>`).join('')}
-      <td class="small">${esc(r.rabatchange || '')}</td>
+      <td><input type="text" class="aendr" data-f="rabatchange" value="${esc(vaerdi(r, 'rabatchange') || '')}" maxlength="200" placeholder="fx ok"></td>
       <td><input type="text" class="komm" data-f="kommentar" value="${esc(vaerdi(r, 'kommentar') || '')}" maxlength="4000"${data.kommentarKolonne ? '' : ' disabled title="Opret kolonnen lch_kommentar i lch_rabat_grupper"'}></td>
       <td style="white-space:nowrap">
         <button type="button" class="btn primary" data-act="gem"${d ? '' : ' disabled'}>Gem</button>
@@ -360,7 +361,7 @@
   $('rbFilterG').onchange = renderKunder;
   $('rbNy').onclick = () => {
     if (ny) return;
-    ny = { kundenr: '', gruppe: null, robot: false, yverpleje: false, tank: false, kommentar: '' };
+    ny = { kundenr: '', gruppe: null, robot: false, yverpleje: false, tank: false, rabatchange: '', kommentar: '' };
     $('rbKundeList').innerHTML = (rows || []).map(k => `<option value="${esc(k.kundenr)} – ${esc(k.navn)}"></option>`).join('');
     renderKunder();
   };

@@ -6,7 +6,7 @@
 //
 // Kun portal_admin / portal_kundeliste_admin:
 //   GET    ?action=liste            → { items, struktur, kommentarKolonne }
-//   POST   ?action=gem              body { kundenr, gruppe, robot, yverpleje, tank, kommentar }
+//   POST   ?action=gem              body { kundenr, gruppe?, robot?, yverpleje?, tank?, kommentar?, rabatchange? } (kun ændrede felter)
 //   POST   ?action=import           body { rows: [{ kundenr, gruppe, robot, yverpleje, tank, rabatchange, kommentar, ark }] }
 //   POST   ?action=struktur         body { items: [{ id?, gruppe, koebsgraense, rabatprocent, farve }] }
 //   DELETE ?action=struktur&id=<guid>
@@ -45,7 +45,7 @@ module.exports = async function (context, req) {
     if (action === "gem" && method === "POST") {
       const b = req.body || {};
       const input = { kundenr: b.kundenr };
-      for (const f of ["gruppe", "robot", "yverpleje", "tank", "kommentar"]) if (f in b) input[f] = b[f];
+      for (const f of ["gruppe", "robot", "yverpleje", "tank", "kommentar", "rabatchange"]) if (f in b) input[f] = b[f];
       return N.json(context, 200, await R.gemRabat(input, { kilde: "Portal", af }));
     }
     if (action === "import" && method === "POST") {
