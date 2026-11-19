@@ -89,6 +89,9 @@
     .saLine.udlobet { color:#9ca3af; }
     .saChip { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; margin:1px 4px 1px 0; background:#e0f2fe; color:#075985; white-space:nowrap; }
     .saChip.udlobet { background:#f3f4f6; color:#9ca3af; text-decoration:line-through; }
+    /* Kunder der kun findes i Uniconta (vises kun ved søgning) */
+    .uniTag { display:inline-block; padding:0 6px; border-radius:999px; font-size:11px; background:#ede9fe; color:#5b21b6; font-weight:600; margin-left:4px; }
+    #tbody tr.uniRow td { background:#faf9ff; }
     /* Kontrakt: én farvet "pille" pr. kontrakttype (farver styres på kundeliste_admin.html) */
     .kChip { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600;
              margin:1px 4px 1px 0; border:1px solid rgba(0,0,0,.08); white-space:nowrap; background:#eef0f2; color:#333; }
@@ -304,6 +307,31 @@
       setStatus('', '');
       buildHead();                   // filter-rullelister bygges ud fra de hentede kunder
       render();
+      loadUniconta();                // i baggrunden – bruges kun ved søgning
+    }
+
+    // ── Uniconta-debitorer ─────────────────────────────────────────────────
+    // Hentes i baggrunden efter kundelisten (serveren cacher dem i 15 min).
+    // Med tomt søgefelt vises kun kundelisten. Søges der, vises også
+    // Uniconta-debitorer, der IKKE er i kundelisten – med distrikt som område.
+    let uniKunder = null;
+    let uniPromise = null;
+    function loadUniconta() {
+      if (uniKunder || uniPromise) return uniPromise;
+      uniPromise = fetch('/api/kundeliste-uniconta', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(j => { uniKunder = (j.kunder || []).filter(u => !u.iKundeliste); })
+        .catch(() => { uniKunder = []; })
+        .finally(() => { uniPromise = null; if (document.getElementById('q').value.trim()) render(); });
+      return uniPromise;
+    }
+    function uniTreffer(q) {
+      if (!uniKunder || q.length < 2 || onlyXX || onlySal) return [];
+      const iListe = new Set(rows.map(k => String(k.kundenr)));
+      return uniKunder
+        .filter(u => !iListe.has(u.kundenr) && [u.kundenr, u.konto, u.navn, u.distrikt].join(' ').toLowerCase().includes(q))
+        .map(u => ({ kundenr: u.kundenr, navn: u.navn, omraade: u.distrikt, uniconta: true,
+                     kontraktAntal: {}, serier: [], postnumre: [], salmonella: [] }));
     }
 
     async function loadKunder() {
@@ -343,7 +371,7 @@
       },
       navn: {
         sort: k => k.navn, text: k => k.navn,
-        cell: k => `<td><a class="link" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">${esc(k.navn)}</a></td>`
+        cell: k => `<td><a class="link" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">${esc(k.navn)}</a>${k.uniconta ? '<span class="uniTag" title="Findes kun i Uniconta – ikke i kundelisten">Uniconta</span>' : ''}</td>`
       },
       omraade:     { sort: k => k.omraade, text: k => k.omraade, cell: k => `<td>${esc(k.omraade)}</td>` },
       kundestatus: { sort: k => k.kundestatus, text: k => k.kundestatus, cell: k => `<td>${esc(k.kundestatus)}</td>` },
@@ -664,6 +692,8 @@
         (!onlyXX || k.harXX) &&
         (!onlySal || hasSal(k))
       );
+      const uni = uniTreffer(q).filter(k => active.every(c => matchFilter(k, c, colFilters[c])));
+      filtered.push(...uni);
       document.getElementById('btnXX').classList.toggle('active', onlyXX);
       document.getElementById('btnSal').classList.toggle('active', onlySal);
       // Vis i den grå linje, hvilken filtrering der er aktiv
@@ -674,9 +704,13 @@
       document.getElementById('btnClearFilters').style.display = active.length ? '' : 'none';
       filtered.sort((a,b)=>String(sortValue(a, sortKey)).localeCompare(String(sortValue(b, sortKey)),'da',{numeric:true})*sortDir);
       document.querySelectorAll('th.sortable').forEach(th => th.classList.toggle('sort-active', th.dataset.sort === sortKey));
-      document.getElementById('countText').textContent = `${filtered.length} af ${rows.length} kunder${onlySal || onlyXX ? ' (filtreret)' : ''}`;
+      document.getElementById('countText').textContent = `${filtered.length - uni.length} af ${rows.length} kunder${onlySal || onlyXX ? ' (filtreret)' : ''}${uni.length ? ` + ${uni.length} fra Uniconta` : ''}${q && !uniKunder ? ' · henter Uniconta…' : ''}`;
       renderSnHint();
       document.getElementById('tbody').innerHTML = filtered.map(k => {
+        if (k.uniconta) return `<tr class="clickable-row uniRow" onclick="openKunde('${esc(k.kundenr)}')">
+        ${activeCols.map(c => COLDEF[c].cell(k)).join('')}
+        <td style="white-space:nowrap;"><a class="btn" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()" title="Kunden findes kun i Uniconta – viser kemi rabat">Åbn</a></td>
+      </tr>`;
         return `<tr class="clickable-row" onclick="openKunde('${esc(k.kundenr)}')">
         ${activeCols.map(c => COLDEF[c].cell(k)).join('')}
         <td style="white-space:nowrap;"><a class="btn" href="/kundeinfo.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Info</a> <a class="btn" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">Åbn</a> <a class="btn" href="${esc(produktUrl(k.kundenr))}" onclick="event.stopPropagation()" title="Åbn kundens produktliste">Produkt</a></td>

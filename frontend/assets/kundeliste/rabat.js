@@ -24,7 +24,25 @@
     return j;
   }
   const $ = id => document.getElementById(id);
-  const navnFor = nr => (rows || []).find(k => String(k.kundenr) === String(nr))?.navn || '';
+  // Navn fra kundelisten – eller "Navn (Distrikt)" fra Uniconta, så det er tydeligt
+  // at kunden ikke er i kundelisten
+  let uniKunder = null;           // [{ kundenr, konto, navn, distrikt }]
+  let uniLoading = null;
+  function loadUni() {
+    if (uniKunder) return Promise.resolve(uniKunder);
+    if (!uniLoading) {
+      uniLoading = fetch('/api/kundeliste-uniconta', { cache: 'no-store' })
+        .then(r => r.json()).then(j => { uniKunder = j.kunder || []; return uniKunder; })
+        .catch(() => { uniKunder = []; return uniKunder; })
+        .finally(() => { uniLoading = null; });
+    }
+    return uniLoading;
+  }
+  const kundelisteNavn = nr => (rows || []).find(k => String(k.kundenr) === String(nr))?.navn || '';
+  const uniFor = nr => (uniKunder || []).find(u => u.kundenr === String(nr)) || null;
+  const uniNavn = u => u ? `${u.navn}${u.distrikt ? ` (${u.distrikt})` : ''}` : '';
+  const navnFor = nr => kundelisteNavn(nr) || uniNavn(uniFor(nr));
+  const erUniconta = nr => !kundelisteNavn(nr) && !!uniFor(nr) && !uniFor(nr).iKundeliste;
   const normNr = v => { const s = String(v ?? '').trim().replace(/\.0+$/, ''); return /^\d+$/.test(s) && s.length < 10 ? s.padStart(10, '0') : s; };
   const fmtTid = s => { const d = new Date(s); return isNaN(d) ? '' : d.toLocaleString('da-DK', { dateStyle: 'short', timeStyle: 'short' }); };
 
@@ -67,6 +85,7 @@
     .rbTable input[type=text], .rbTable input[type=number], .rbTable select { height:30px; border:1px solid #d1d5db; border-radius:6px; padding:0 6px; font:inherit; font-size:13px; }
     .rbTable input.komm { width:100%; min-width:160px; }
     .rbTable input.aendr { width:100%; min-width:130px; }
+    .rbUni { display:inline-block; padding:0 6px; border-radius:999px; font-size:11px; background:#ede9fe; color:#5b21b6; font-weight:600; }
     .rbTable tr.hist td { background:#fafafa; padding:6px 8px 10px 28px; }
     .rbHist { font-size:12px; border-collapse:collapse; }
     .rbHist td { padding:2px 10px 2px 0; border:0; }
@@ -225,6 +244,7 @@
       data = await api('action=liste');
       dirty.clear();
       renderKunder();
+      if (!uniKunder) loadUni().then(() => renderKunder());
       if (!data.kommentarKolonne) msg('rbMsg', 'Bemærk: kolonnen lch_kommentar findes ikke i lch_rabat_grupper endnu', 'err');
     } catch (e) {
       $('rbBody').innerHTML = `<tr><td colspan="9" class="rbMsg err">Fejl: ${esc(e.message)}</td></tr>`;
@@ -240,7 +260,7 @@
     const grupper = [...new Set([1, 2, 3, ...data.struktur.map(s => s.gruppe).filter(Number.isFinite)])].sort((a, b) => a - b);
     return `<tr data-nr="${esc(r.kundenr)}"${d ? ' class="dirty"' : ''}>
       <td>${isNew ? `<input type="text" id="rbNyNr" list="rbKundeList" placeholder="Kundenr. eller navn" style="width:170px">` : esc(r.kundenr)}</td>
-      <td>${isNew ? '<span class="muted" id="rbNyNavn"></span>' : (r.navn || navnFor(r.kundenr)) ? `<a class="link" href="${esc(kundeUrl(r.kundenr))}">${esc(r.navn || navnFor(r.kundenr))}</a>` : '<span class="muted">–</span>'}</td>
+      <td>${isNew ? '<span class="muted" id="rbNyNavn"></span>' : visNavn(r)}</td>
       <td style="white-space:nowrap">${gruppeBadge(g)}
         <select data-f="gruppe" title="Gruppe – foreslås ud fra antal ydelser">
           <option value=""${g === null || g === '' ? ' selected' : ''}>–</option>
@@ -254,6 +274,13 @@
         ${isNew ? '<button type="button" class="btn" data-act="annuller">Annuller</button>' : `<button type="button" class="btn" data-act="hist" title="Vis historik">${openHist.has(r.kundenr) ? '▾' : '▸'} Historik</button>`}
       </td>
     </tr>${!isNew && openHist.has(r.kundenr) ? `<tr class="hist"><td colspan="9" id="rbHist-${esc(r.kundenr)}"><span class="muted">Henter historik…</span></td></tr>` : ''}`;
+  }
+
+  function visNavn(r) {
+    const uni = r.kilde === 'uniconta' || (!r.kilde && erUniconta(r.kundenr));
+    const navn = uni ? (r.distrikt ? `${r.navn} (${r.distrikt})` : (r.navn || uniNavn(uniFor(r.kundenr)))) : (r.navn || navnFor(r.kundenr));
+    if (!navn) return '<span class="muted">–</span>';
+    return `<a class="link" href="${esc(kundeUrl(r.kundenr))}">${esc(navn)}</a>${uni ? ' <span class="rbUni" title="Kunden findes kun i Uniconta">Uniconta</span>' : ''}`;
   }
 
   function renderKunder() {
@@ -311,7 +338,7 @@
         inp.addEventListener('input', () => {
           const nr = normNr(inp.value.split(' – ')[0]);
           const navn = navnFor(nr);
-          $('rbNyNavn').textContent = navn || (inp.value ? 'Ukendt kundenr.' : '');
+          $('rbNyNavn').textContent = navn ? `${navn}${erUniconta(nr) ? ' · fra Uniconta' : ''}` : (inp.value ? 'Ukendt kundenr.' : '');
           ny.kundenr = nr;
         });
         setTimeout(() => inp.focus());
@@ -328,7 +355,7 @@
   async function gem(tr, r, isNew) {
     const body = isNew ? { ...ny } : { kundenr: r.kundenr, ...(dirty.get(r.kundenr) || {}) };
     if (isNew) {
-      if (!body.kundenr || !navnFor(body.kundenr)) { msg('rbMsg', 'Vælg en kunde fra listen', 'err'); return; }
+      if (!body.kundenr || !navnFor(body.kundenr)) { msg('rbMsg', 'Vælg en kunde fra listen (kundelisten eller Uniconta)', 'err'); return; }
       if (data.items.some(x => x.kundenr === body.kundenr)) { msg('rbMsg', 'Kunden er allerede i rabatordningen', 'err'); return; }
     }
     tr.querySelectorAll('button').forEach(b => b.disabled = true);
@@ -359,11 +386,20 @@
 
   $('rbSearch').oninput = renderKunder;
   $('rbFilterG').onchange = renderKunder;
-  $('rbNy').onclick = () => {
+  $('rbNy').onclick = async () => {
     if (ny) return;
     ny = { kundenr: '', gruppe: null, robot: false, yverpleje: false, tank: false, rabatchange: '', kommentar: '' };
-    $('rbKundeList').innerHTML = (rows || []).map(k => `<option value="${esc(k.kundenr)} – ${esc(k.navn)}"></option>`).join('');
     renderKunder();
+    // Forslag: kundelisten + Uniconta-kunder, der ikke er i kundelisten (vist som "Navn (Distrikt) · Uniconta")
+    const fyld = () => {
+      const iListe = new Set((rows || []).map(k => String(k.kundenr)));
+      $('rbKundeList').innerHTML =
+        (rows || []).map(k => `<option value="${esc(k.kundenr)} – ${esc(k.navn)}"></option>`).join('') +
+        (uniKunder || []).filter(u => !iListe.has(u.kundenr) && !u.iKundeliste)
+          .map(u => `<option value="${esc(u.kundenr)} – ${esc(uniNavn(u))} · Uniconta"></option>`).join('');
+    };
+    fyld();
+    if (!uniKunder) { await loadUni(); fyld(); }
   };
 
   // ── Fanen Importér Excel ─────────────────────────────────────────────────
@@ -462,8 +498,8 @@
   // Sammenlign med det, der allerede er i Dataverse
   function diff(r) {
     const cur = data.items.find(x => x.kundenr === r.kundenr);
-    if (!navnFor(r.kundenr) && !cur) return { status: 'fejl', text: 'Kundenr. findes ikke i kundelisten' };
-    if (!cur) return { status: 'ny', text: '' };
+    if (!navnFor(r.kundenr) && !cur) return { status: 'fejl', text: 'Kundenr. findes hverken i kundelisten eller i Uniconta' };
+    if (!cur) return { status: 'ny', text: erUniconta(r.kundenr) ? 'fra Uniconta' : '' };
     const d = [];
     if ('gruppe' in r && (r.gruppe ?? null) !== (cur.gruppe ?? null)) d.push(`gruppe ${cur.gruppe ?? '–'} → ${r.gruppe ?? '–'}`);
     YD.forEach(([f, l]) => { if (f in r && !!r[f] !== !!cur[f]) d.push(`${r[f] ? '+' : '-'} ${l.toLowerCase()}`); });
@@ -493,6 +529,7 @@
     msg('rbImpMsg', 'Læser regnearket…');
     try {
       if (!data.items.length && !data.struktur.length) await load();
+      await loadUni();               // kunder, der kun findes i Uniconta, kan også importeres
       const { rows: list, ark } = await readFile(f);
       // Samme kundenr. i flere ark: den sidste vinder
       const seen = new Map();
@@ -582,11 +619,17 @@
   $('rbStGem').onclick = async () => {
     msg('rbStMsg', 'Gemmer…');
     try {
+      const sendt = stDraft.length;
       const j = await api('action=struktur', { method: 'POST', body: JSON.stringify({ items: stDraft }) });
       data.struktur = j.items || [];
       renderStruktur();
       renderKunder();
-      msg('rbStMsg', 'Gemt ✓', 'ok');
+      // Kontrol: læs det gemte tilbage fra Dataverse
+      if (sendt && !data.struktur.length) {
+        msg('rbStMsg', 'Dataverse svarede OK, men tabellen er stadig tom – tjek at app-brugeren har læse- og oprette-rettighed på lch_rabat_struktur', 'err');
+      } else {
+        msg('rbStMsg', `Gemt ✓ – ${data.struktur.length} rækker i Dataverse`, 'ok');
+      }
     } catch (e) {
       msg('rbStMsg', 'Fejl: ' + e.message, 'err');
     }

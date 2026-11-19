@@ -314,7 +314,11 @@ function dateText(s){
 
 async function load(){
  const r = await fetch('/api/kunde?' + new URLSearchParams({ kundenr, id }).toString()); const j = await r.json();
- if(!r.ok || j.error) return setStatus('error','Fejl: '+esc(j.error || r.status));
+ if(!r.ok || j.error) {
+   // Ikke i kundelisten → måske en Uniconta-kunde (fx i kemi-rabatordningen)
+   if (kundenr && await loadUnicontaKunde(kundenr)) return;
+   return setStatus('error','Fejl: '+esc(j.error || r.status));
+ }
  state = { kunde:j.kunde, adresser:j.adresser||[], produkter:j.produkter||[], selectedAdresseKey:'' };
  setStatus('',''); document.getElementById('content').style.display='block'; render();
  loadSalmonella(j.kunde?.chr, j.adresser || []);
@@ -589,6 +593,31 @@ function renderKontrakter(products){
     items.forEach(p => { const n = p.produkt || p.navn || 'Ukendt'; navne.set(n, (navne.get(n) || 0) + 1); });
     return `<tr><td>${kChip(k, 'first')}<div class="kProd">${[...navne.entries()].map(([n, c]) => `${esc(n)} × ${c}`).join(' · ')}</div></td><td class="num">${items.length}</td></tr>`;
   }).join('')}</table>`;
+}
+
+// ── Kunde der kun findes i Uniconta: vis navn, distrikt og kemi rabat ──
+async function loadUnicontaKunde(nr){
+  try {
+    const r = await fetch('/api/kundeliste-uniconta?kundenr=' + encodeURIComponent(nr), { cache:'no-store' });
+    const j = await r.json();
+    const u = j.kunde;
+    if (!r.ok || !u) return false;
+    document.getElementById('brandTitle').textContent = `${u.navn} (Uniconta)`;
+    document.title = u.navn;
+    document.getElementById('btnProdukter').style.display = 'none';
+    document.getElementById('btnInfo').style.display = 'none';
+    document.querySelectorAll('#content .detailGrid').forEach(el => el.style.display = 'none');
+    const sum = document.getElementById('summary');
+    sum.style.gridTemplateColumns = 'repeat(4, minmax(140px, 1fr))';
+    sum.innerHTML =
+      `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(u.kundenr)}</div></div>` +
+      `<div class="card"><div class="label">Navn</div><div class="value" style="font-size:18px">${esc(u.navn)}</div><div class="muted small" style="margin-top:4px">Findes kun i Uniconta – ikke i kundelisten</div></div>` +
+      `<div class="card"><div class="label">Distrikt</div><div class="value">${esc(u.distrikt || '–')}</div></div>` +
+      `<div class="card rabatCard" id="rabatTile" onclick="openRabatHistorik()" title="Klik for historik">${rabatTileHtml()}</div>`;
+    setStatus('',''); document.getElementById('content').style.display = 'block';
+    loadRabat(u.kundenr);
+    return true;
+  } catch { return false; }
 }
 
 // ── Kemi rabat (kort i øverste linje) ──

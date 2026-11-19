@@ -9,6 +9,12 @@
 
 const crypto = require("crypto");
 const { dvFetch, fetchAll } = require("./_dvKunde");
+const U = require("./_unicontaKunder");   // kunder, der kun findes i Uniconta
+
+// Uniconta-kunde (eller null) – fejler Uniconta, fortsættes uden
+async function uniconta(kundenr) {
+  try { return await U.unicontaKunde(kundenr); } catch { return null; }
+}
 
 const T = {
   gruppe:   { logical: "cr1eb_lch_rabat_grupper",  set: "cr1eb_lch_rabat_gruppers",  id: "cr1eb_lch_rabat_grupperid" },
@@ -99,11 +105,23 @@ async function listRabat() {
   // Kundenr. fra kunden (opslaget) hvis navnet ikke er sat
   const kunder = await kundeMap();
   const byId = new Map([...kunder.values()].map(k => [k.id, k]));
-  return rows.map(fromDv).map(r => {
+  const list = rows.map(fromDv).map(r => {
     const k = r.kundeId && byId.get(r.kundeId);
-    if (k) { r.kundenr = k.kundenr; r.navn = k.navn; }
+    if (k) { r.kundenr = k.kundenr; r.navn = k.navn; r.kilde = "kundeliste"; }
     return r;
   });
+  // Kunder uden for kundelisten: navn og distrikt fra Uniconta
+  const mangler = list.filter(r => !r.navn);
+  if (mangler.length) {
+    let uk = [];
+    try { uk = await U.unicontaKunder(); } catch { /* Uniconta svarer ikke */ }
+    const byNr = new Map(uk.map(u => [u.kundenr, u]));
+    for (const r of mangler) {
+      const u = byNr.get(r.kundenr);
+      if (u) { r.navn = u.navn; r.distrikt = u.distrikt; r.kilde = "uniconta"; }
+    }
+  }
+  return list;
 }
 
 let kundeCache = { at: 0, map: null };
@@ -129,7 +147,10 @@ async function rabatForKunde(kundenr) {
     : `cr1eb_lch_name eq '${kundenr.replace(/'/g, "''")}'`;
   const j = await dvFetch(`${T.gruppe.set}?$select=${sel}&$filter=${encodeURIComponent(filter)}&$top=1`);
   const r = j.value?.[0];
-  return r ? { ...fromDv(r), kundenr, navn: k?.navn || "" } : null;
+  if (!r) return null;
+  if (k) return { ...fromDv(r), kundenr, navn: k.navn, kilde: "kundeliste" };
+  const u = await uniconta(kundenr);
+  return { ...fromDv(r), kundenr, navn: u?.navn || "", distrikt: u?.distrikt || "", kilde: u ? "uniconta" : "" };
 }
 
 async function historik(kundenr) {
@@ -156,8 +177,9 @@ async function gemRabat(input, opts) {
   const types = await attrTypes();
   const kundenr = normKundenr(input?.kundenr);
   if (!kundenr) throw bad("Kundenr. mangler");
+  // Kunden skal findes i kundelisten – eller i Uniconta (så bindes intet opslag)
   const kunde = (await kundeMap()).get(kundenr);
-  if (!kunde) throw bad(`Kunde ${kundenr} findes ikke i kundelisten`);
+  if (!kunde && !(await uniconta(kundenr))) throw bad(`Kunde ${kundenr} findes hverken i kundelisten eller i Uniconta`);
 
   const existing = opts.existing !== undefined ? opts.existing : await rabatForKunde(kundenr);
   const next = {};
@@ -183,7 +205,7 @@ async function gemRabat(input, opts) {
   let id = existing?.id;
   if (!existing) {
     body.cr1eb_lch_name = kundenr;
-    body[`${KUNDE_NAV}@odata.bind`] = `/${T.kunde.set}(${kunde.id})`;
+    if (kunde) body[`${KUNDE_NAV}@odata.bind`] = `/${T.kunde.set}(${kunde.id})`;
     const created = await dvFetch(T.gruppe.set, { method: "POST", body, headers: { Prefer: "return=representation" } });
     id = created?.[T.gruppe.id];
   } else {
@@ -270,6 +292,6 @@ async function sletStruktur(id) {
 }
 
 module.exports = {
-  normKundenr, listRabat, rabatForKunde, historik, gemRabat, importer,
+  kundeMap, normKundenr, listRabat, rabatForKunde, historik, gemRabat, importer,
   listStruktur, gemStruktur, sletStruktur, attrTypes, hasKommentar
 };
