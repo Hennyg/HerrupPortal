@@ -122,7 +122,7 @@
           <span class="rbMsg" id="rbImpMsg"></span>
         </div>
         <div class="rbInfo">Vælg regnearket. Alle ark med en kolonne <b>Kundenr.</b> læses (fx Tabel1, Tabel2 og Tabel3).
-          Kolonnerne findes ud fra overskrifterne: <i>Kemi Rabat gr.</i>, <i>Kundenr.</i>, <i>Robot rengøring</i>, <i>Yverpleje</i>, <i>Tank rengøring</i> og <i>Rabat ændring</i> (hvor den findes).
+          Kolonnerne findes ud fra overskrifterne: <i>Kemi Rabat gr.</i>, <i>Kundenr.</i>, <i>Robot rengøring</i>, <i>Yverpleje</i>, <i>Tank rengøring</i> og <i>Rabat ændring</i> (kolonne H, hvis overskriften ikke findes).
           Rækker med kundenr. 0 (slettede kunder) springes over. Kunder, der ikke er i regnearket, røres ikke.</div>
         <div class="rbScroll">
           <table class="rbTable">
@@ -368,8 +368,9 @@
       const i = grid[up].findIndex(x => norm(x).includes('kommentar'));
       if (i >= 0) return i;
     }
-    return -1;
+    return RABAT_KOLONNE;           // sidste udvej: kolonne H i alle tre ark
   }
+  const RABAT_KOLONNE = 7;          // H (A = 0)
   // Kundenr. 0 = kunden er slettet i kundelisten → importeres ikke
   const erSlettet = nr => /^0+$/.test(String(nr || ''));
 
