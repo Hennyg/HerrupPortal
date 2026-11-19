@@ -85,7 +85,10 @@
     .btn:disabled { opacity:.5; cursor:default; }
     @media (max-width:560px) { .saRow2 { grid-template-columns:1fr; } }
     /* Serviceaftale-kolonner: én linje pr. aftale */
-    .saLine { white-space:nowrap; line-height:1.55; }
+    /* Én linje pr. aftale – samme højde i alle serviceaftale-kolonner, så
+       datoerne står ud for den aftale, de hører til */
+    .saLine { white-space:nowrap; height:24px; line-height:24px; overflow:hidden; text-overflow:ellipsis; }
+    .saLine .saChip { margin:0; line-height:18px; vertical-align:middle; }
     .saLine.udlobet { color:#9ca3af; }
     .saChip { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; margin:1px 4px 1px 0; background:#e0f2fe; color:#075985; white-space:nowrap; }
     .saChip.udlobet { background:#f3f4f6; color:#9ca3af; text-decoration:line-through; }
@@ -422,7 +425,7 @@
         text: k => saFor(k).map(a => `${a.servicetype} ${a.varenr}`).join(' '),
         values: k => saFor(k).map(a => a.servicetype || a.varenr),
         cell: k => `<td>${saFor(k).map(a =>
-          `<span class="saChip${saUdlobet(a) ? ' udlobet' : ''}" title="${esc(saTitle(a))}">${esc(a.servicetype || a.varenr || 'Aftale')}</span>`).join('')}</td>`
+          `<div class="saLine"><span class="saChip${saUdlobet(a) ? ' udlobet' : ''}" title="${esc(saTitle(a))}">${esc(a.servicetype || a.varenr || 'Aftale')}</span></div>`).join('')}</td>`
       },
       sa_antal: {
         sort: k => String(saFor(k).length).padStart(4, '0'), text: k => String(saFor(k).length || ''),
