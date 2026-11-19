@@ -21,7 +21,7 @@ const T = {
 const F = {
   gruppe:     "cr1eb_lch_kemi_rabat_gr",
   robot:      "cr1eb_lch_robot",
-  yverpleje:  "cr1eb_lch_yverpleje",
+  yverpleje:  "cr1eb_lch_yver",        // kolonnen hedder lch_yver i Dataverse
   tank:       "cr1eb_lch_tank",
   rabatchange:"cr1eb_lch_rabatchange",
   kommentar:  "cr1eb_lch_kommentar"     // tekst (flere linjer) – oprettes i tabellen

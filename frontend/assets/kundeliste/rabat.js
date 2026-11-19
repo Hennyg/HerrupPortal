@@ -79,6 +79,16 @@
     .rbProgress { height:8px; background:#f3f4f6; border-radius:99px; overflow:hidden; width:220px; }
     .rbProgress span { display:block; height:100%; background:var(--red); width:0; transition:width .2s; }
     .rbInfo { padding:12px 18px; font-size:13px; color:#4b5563; }
+    .rbSwatch { width:32px; height:30px; border-radius:6px; border:1px solid #d1d5db; cursor:pointer; padding:0; vertical-align:middle; }
+    .rbSwatch:hover { outline:2px solid var(--red); outline-offset:1px; }
+    .rbPal { position:fixed; z-index:230; background:#fff; border:1px solid var(--border); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:10px 12px; }
+    .rbPal[hidden] { display:none; }
+    .rbPalRow { display:grid; grid-template-columns:62px repeat(3, 30px); gap:6px; align-items:center; margin:3px 0; }
+    .rbPalRow span { font-size:12px; color:#4b5563; }
+    .rbPalRow button { width:30px; height:30px; border-radius:6px; border:1px solid rgba(0,0,0,.12); cursor:pointer; padding:0; }
+    .rbPalRow button:hover { transform:scale(1.12); }
+    .rbPalRow button.sel { outline:2px solid #111827; outline-offset:1px; }
+    .rbPalNone { margin-top:6px; border:0; background:none; color:var(--red); cursor:pointer; font-size:12px; padding:0; }
   `;
   document.head.appendChild(style);
 
@@ -149,6 +159,43 @@
     </div>`;
   document.body.appendChild(wrap);
 
+  // ── Farvepalet (som kontraktfarverne): grundfarver i 3 nyancer ──────────
+  const PALETTE = [
+    { navn: 'Grøn',   farver: ['#bbf7d0', '#4ade80', '#15803d'] },
+    { navn: 'Orange', farver: ['#fed7aa', '#fb923c', '#c2410c'] },
+    { navn: 'Blå',    farver: ['#bfdbfe', '#60a5fa', '#1d4ed8'] },
+    { navn: 'Rød',    farver: ['#fecaca', '#f87171', '#b91c1c'] },
+    { navn: 'Gul',    farver: ['#fef08a', '#facc15', '#a16207'] },
+    { navn: 'Lilla',  farver: ['#e9d5ff', '#c084fc', '#7e22ce'] },
+    { navn: 'Turkis', farver: ['#a5f3fc', '#22d3ee', '#0e7490'] },
+    { navn: 'Grå',    farver: ['#e5e7eb', '#9ca3af', '#4b5563'] }
+  ];
+  const NYANCE = ['lys', 'mellem', 'mørk'];
+  function paletteName(hex) {
+    hex = String(hex || '').toLowerCase();
+    for (const p of PALETTE) { const i = p.farver.indexOf(hex); if (i >= 0) return `${p.navn} ${NYANCE[i]}`; }
+    return hex;
+  }
+  const pal = document.createElement('div');
+  pal.className = 'rbPal';
+  pal.hidden = true;
+  document.body.appendChild(pal);
+  let palCb = null;
+  function openPalette(btn, cur, cb) {
+    palCb = cb;
+    pal.innerHTML = PALETTE.map(p => `<div class="rbPalRow"><span>${p.navn}</span>${p.farver.map((c, n) =>
+      `<button type="button" data-c="${c}" style="background:${c}" title="${p.navn} ${NYANCE[n]}"${c === cur ? ' class="sel"' : ''}></button>`).join('')}</div>`).join('') +
+      '<button type="button" class="rbPalNone" data-c="">Ingen farve</button>';
+    pal.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const f = palCb; closePalette(); f && f(b.dataset.c); });
+    pal.hidden = false;
+    const r = btn.getBoundingClientRect(), w = pal.offsetWidth, h = pal.offsetHeight;
+    pal.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+    pal.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + 'px';
+  }
+  function closePalette() { pal.hidden = true; palCb = null; }
+  document.addEventListener('click', e => { if (!pal.hidden && !e.target.closest('.rbPal, .rbSwatch')) closePalette(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePalette(); });
+
   function msg(id, text, cls = '') { const el = $(id); el.className = 'rbMsg ' + cls; el.textContent = text; }
 
   function tab(name) {
@@ -166,7 +213,7 @@
     await load();
     if (fane === 'struktur') renderStruktur();
   }
-  function close() { wrap.hidden = true; }
+  function close() { wrap.hidden = true; closePalette(); }
   $('rbClose').onclick = close;
   wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !wrap.hidden) close(); });
@@ -496,17 +543,25 @@
         <td><input type="number" data-i="${i}" data-f="gruppe" value="${s.gruppe ?? ''}" min="0" max="99" style="width:70px"></td>
         <td><input type="number" data-i="${i}" data-f="koebsgraense" value="${s.koebsgraense ?? ''}" min="0" step="1000" style="width:120px"></td>
         <td><input type="number" data-i="${i}" data-f="rabatprocent" value="${s.rabatprocent ?? ''}" min="0" max="100" style="width:80px"> %</td>
-        <td><input type="color" data-i="${i}" data-f="farve" value="${s.farve || '#eef0f2'}"> ${gruppeBadgeDraft(s)}</td>
+        <td style="white-space:nowrap"><button type="button" class="rbSwatch" data-pal="${i}" style="background:${s.farve || '#eef0f2'}" title="Vælg farve"></button>
+          ${gruppeBadgeDraft(s)} <span class="small muted">${esc(s.farve ? paletteName(s.farve) : 'ingen farve')}</span></td>
         <td><button type="button" class="btn" data-del="${i}">Slet</button></td>
       </tr>`).join('') || '<tr><td colspan="5" class="muted">Ingen rækker – tilføj fx gruppe 1, 10.000 kr., 4 %</td></tr>';
     $('rbStBody').querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
       const s = stDraft[+inp.dataset.i];
       const f = inp.dataset.f;
-      s[f] = f === 'farve' ? inp.value : (inp.value === '' ? null : Number(inp.value));
-      // Samme farve på alle rækker i gruppen
-      if (f === 'farve') stDraft.forEach(x => { if (x.gruppe === s.gruppe) x.farve = inp.value; });
-      if (f === 'farve' || f === 'gruppe') drawStruktur();
+      s[f] = inp.value === '' ? null : Number(inp.value);
+      if (f === 'gruppe') drawStruktur();
     }));
+    $('rbStBody').querySelectorAll('[data-pal]').forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      const s = stDraft[+b.dataset.pal];
+      openPalette(b, s.farve, farve => {
+        // Samme farve på alle rækker i gruppen
+        stDraft.forEach(x => { if (x === s || (s.gruppe !== null && x.gruppe === s.gruppe)) x.farve = farve; });
+        drawStruktur();
+      });
+    });
     $('rbStBody').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
       const s = stDraft[+b.dataset.del];
       if (s.id) {
