@@ -116,6 +116,7 @@
   <div class="adminBar" id="adminBar" hidden>
     <span class="adminBarLabel">Admin</span>
     <button type="button" class="btn" id="btnServiceaftaler">Serviceaftaler</button>
+    <button type="button" class="btn" id="btnRabat">Kemi rabat</button>
   </div>
 
   <main class="pageWrap">
@@ -452,7 +453,8 @@
     // ── Kolonnefiltre ──
     // Har en kolonne få forskellige værdier (fx Område: Nord, Syd, Øst …),
     // bliver filteret en rulleliste med værdierne. Ellers et tekstfelt.
-    // Valg i rullelisten gemmes som "=værdi" (præcis match), "=" = tom.
+    // Valg i rullelisten gemmes som "=værdi" (præcis match), "=" = tom og
+    // "=*" = udfyldt (alle med en værdi i kolonnen).
     const MAX_VALG = 40;
     const NO_SELECT = new Set(['kundenr', 'navn', 'importeret', 'sa_note']);
 
@@ -481,6 +483,7 @@
     }
     function matchFilter(k, key, f) {
       f = String(f || '').trim();
+      if (f === '=*') return colValues(k, key).length > 0;
       if (f.startsWith('=')) {
         const want = f.slice(1).toLowerCase();
         const vals = colValues(k, key).map(v => v.toLowerCase());
@@ -497,6 +500,7 @@
       const fri = cur && !cur.startsWith('=') ? `<option value="${esc(cur)}" selected>Indeholder "${esc(cur)}"</option>` : '';
       return `<select class="colFilter colSelect" data-col="${key}">
         <option value="">Alle</option>${fri}
+        ${d.tomme ? `<option value="=*"${cur === '=*' ? ' selected' : ''}>– Udfyldt –</option>` : ''}
         ${d.values.map(v => `<option value="=${esc(v)}"${cur.toLowerCase() === ('=' + v).toLowerCase() ? ' selected' : ''}>${esc(v)}</option>`).join('')}
         ${d.tomme ? `<option value="="${cur === '=' ? ' selected' : ''}>– Tom –</option>` : ''}
       </select>`;
@@ -885,6 +889,10 @@
   </script>
   <script src="/assets/kundeliste/udstyr.js"></script>
   <script src="/assets/kundeliste/eksport.js"></script>
-  <script>document.getElementById('btnEksport').onclick = () => openEksport();</script>
+  <script src="/assets/kundeliste/rabat.js"></script>
+  <script>
+    document.getElementById('btnEksport').onclick = () => openEksport();
+    document.getElementById('btnRabat').onclick = () => openRabat();
+  </script>
 </body>
 </html>
