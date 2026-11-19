@@ -136,7 +136,8 @@
         <option value="">Alle</option>
         <option value="false">Inaktive</option>
         <option value="flereadresser">Flere adresser</option>
-        <option value="uniconta">Uniconta</option>
+        <option value="uniconta">Uniconta aktiv</option>
+        <option value="uniconta_inaktiv">Uniconta inaktiv</option>
       </select>
       <select id="kolGruppe" title="Hvilke kolonner der vises. Automatisk = ud fra din afdeling"></select>
       <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
@@ -323,7 +324,7 @@
     // Uniconta-debitorer, der IKKE er i kundelisten – med distrikt som område.
     let uniKunder = null;
     let uniPromise = null;
-    const visUniconta = () => document.getElementById('aktiv').value === 'uniconta';
+    const visUniconta = () => document.getElementById('aktiv').value.startsWith('uniconta');
     // En Uniconta-debitor som række i kundelisten (distrikt vises som område)
     const uniRow = u => ({ kundenr: u.kundenr, navn: u.navn, omraade: u.distrikt, uniconta: true,
                            kontraktAntal: {}, serier: [], postnumre: [], salmonella: [] });
@@ -341,16 +342,17 @@
       if (!uniKunder || q.length < 2 || onlyXX || onlySal || visUniconta()) return [];
       const iListe = new Set(rows.map(k => String(k.kundenr)));
       return uniKunder
-        .filter(u => !iListe.has(u.kundenr) && [u.kundenr, u.konto, u.navn, u.distrikt].join(' ').toLowerCase().includes(q))
+        .filter(u => u.aktiv !== false && !iListe.has(u.kundenr) && [u.kundenr, u.konto, u.navn, u.distrikt].join(' ').toLowerCase().includes(q))
         .map(uniRow);
     }
 
     async function loadKunder() {
       const aktiv = document.getElementById('aktiv').value;
       // "Uniconta": kun debitorer, der findes i Uniconta men ikke i kundelisten
-      if (aktiv === 'uniconta') {
+      if (aktiv === 'uniconta' || aktiv === 'uniconta_inaktiv') {
         await loadUniconta();
-        rows = (uniKunder || []).map(uniRow);
+        const vilAktive = aktiv === 'uniconta';
+        rows = (uniKunder || []).filter(u => (u.aktiv !== false) === vilAktive).map(uniRow);
         salOk = true;
         document.getElementById('salStatus').textContent = '';
         return;
@@ -756,7 +758,7 @@
       document.getElementById('btnXX').classList.toggle('active', onlyXX);
       document.getElementById('btnSal').classList.toggle('active', onlySal);
       // Vis i den grå linje, hvilken filtrering der er aktiv
-      const aktive = [visUniconta() ? 'UNICONTA DEBITORER' : '', onlySal ? 'Salmonella' : '', onlyXX ? 'Projekt' : ''].filter(Boolean);
+      const aktive = [visUniconta() ? (document.getElementById('aktiv').value === 'uniconta' ? 'UNICONTA DEBITORER – AKTIVE' : 'UNICONTA DEBITORER – INAKTIVE') : '', onlySal ? 'Salmonella' : '', onlyXX ? 'Projekt' : ''].filter(Boolean);
       const af = document.getElementById('activeFilter');
       af.hidden = !aktive.length;
       af.textContent = aktive.length ? `Aktiv filtrering: ${aktive.join(' + ')}` : '';

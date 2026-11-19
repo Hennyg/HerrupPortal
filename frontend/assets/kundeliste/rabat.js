@@ -395,7 +395,7 @@
       const iListe = new Set((rows || []).map(k => String(k.kundenr)));
       $('rbKundeList').innerHTML =
         (rows || []).map(k => `<option value="${esc(k.kundenr)} – ${esc(k.navn)}"></option>`).join('') +
-        (uniKunder || []).filter(u => !iListe.has(u.kundenr) && !u.iKundeliste)
+        (uniKunder || []).filter(u => !iListe.has(u.kundenr) && !u.iKundeliste && u.aktiv !== false)
           .map(u => `<option value="${esc(u.kundenr)} – ${esc(uniNavn(u))} · Uniconta"></option>`).join('');
     };
     fyld();

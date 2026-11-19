@@ -1,6 +1,6 @@
 // api/_unicontaKunder.js
 // Debitorer fra Uniconta (kontonumre 8000…) i en let udgave til kundelisten:
-//   { kundenr: "0080002026", konto: "80002026", navn, distrikt }
+//   { kundenr: "0080002026", konto: "80002026", navn, distrikt, aktiv }
 // Kundenr. fyldes op til 10 cifre, så det kan sammenlignes med kundelisten.
 // Listen caches i 15 min, så kun den første, der åbner kundelisten, venter.
 //
@@ -8,7 +8,8 @@
 // andet hos jer, sættes app setting UNICONTA_DISTRICT_FIELD (fx "Dim1").
 // Feltnavnene kan ses på /api/uniconta/test?entity=DebtorClient
 //
-// Kun debitorer med AktivKunde = Ja tages med (brugerfelt i Uniconta).
+// aktiv = brugerfeltet AktivKunde = Ja. Alle debitorer returneres med flaget,
+// så kundelisten kan vise både "Uniconta aktiv" og "Uniconta inaktiv".
 // Hedder feltet noget andet, sættes app setting UNICONTA_AKTIV_FIELD.
 
 const { unicontaFetch } = require("./_uniconta");
@@ -42,7 +43,7 @@ async function hent() {
   }
   const df = distriktFelter();
   // AktivKunde = Ja (true / "Ja" / "1"). Findes feltet slet ikke i data,
-  // filtreres der ikke – så listen ikke bliver tom pga. et forkert feltnavn.
+  // regnes alle som aktive – så intet forsvinder pga. et forkert feltnavn.
   const aktivFelt = String(process.env.UNICONTA_AKTIV_FIELD || "AktivKunde").trim();
   const harFelt = rows.some(r => r && Object.prototype.hasOwnProperty.call(r, aktivFelt));
   const erAktiv = r => {
@@ -50,8 +51,8 @@ async function hent() {
     return v === true || v === 1 || /^(ja|1|true|yes|sand)$/i.test(String(v ?? "").trim());
   };
   const list = rows
-    .filter(r => !harFelt || erAktiv(r))
     .map(r => ({
+      aktiv: !harFelt || erAktiv(r),
       konto: first(r, ["Account", "account"]),
       navn: first(r, ["Name", "name"]),
       distrikt: first(r, df)
