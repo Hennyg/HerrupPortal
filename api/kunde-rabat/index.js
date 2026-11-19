@@ -3,6 +3,7 @@
 //
 // Alle indloggede:
 //   GET    ?kundenr=<nr>            → { rabat, struktur, historik }   (kunde.html)
+//   GET    ?action=kolonner         → { items, struktur }             (kemi rabat-kolonner i kundelisten)
 //
 // Kun portal_admin / portal_kundeliste_admin:
 //   GET    ?action=liste            → { items, struktur, kommentarKolonne }
@@ -22,6 +23,16 @@ module.exports = async function (context, req) {
   try {
     const me = N.getPrincipal(req);
     if (!me) return N.json(context, 401, { error: "Ikke logget ind" });
+
+    // Kemi rabat-kolonner i kundelisten (alle indloggede): alle rabat-kunder + struktur
+    if (action === "kolonner" && method === "GET") {
+      const [items, struktur] = await Promise.all([R.listRabat(), R.listStruktur()]);
+      return N.json(context, 200, {
+        items: items.map(r => ({ kundenr: r.kundenr, gruppe: r.gruppe, robot: r.robot, yverpleje: r.yverpleje,
+                                 tank: r.tank, rabatchange: r.rabatchange, kommentar: r.kommentar })),
+        struktur
+      });
+    }
 
     // Læsning til kundesiden
     if (!action && method === "GET") {

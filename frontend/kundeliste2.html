@@ -89,6 +89,9 @@
     .saLine.udlobet { color:#9ca3af; }
     .saChip { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; margin:1px 4px 1px 0; background:#e0f2fe; color:#075985; white-space:nowrap; }
     .saChip.udlobet { background:#f3f4f6; color:#9ca3af; text-decoration:line-through; }
+    /* Kemi rabat-kolonner */
+    .rbBadge { display:inline-block; min-width:24px; text-align:center; padding:1px 8px; border-radius:999px; font-weight:700; font-size:12px; background:#eef0f2; }
+    td.rbYes { text-align:center; color:#15803d; font-weight:700; }
     /* Kunder der kun findes i Uniconta (vises kun ved søgning) */
     .uniTag { display:inline-block; padding:0 6px; border-radius:999px; font-size:11px; background:#ede9fe; color:#5b21b6; font-weight:600; margin-left:4px; }
     #tbody tr.uniRow td { background:#faf9ff; }
@@ -132,9 +135,9 @@
         <option value="flereadresser">Flere adresser</option>
         <option value="uniconta">Uniconta</option>
       </select>
+      <select id="kolGruppe" title="Hvilke kolonner der vises. Automatisk = ud fra din afdeling"></select>
       <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
       <button type="button" class="btn" id="btnXX" title="Vis kun projekter: kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (planlagte projekter, der ikke er aktive endnu)">Projekt</button>
-      <select id="kolGruppe" title="Hvilke kolonner der vises. Automatisk = ud fra din afdeling"></select>
       <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
       <div class="toolbarSpacer"></div>
       <div id="countText" class="muted small"></div>
@@ -304,7 +307,7 @@
     async function load() {
       setStatus('loading','<div class="spinner"></div> Henter kunder...');
       await Promise.all([loadKunder(), loadLastImport(), loadFarver(), kolCfgLoaded || (kolCfgLoaded = loadKolonner())]);
-      await ensureSa();
+      await Promise.all([ensureSa(), ensureRb()]);
       setStatus('', '');
       buildHead();                   // filter-rullelister bygges ud fra de hentede kunder
       render();
@@ -430,8 +433,46 @@
       sa_afdeling:    saLines(a => a.afdeling),
       sa_start:       saLines(a => fmtDate(a.startdato), a => a.startdato),
       sa_slut:        saLines(a => fmtDate(a.enddato), a => a.enddato),
-      sa_note:        saLines(a => a.note, null, 'small')
+      sa_note:        saLines(a => a.note, null, 'small'),
+
+      // ── Kemi rabat (fra lch_rabat_grupper) ──
+      rb_gruppe: {
+        sort: k => String(rbFor(k)?.gruppe ?? '').padStart(3, '0'), text: k => String(rbFor(k)?.gruppe ?? ''),
+        cell: k => { const g = rbFor(k)?.gruppe; if (g === null || g === undefined) return '<td></td>';
+          const c = rbFarve(g); return `<td><span class="rbBadge"${c ? ` style="background:${c};color:${textOn(c)}"` : ''}>${esc(g)}</span></td>`; }
+      },
+      rb_robot: rbYd('robot'),
+      rb_yver:  rbYd('yverpleje'),
+      rb_tank:  rbYd('tank'),
+      rb_aendring:  { sort: k => rbFor(k)?.rabatchange || '', text: k => rbFor(k)?.rabatchange || '', cell: k => `<td class="small">${esc(rbFor(k)?.rabatchange || '')}</td>` },
+      rb_kommentar: { sort: k => rbFor(k)?.kommentar || '', text: k => rbFor(k)?.kommentar || '', cell: k => `<td class="small">${esc(rbFor(k)?.kommentar || '')}</td>` }
     };
+
+    // ── Kemi rabat-data ────────────────────────────────────────────────────
+    // Hentes kun, når en rb_-kolonne vises.
+    let rbByKunde = null, rbStruktur = [], rbLoading = null;
+    const usesRb = () => activeCols.some(c => c.startsWith('rb_'));
+    const rbFor = k => (rbByKunde && rbByKunde.get(String(k.kundenr))) || null;
+    const rbFarve = g => rbStruktur.find(s => s.gruppe === Number(g) && s.farve)?.farve || '';
+    // Ja/nej-kolonne: ✓ i cellen, "Ja"/"Nej" i filter-rullelisten
+    function rbYd(f) {
+      return {
+        sort: k => rbFor(k)?.[f] ? '1' : '0',
+        text: k => rbFor(k) ? (rbFor(k)[f] ? 'Ja' : 'Nej') : '',
+        cell: k => `<td class="rbYes">${rbFor(k)?.[f] ? '✓' : ''}</td>`
+      };
+    }
+    async function ensureRb() {
+      if (rbByKunde || !usesRb()) return;
+      if (!rbLoading) {
+        rbLoading = fetch('/api/kunde-rabat?action=kolonner', { cache: 'no-store' })
+          .then(r => r.json())
+          .then(j => { rbByKunde = new Map((j.items || []).map(r => [String(r.kundenr), r])); rbStruktur = j.struktur || []; })
+          .catch(() => { rbByKunde = new Map(); })
+          .finally(() => { rbLoading = null; });
+      }
+      await rbLoading;
+    }
 
     // ── Serviceaftale-data ─────────────────────────────────────────────────
     // Hentes kun, når en serviceaftale-kolonne vises (eller efter oprettelse).
@@ -497,7 +538,7 @@
     // Valg i rullelisten gemmes som "=værdi" (præcis match), "=" = tom og
     // "=*" = udfyldt (alle med en værdi i kolonnen).
     const MAX_VALG = 40;
-    const NO_SELECT = new Set(['kundenr', 'navn', 'importeret', 'sa_note']);
+    const NO_SELECT = new Set(['kundenr', 'navn', 'importeret', 'sa_note', 'rb_kommentar']);
 
     // Værdierne i en kolonne for én kunde (flere ved fx kontrakter/aftaler)
     function colValues(k, key) {
@@ -509,6 +550,7 @@
     function distinctValues(key) {
       if (!rows.length || NO_SELECT.has(key)) return null;   // (ingen kunder endnu = første buildHead)
       if (key.startsWith('sa_') && !saByKunde) return null;
+      if (key.startsWith('rb_') && !rbByKunde) return null;
       const set = new Map();
       let tomme = false;
       for (const k of rows) {
@@ -612,6 +654,7 @@
       buildHead();
       render();
       if (usesSa() && !saByKunde) ensureSa().then(() => { buildHead(); render(); });
+      if (usesRb() && !rbByKunde) ensureRb().then(() => { buildHead(); render(); });
     }
 
     document.getElementById('kolGruppe').onchange = e => {

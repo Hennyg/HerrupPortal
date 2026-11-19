@@ -13,7 +13,7 @@
 
   // ── Felter ───────────────────────────────────────────────────────────────
   const KUNDE_FELTER = KL_KOLONNER.map(c => ({
-    id: 'k:' + c.key, gruppe: c.gruppe === 'Serviceaftale' ? 'Serviceaftale' : 'Kunde', label: c.label,
+    id: 'k:' + c.key, gruppe: ['Serviceaftale', 'Kemi rabat'].includes(c.gruppe) ? c.gruppe : 'Kunde', label: c.label,
     value: (k) => cleanText(COLDEF[c.key] ? COLDEF[c.key].text(k) : k[c.key])
   }));
   // Pænere tekst til eksport end filterteksten
@@ -60,6 +60,14 @@
   let optionKeys = [...KL_UDSTYR_KEYS];
   const optFelt = key => ({ id: 'o:' + key, gruppe: 'Options', label: key, option: key, value: (k, p) => cleanText(p?.udstyr?.[key]) });
 
+  // Kemi rabat-data hentes, selv om kolonnerne ikke vises i listen
+  async function ensureRbFor() {
+    if (rbByKunde) return;
+    const r = await fetch('/api/kunde-rabat?action=kolonner', { cache: 'no-store' });
+    const j = await r.json().catch(() => ({}));
+    rbByKunde = new Map((j.items || []).map(x => [String(x.kundenr), x]));
+    rbStruktur = j.struktur || [];
+  }
   function cleanText(v) { return String(v ?? '').replace(/[\t\r\n]+/g, ' ').trim(); }
 
   // ── Popup ────────────────────────────────────────────────────────────────
@@ -159,6 +167,7 @@
     const grupper = [
       ['Kunde', KUNDE_FELTER.filter(f => f.gruppe === 'Kunde'), true],
       ['Serviceaftale', KUNDE_FELTER.filter(f => f.gruppe === 'Serviceaftale'), true],
+      ['Kemi rabat', KUNDE_FELTER.filter(f => f.gruppe === 'Kemi rabat'), true],
       ['Produkt', PRODUKT_FELTER, prod],
       ['Tomme kolonner', BLANK, true],
       ['Options', optionKeys.map(optFelt), prod]
@@ -213,7 +222,13 @@
   async function build() {
     const fields = valgteFelter();
     if (!fields.length) throw new Error('Vælg mindst én kolonne');
-    if (fields.some(f => f.id.startsWith('k:sa_'))) await ensureSa();
+    if (fields.some(f => f.id.startsWith('k:sa_')) && !saByKunde) {
+      // Serviceaftaler hentes, selv om kolonnerne ikke vises i listen
+      const r = await fetch('/api/kunde-serviceaftaler', { cache: 'no-store' });
+      const j = await r.json().catch(() => ({}));
+      buildSaMap(j.items || []);
+    }
+    if (fields.some(f => f.id.startsWith('k:rb_'))) await ensureRbFor(fields);
     const title = $('exOverskrift').value.trim() || 'Kundeliste';
     const kunder = [...filtered];
 

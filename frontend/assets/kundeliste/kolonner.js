@@ -4,6 +4,8 @@
 // ikke ændres – "label" og "gruppe" må gerne.
 // Knapperne Info / Åbn / Produkt vises altid til sidst.
 //
+// Kemi rabat-kolonnerne (rb_*) kommer fra lch_rabat_grupper (+ farve fra lch_rabat_struktur).
+//
 // Serviceaftale-kolonnerne (sa_*) kommer fra tabellen lch_serviceaftaler
 // (+ aftaleteksten). En kunde kan have flere aftaler – så står der én linje
 // pr. aftale, i samme rækkefølge i alle sa_-kolonner (nyeste start først).
@@ -26,7 +28,14 @@ window.KL_KOLONNER = [
   { key: 'sa_afdeling',    label: 'Aftale afdeling',      gruppe: 'Serviceaftale' },
   { key: 'sa_start',       label: 'Aftale start',         gruppe: 'Serviceaftale' },
   { key: 'sa_slut',        label: 'Aftale slut',          gruppe: 'Serviceaftale' },
-  { key: 'sa_note',        label: 'Aftale note',          gruppe: 'Serviceaftale' }
+  { key: 'sa_note',        label: 'Aftale note',          gruppe: 'Serviceaftale' },
+
+  { key: 'rb_gruppe',      label: 'Kemi rabat gr.',       gruppe: 'Kemi rabat' },
+  { key: 'rb_robot',       label: 'Robot rengøring',      gruppe: 'Kemi rabat' },
+  { key: 'rb_yver',        label: 'Yverpleje',            gruppe: 'Kemi rabat' },
+  { key: 'rb_tank',        label: 'Tank rengøring',       gruppe: 'Kemi rabat' },
+  { key: 'rb_aendring',    label: 'Rabat ændring',        gruppe: 'Kemi rabat' },
+  { key: 'rb_kommentar',   label: 'Rabat kommentar',      gruppe: 'Kemi rabat' }
 ];
 
 // Bruges, når der ingen kolonnegruppe er (eller ingen passer)

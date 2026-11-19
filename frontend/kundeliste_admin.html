@@ -18,6 +18,16 @@
     .linkTile span.muted { font-size:12px; }
     .panelHead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
     .panelHead h2 { margin:0; flex:1; }
+    /* Sammenklappelige sektioner: kun overskriften vises, klik for at åbne */
+    .panel.fold > .panelHead { cursor:pointer; margin-bottom:0; user-select:none; }
+    .panel.fold > .panelHead h2::before { content:'▸'; display:inline-block; width:1.1em; color:#9ca3af; transition:transform .15s; }
+    .panel.fold.open > .panelHead h2::before { transform:rotate(90deg); }
+    .panel.fold.open > .panelHead { margin-bottom:10px; }
+    .panel.fold:not(.open) > .panelHead > :not(h2) { display:none; }
+    .panel.fold:not(.open) > .foldBody { display:none; }
+    .panel.fold > .panelHead:hover h2 { color:var(--red); }
+    .foldTools { display:flex; justify-content:flex-end; gap:8px; }
+    .foldTools button { border:0; background:none; color:var(--red); cursor:pointer; font-size:13px; }
     .panel p.muted { margin:0 0 10px; font-size:13px; }
     .admTable { width:100%; border-collapse:collapse; font-size:14px; }
     .admTable th { text-align:left; font-size:13px; color:#374151; padding:8px; border-bottom:1px solid #d1d5db; background:#f9fafb; white-space:nowrap; }
@@ -126,6 +136,25 @@
         </a>
       </div>
 
+      <div class="foldTools">
+        <button type="button" id="foldAllOpen">Åbn alle</button>
+        <button type="button" id="foldAllClose">Luk alle</button>
+      </div>
+
+      <!-- Kemi rabat -->
+      <section class="panel" data-fold="rabat">
+        <div class="panelHead">
+          <h2>💸 Kemi rabat</h2>
+        </div>
+        <p class="muted">Kunderabatordningen (lch_rabat_grupper). Ret kundernes gruppe og ydelser, importér regnearket eller ret rabatstrukturen. Alle ændringer gemmes i historikken.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn primary" data-rabat="kunder">Kunder i rabatordningen</button>
+          <button type="button" class="btn" data-rabat="import">Importér Excel</button>
+          <button type="button" class="btn" data-rabat="struktur">Rabatstruktur</button>
+          <span class="msg" id="rabatMsg"></span>
+        </div>
+      </section>
+
       <!-- Aftaletekster -->
       <section class="panel">
         <div class="panelHead">
@@ -205,6 +234,7 @@
 
   <script src="/assets/kundeliste/common.js"></script>
   <script src="/assets/kundeliste/kolonner.js"></script>
+  <script src="/assets/kundeliste/rabat.js"></script>
   <script>
     const API = '/api/kundeliste-admin';
 
@@ -534,6 +564,7 @@
     }
 
     document.getElementById('btnNyGruppe').onclick = () => openGruppe(null);
+    // (knapperne i overskrifterne vises kun, når sektionen er åben)
     document.getElementById('kgCancel').onclick = closeGruppe;
     document.getElementById('kgAfdAdd').onclick = () => {
       const inp = document.getElementById('kgAfdNy');
@@ -582,6 +613,56 @@
       }
     }
 
+    // ── Sammenklappelige sektioner ─────────────────────────────────────────
+    // Alle sektioner starter lukkede; hvilke der er åbne, huskes i browseren.
+    const FOLD_KEY = 'kundeliste_admin_open';
+    function foldState() { try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]')); } catch { return new Set(); } }
+    function saveFold() {
+      const open = [...document.querySelectorAll('.panel.fold.open')].map(p => p.dataset.fold);
+      try { localStorage.setItem(FOLD_KEY, JSON.stringify(open)); } catch {}
+    }
+    function setupFold() {
+      const open = foldState();
+      document.querySelectorAll('#adminWrap > section.panel').forEach((p, i) => {
+        const head = p.querySelector(':scope > .panelHead');
+        if (!head) return;
+        p.dataset.fold = p.dataset.fold || (head.querySelector('h2')?.textContent || 'p' + i).trim();
+        // Alt efter overskriften pakkes ind, så det kan skjules
+        const body = document.createElement('div');
+        body.className = 'foldBody';
+        while (head.nextSibling) body.appendChild(head.nextSibling);
+        p.appendChild(body);
+        p.classList.add('fold');
+        p.classList.toggle('open', open.has(p.dataset.fold));
+        head.addEventListener('click', e => {
+          if (e.target.closest('button, input, select, a, label')) return;   // knapper i overskriften
+          p.classList.toggle('open');
+          saveFold();
+        });
+      });
+      document.getElementById('foldAllOpen').onclick = () => { document.querySelectorAll('.panel.fold').forEach(p => p.classList.add('open')); saveFold(); };
+      document.getElementById('foldAllClose').onclick = () => { document.querySelectorAll('.panel.fold').forEach(p => p.classList.remove('open')); saveFold(); };
+    }
+    // Åbn en sektion (fx når man trykker "Ny gruppe" eller retter noget)
+    function openFold(el) { const p = el.closest('.panel.fold'); if (p && !p.classList.contains('open')) { p.classList.add('open'); saveFold(); } }
+
+    // ── Kemi rabat (popuppen fra rabat.js) ─────────────────────────────────
+    // rabat.js bruger "rows" (kunder til navne/opslag) og kundeUrl fra kundelisten.
+    var rows = [];
+    function kundeUrl(nr) { return `/kunde.html?kundenr=${encodeURIComponent(nr)}`; }
+    let kunderHentet = null;
+    document.querySelectorAll('[data-rabat]').forEach(b => b.onclick = async () => {
+      if (!kunderHentet) {
+        setMsg('rabatMsg', 'Henter kunder…');
+        kunderHentet = fetch('/api/kunder?aktiv=', { cache: 'no-store' })
+          .then(r => r.json()).then(j => { rows = j.kunder || []; })
+          .catch(() => { kunderHentet = null; });
+        await kunderHentet;
+        setMsg('rabatMsg', '');
+      }
+      openRabat(b.dataset.rabat);
+    });
+
     // ── Start ───────────────────────────────────────────────────────────────
     (async function init() {
       initUser();
@@ -593,6 +674,7 @@
       }
       setStatus('', '');
       document.getElementById('adminWrap').hidden = false;
+      setupFold();
       loadKontrakter().catch(e => {
         document.getElementById('farveBody').innerHTML = `<tr><td colspan="5" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;
       });
