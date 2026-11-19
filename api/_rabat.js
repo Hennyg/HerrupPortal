@@ -106,7 +106,8 @@ async function listRabat() {
   const kunder = await kundeMap();
   const byId = new Map([...kunder.values()].map(k => [k.id, k]));
   const list = rows.map(fromDv).map(r => {
-    const k = r.kundeId && byId.get(r.kundeId);
+    // Opslaget – eller kundenr. (rækker oprettet for en Uniconta-kunde har intet opslag)
+    const k = (r.kundeId && byId.get(r.kundeId)) || kunder.get(r.kundenr);
     if (k) { r.kundenr = k.kundenr; r.navn = k.navn; r.kilde = "kundeliste"; }
     return r;
   });
@@ -142,9 +143,10 @@ async function rabatForKunde(kundenr) {
   const k = (await kundeMap()).get(kundenr);
   const types = await attrTypes();
   const sel = [...SELECT_G(), ...(hasKommentar(types) && Object.keys(types).length ? [F.kommentar] : [])].join(",");
-  const filter = k
-    ? `${KUNDE_VAL} eq ${k.id}`
-    : `cr1eb_lch_name eq '${kundenr.replace(/'/g, "''")}'`;
+  // Find rækken via opslaget ELLER kundenr. i lch_name – så en række oprettet for
+  // en Uniconta-kunde stadig findes, når kunden senere kommer i kundelisten
+  const nameFilter = `cr1eb_lch_name eq '${kundenr.replace(/'/g, "''")}'`;
+  const filter = k ? `(${KUNDE_VAL} eq ${k.id} or ${nameFilter})` : nameFilter;
   const j = await dvFetch(`${T.gruppe.set}?$select=${sel}&$filter=${encodeURIComponent(filter)}&$top=1`);
   const r = j.value?.[0];
   if (!r) return null;
@@ -209,6 +211,8 @@ async function gemRabat(input, opts) {
     const created = await dvFetch(T.gruppe.set, { method: "POST", body, headers: { Prefer: "return=representation" } });
     id = created?.[T.gruppe.id];
   } else {
+    // Kunden er kommet i kundelisten siden: bind opslaget nu
+    if (kunde && !existing.kundeId) body[`${KUNDE_NAV}@odata.bind`] = `/${T.kunde.set}(${kunde.id})`;
     await dvFetch(`${T.gruppe.set}(${id})`, { method: "PATCH", body });
   }
 
