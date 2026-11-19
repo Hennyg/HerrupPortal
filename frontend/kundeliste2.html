@@ -130,6 +130,7 @@
         <option value="">Alle</option>
         <option value="false">Inaktive</option>
         <option value="flereadresser">Flere adresser</option>
+        <option value="uniconta">Uniconta</option>
       </select>
       <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
       <button type="button" class="btn" id="btnXX" title="Vis kun projekter: kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (planlagte projekter, der ikke er aktive endnu)">Projekt</button>
@@ -316,26 +317,38 @@
     // Uniconta-debitorer, der IKKE er i kundelisten – med distrikt som område.
     let uniKunder = null;
     let uniPromise = null;
+    const visUniconta = () => document.getElementById('aktiv').value === 'uniconta';
+    // En Uniconta-debitor som række i kundelisten (distrikt vises som område)
+    const uniRow = u => ({ kundenr: u.kundenr, navn: u.navn, omraade: u.distrikt, uniconta: true,
+                           kontraktAntal: {}, serier: [], postnumre: [], salmonella: [] });
     function loadUniconta() {
-      if (uniKunder || uniPromise) return uniPromise;
+      if (uniKunder) return Promise.resolve();
+      if (uniPromise) return uniPromise;
       uniPromise = fetch('/api/kundeliste-uniconta', { cache: 'no-store' })
         .then(r => r.json())
         .then(j => { uniKunder = (j.kunder || []).filter(u => !u.iKundeliste); })
         .catch(() => { uniKunder = []; })
-        .finally(() => { uniPromise = null; if (document.getElementById('q').value.trim()) render(); });
+        .finally(() => { uniPromise = null; if (document.getElementById('q').value.trim() && !visUniconta()) render(); });
       return uniPromise;
     }
     function uniTreffer(q) {
-      if (!uniKunder || q.length < 2 || onlyXX || onlySal) return [];
+      if (!uniKunder || q.length < 2 || onlyXX || onlySal || visUniconta()) return [];
       const iListe = new Set(rows.map(k => String(k.kundenr)));
       return uniKunder
         .filter(u => !iListe.has(u.kundenr) && [u.kundenr, u.konto, u.navn, u.distrikt].join(' ').toLowerCase().includes(q))
-        .map(u => ({ kundenr: u.kundenr, navn: u.navn, omraade: u.distrikt, uniconta: true,
-                     kontraktAntal: {}, serier: [], postnumre: [], salmonella: [] }));
+        .map(uniRow);
     }
 
     async function loadKunder() {
       const aktiv = document.getElementById('aktiv').value;
+      // "Uniconta": kun debitorer, der findes i Uniconta men ikke i kundelisten
+      if (aktiv === 'uniconta') {
+        await loadUniconta();
+        rows = (uniKunder || []).map(uniRow);
+        salOk = true;
+        document.getElementById('salStatus').textContent = '';
+        return;
+      }
       const r = await fetch('/api/kunder?aktiv=' + encodeURIComponent(aktiv));
       const j = await r.json();
       if (!r.ok || j.error) throwStatus('Fejl: ' + esc(j.error || r.status));
@@ -697,7 +710,7 @@
       document.getElementById('btnXX').classList.toggle('active', onlyXX);
       document.getElementById('btnSal').classList.toggle('active', onlySal);
       // Vis i den grå linje, hvilken filtrering der er aktiv
-      const aktive = [onlySal ? 'Salmonella' : '', onlyXX ? 'Projekt' : ''].filter(Boolean);
+      const aktive = [visUniconta() ? 'UNICONTA DEBITORER' : '', onlySal ? 'Salmonella' : '', onlyXX ? 'Projekt' : ''].filter(Boolean);
       const af = document.getElementById('activeFilter');
       af.hidden = !aktive.length;
       af.textContent = aktive.length ? `Aktiv filtrering: ${aktive.join(' + ')}` : '';
