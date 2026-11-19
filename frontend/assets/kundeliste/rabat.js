@@ -4,7 +4,8 @@
 //   Importér Excel – læs regnearket (alle ark med en "Kundenr."-kolonne), vis ændringer, importér
 //   Rabatstruktur – rabat-% pr. gruppe og købsgrænse + farve pr. gruppe
 //
-// Forudsætter kundelistens globale: rows (kunder), esc, kundeUrl.
+// Forudsætter globale: rows (kunder), esc, kundeUrl – findes på kundeliste2.html
+// og kundeliste_admin.html. openRabat('kunder' | 'import' | 'struktur').
 (function () {
   const API = '/api/kunde-rabat';
   const YD = [['robot', 'Robot'], ['yverpleje', 'Yverpleje'], ['tank', 'Tank']];
@@ -121,11 +122,11 @@
           <span class="rbMsg" id="rbImpMsg"></span>
         </div>
         <div class="rbInfo">Vælg regnearket. Alle ark med en kolonne <b>Kundenr.</b> læses (fx Tabel1, Tabel2 og Tabel3).
-          Kolonnerne findes ud fra overskrifterne: <i>Kemi Rabat gr.</i>, <i>Kundenr.</i>, <i>Robot rengøring</i>, <i>Yverpleje</i>, <i>Tank rengøring</i>, <i>Rabat ændring</i> og evt. <i>Kommentar</i>.
-          I <i>Rabat ændring</i> gemmes "ok" og "ændret …" som ændring – anden tekst (fx et navn) lægges i kommentaren. Kunder, der ikke er i regnearket, røres ikke.</div>
+          Kolonnerne findes ud fra overskrifterne: <i>Kemi Rabat gr.</i>, <i>Kundenr.</i>, <i>Robot rengøring</i>, <i>Yverpleje</i>, <i>Tank rengøring</i> og <i>Rabat ændring</i> (hvor den findes).
+          Rækker med kundenr. 0 (slettede kunder) springes over. Kunder, der ikke er i regnearket, røres ikke.</div>
         <div class="rbScroll">
           <table class="rbTable">
-            <thead><tr><th>Ark</th><th>Kundenr.</th><th>Navn</th><th>Gruppe</th><th class="c">Robot</th><th class="c">Yverpleje</th><th class="c">Tank</th><th>Rabat ændring</th><th>Kommentar</th><th>Status</th></tr></thead>
+            <thead><tr><th>Ark</th><th>Kundenr.</th><th>Navn</th><th>Gruppe</th><th class="c">Robot</th><th class="c">Yverpleje</th><th class="c">Tank</th><th>Rabat ændring</th><th>Status</th></tr></thead>
             <tbody id="rbImpBody"></tbody>
           </table>
         </div>
@@ -159,10 +160,11 @@
   }
   wrap.querySelectorAll('.rbTabs button').forEach(b => b.onclick = () => tab(b.dataset.tab));
 
-  async function open() {
+  async function open(fane = 'kunder') {
     wrap.hidden = false;
-    tab('kunder');
+    tab(fane);
     await load();
+    if (fane === 'struktur') renderStruktur();
   }
   function close() { wrap.hidden = true; }
   $('rbClose').onclick = close;
@@ -344,12 +346,11 @@
       robot: idx(h => h.includes('robot')),
       yverpleje: idx(h => h.includes('yver')),
       tank: idx(h => h.includes('tank')),
-      change: idx(h => h.includes('rabat ændring') || h.includes('rabat aendring') || h.includes('rabatændring')),
-      kommentar: idx(h => h.includes('kommentar'))
+      change: idx(h => h.includes('rabat ændring') || h.includes('rabat aendring') || h.includes('rabatændring'))
     };
   }
-  // "ok" og "ændret …" er rabat-ændringer – alt andet er en kommentar
-  const erAendring = v => /^(ok|ændret|aendret|[+-])/i.test(String(v || '').trim());
+  // Kundenr. 0 = kunden er slettet i kundelisten → importeres ikke
+  const erSlettet = nr => /^0+$/.test(String(nr || ''));
 
   async function readFile(file) {
     const XLSX = await loadXlsx();
@@ -365,30 +366,24 @@
       }
       if (h < 0) continue;
       const c = findCols(grid[h]);
-      // "Kommentar til leveringssted" kan stå i rækken over overskrifterne
-      if (c.kommentar < 0 && h > 0) {
-        const up = grid[h - 1].findIndex(x => norm(x).includes('kommentar'));
-        if (up >= 0) c.kommentar = up;
-      }
-      let n = 0;
+      let n = 0, slettede = 0;
       for (let i = h + 1; i < grid.length; i++) {
         const row = grid[i];
         const nr = normNr(row[c.kundenr]);
         if (!nr) continue;
+        if (erSlettet(nr)) { slettede++; continue; }
         const gr = parseInt(String(row[c.gruppe] ?? '').trim(), 10);
-        const ch = c.change >= 0 ? String(row[c.change] ?? '').trim() : '';
-        const komm = [c.kommentar >= 0 ? String(row[c.kommentar] ?? '').trim() : '', ch && !erAendring(ch) ? ch : ''].filter(Boolean).join(' · ');
         const r = { ark: name, kundenr: nr, navnExcel: c.navn >= 0 ? String(row[c.navn] ?? '').trim() : '' };
         if (c.gruppe >= 0) r.gruppe = Number.isFinite(gr) ? gr : null;
         if (c.robot >= 0) r.robot = String(row[c.robot] ?? '').trim() !== '' && String(row[c.robot]).trim() !== '0';
         if (c.yverpleje >= 0) r.yverpleje = String(row[c.yverpleje] ?? '').trim() !== '' && String(row[c.yverpleje]).trim() !== '0';
         if (c.tank >= 0) r.tank = String(row[c.tank] ?? '').trim() !== '' && String(row[c.tank]).trim() !== '0';
-        if (c.change >= 0) r.rabatchange = erAendring(ch) ? ch : '';
-        if (komm) r.kommentar = komm;
+        // Rabat ændring kun i de ark, der har kolonnen (Vest/Tabel1) – teksten tages som den står
+        if (c.change >= 0) r.rabatchange = String(row[c.change] ?? '').trim();
         out.push(r);
         n++;
       }
-      ark.push(`${name}: ${n}`);
+      ark.push(`${name}: ${n}${slettede ? ` (+${slettede} med kundenr. 0 sprunget over)` : ''}`);
     }
     return { rows: out, ark };
   }
@@ -401,7 +396,6 @@
     const d = [];
     if ('gruppe' in r && (r.gruppe ?? null) !== (cur.gruppe ?? null)) d.push(`gruppe ${cur.gruppe ?? '–'} → ${r.gruppe ?? '–'}`);
     YD.forEach(([f, l]) => { if (f in r && !!r[f] !== !!cur[f]) d.push(`${r[f] ? '+' : '-'} ${l.toLowerCase()}`); });
-    if (r.kommentar && r.kommentar !== cur.kommentar) d.push('kommentar');
     if ('rabatchange' in r && (r.rabatchange || '') !== (cur.rabatchange || '')) d.push('rabat ændring');
     return d.length ? { status: 'opdateret', text: d.join(', ') } : { status: 'uændret', text: '' };
   }
@@ -415,10 +409,10 @@
       return `<tr>
         <td class="small muted">${esc(r.ark)}</td><td>${esc(r.kundenr)}</td><td>${esc(navnFor(r.kundenr) || r.navnExcel)}</td>
         <td>${gruppeBadge(r.gruppe)}</td><td class="c">${yes(r.robot)}</td><td class="c">${yes(r.yverpleje)}</td><td class="c">${yes(r.tank)}</td>
-        <td class="small">${esc(r.rabatchange || '')}</td><td class="small">${esc(r.kommentar || '')}</td>
+        <td class="small">${esc(r.rabatchange || '')}</td>
         <td><span class="rbSt ${esc(d.status)}">${esc(d.status)}</span> <span class="rbDiff">${esc(d.text)}</span></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="10" class="muted">Ingen rækker</td></tr>';
+    }).join('') || '<tr><td colspan="9" class="muted">Ingen rækker</td></tr>';
   }
 
   $('rbFile').onchange = async () => {
