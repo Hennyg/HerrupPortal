@@ -55,6 +55,11 @@
   .klAdr.green{ border-color:#16a34a; background:#f0fdf4; }
   .klAdr.none{ border-color:#eab308; background:#fefce8; }
   .klAdr .adr{ font-weight:600; }
+  .klAdr.pick{ cursor:pointer; position:relative; padding-right:2.2rem; }
+  .klAdr.pick::after{ content:'›'; position:absolute; right:.8rem; top:50%; transform:translateY(-50%); font-size:1.6rem; color:#9ca3af; }
+  .klAdr.valgt{ box-shadow:0 0 0 3px rgba(31,108,122,.35); }
+  .klAdr.valgt::after{ content:'✓'; font-size:1.2rem; color:var(--nav-accent); }
+  .klVaelg{ text-align:center; padding:1.2rem .5rem; color:#6b7280; border:2px dashed #e5e7eb; border-radius:10px; }
   .klAdr .chr{ font-size:.85rem; margin-top:4px; }
   .salBadge{ display:inline-block; padding:1px 8px; border-radius:999px; font-size:.78rem; font-weight:700; }
   .salBadge.ok{ background:#dcfce7; color:#166534; }
@@ -153,7 +158,7 @@
   "use strict";
 
   const $ = id => document.getElementById(id);
-  const state = { kunder: [], kunde: null, adresser: [], produkter: [], sal: { state: 'idle', list: [] }, farver: {} };
+  const state = { kunder: [], kunde: null, adresser: [], produkter: [], valgtAdresse: "", sal: { state: 'idle', list: [] }, farver: {} };
 
   function esc(s) {
     return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
@@ -232,6 +237,20 @@
     if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); selectCustomer(el.dataset.nr); }
   });
   $("customerSearch").addEventListener("input", renderCustomers);
+
+  // Vælg adresse (kun når kunden har flere) – klik igen fravælger
+  function vaelgAdresse(el) {
+    const key = el.dataset.key;
+    state.valgtAdresse = state.valgtAdresse === key ? "" : key;
+    renderAdresser();
+    renderProdukter();
+    if (state.valgtAdresse) $("produkter").closest(".klTile").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  $("adresser").addEventListener("click", e => { const el = e.target.closest(".klAdr[data-key]"); if (el) vaelgAdresse(el); });
+  $("adresser").addEventListener("keydown", e => {
+    const el = e.target.closest(".klAdr[data-key]");
+    if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); vaelgAdresse(el); }
+  });
   $("btnChange").addEventListener("click", changeCustomer);
 
   function changeCustomer() {
@@ -258,6 +277,8 @@
       state.kunde = j.kunde || {};
       state.adresser = j.adresser || [];
       state.produkter = j.produkter || [];
+      // Kun én adresse: den er valgt. Flere: brugeren vælger selv
+      state.valgtAdresse = state.adresser.length === 1 ? state.adresser[0].adressekey : "";
       $("selName").textContent = state.kunde.navn || k?.navn || nr;
       setStatus("", "");
       $("details").hidden = false;
@@ -340,7 +361,9 @@
       const chr = herds.length
         ? herds.map(h => `<div class="chr">CHR ${esc(h.chr)} <span class="salBadge ${isFri(h) ? "ok" : h.salmonellaStatus ? "err" : "unk"}">${esc(h.salmonellaStatus || "Ukendt")}</span>${h.salmonellaDato ? ` <span class="muted">${esc(dateText(h.salmonellaDato))}</span>` : ""}</div>`).join("")
         : st === "ok" ? '<div class="chr muted">Ingen CHR-nummer på adressen</div>' : "";
-      return `<div class="klAdr${cls}"><div class="adr">${esc(a.adresse || "–")}</div><div class="muted" style="font-size:.88rem">${esc([a.postnr, a.by].filter(Boolean).join(" "))}</div>${chr}</div>`;
+      const flere = state.adresser.length > 1;
+      const valgt = flere && state.valgtAdresse === a.adressekey;
+      return `<div class="klAdr${cls}${flere ? " pick" : ""}${valgt ? " valgt" : ""}"${flere ? ` tabindex="0" role="button" data-key="${esc(a.adressekey)}"` : ""}><div class="adr">${esc(a.adresse || "–")}</div><div class="muted" style="font-size:.88rem">${esc([a.postnr, a.by].filter(Boolean).join(" "))}</div>${chr}</div>`;
     }).join("");
   }
 
@@ -348,7 +371,18 @@
     const prods = state.produkter;
     const aktive = prods.filter(p => !isXX(p)).length;
     $("prodCount").textContent = prods.length ? `Aktive: ${aktive}` : "";
+    if (state.adresser.length > 1 && state.valgtAdresse) {
+      const a = state.adresser.find(x => x.adressekey === state.valgtAdresse);
+      const n = prods.filter(p => p.adressekey === state.valgtAdresse && !isXX(p)).length;
+      $("prodCount").textContent = `${a?.adresse || ""} · aktive: ${n}`;
+    }
     if (!prods.length) { $("produkter").innerHTML = '<div class="muted">Ingen produkter</div>'; return; }
+
+    // Flere adresser: vis først produkter, når en adresse er valgt
+    if (state.adresser.length > 1 && !state.valgtAdresse) {
+      $("produkter").innerHTML = '<div class="klVaelg">Kunden har flere adresser.<br><b>Vælg en adresse ovenfor</b> for at se produkterne.</div>';
+      return;
+    }
 
     // Gruppér pr. adresse (i samme rækkefølge som adresserne), ukendt adresse til sidst
     const groups = state.adresser.map(a => ({ key: a.adressekey, titel: a.adresse || "Adresse", sub: [a.postnr, a.by].filter(Boolean).join(" "), items: [] }));
@@ -357,7 +391,9 @@
     prods.forEach(p => (byKey.get(p.adressekey) || uden).items.push(p));
     if (uden.items.length) groups.push(uden);
 
-    $("produkter").innerHTML = groups.filter(g => g.items.length).map(g => {
+    const vis = groups.filter(g => g.items.length && (!state.valgtAdresse || g.key === state.valgtAdresse));
+    if (!vis.length) { $("produkter").innerHTML = '<div class="muted">Ingen produkter på denne adresse</div>'; return; }
+    $("produkter").innerHTML = vis.map(g => {
       const items = g.items.slice().sort((a, b) =>
         (isXX(a) - isXX(b)) || String(a.produkt || "").localeCompare(String(b.produkt || ""), "da") ||
         String(a.serienr || "").localeCompare(String(b.serienr || ""), "da", { numeric: true }));
