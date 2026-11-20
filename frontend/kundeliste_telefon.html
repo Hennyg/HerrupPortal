@@ -74,8 +74,6 @@
   .klGrid dd{ margin:0; overflow-wrap:anywhere; }
   .xxTag{ font-size:.75rem; color:#991b1b; font-weight:700; }
 
-  .klLinks{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
-  .klLinks a{ flex:1; min-height:46px; display:flex; align-items:center; justify-content:center; text-decoration:none; color:inherit; box-sizing:border-box; }
 
   @media (max-width: 420px){
     .klFacts{ grid-template-columns:1fr 1fr; }
@@ -145,9 +143,6 @@
         <div id="produkter"></div>
       </section>
 
-      <div class="klLinks">
-        <a class="btn" id="lnkKunde" href="#">Åbn fuld kundeside</a>
-      </div>
     </div>
     <div style="height:2rem"></div>
   </div>
@@ -264,7 +259,6 @@
       state.adresser = j.adresser || [];
       state.produkter = j.produkter || [];
       $("selName").textContent = state.kunde.navn || k?.navn || nr;
-      $("lnkKunde").href = `/kunde.html?kundenr=${encodeURIComponent(nr)}`;
       setStatus("", "");
       $("details").hidden = false;
       renderAll();
