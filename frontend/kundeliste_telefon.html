@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kundeopslag</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kundeopslag">
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260924-empsearch-2" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/assets/favicon-32x32.png">
+
+<style>
+  /* Samme opbygning som Foderradgivning_ny.html: én kolonne med tiles */
+  .klWrap{ max-width:640px; margin:0 auto; }
+  .klTile{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:1rem; margin-top:14px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+  .klTile h2{ margin:0 0 .75rem; font-size:1.1rem; color:var(--heading); }
+  .klTileHead{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:.75rem; }
+  .klTileHead h2{ margin:0; }
+  .klTileHead .muted{ font-size:.85rem; }
+
+  .klInput{ width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:10px; padding:.75rem .8rem; font:inherit; font-size:1rem; background:#fff; }
+  .klInput:focus{ outline:none; border-color:var(--nav-accent); box-shadow:0 0 0 3px rgba(31,108,122,.15); }
+
+  .klResults{ margin-top:8px; max-height:60vh; overflow:auto; border-radius:10px; }
+  .klResult{ padding:.65rem .75rem; border:1px solid #e5e7eb; border-radius:10px; margin-bottom:6px; cursor:pointer; background:#fff; }
+  .klResult:hover, .klResult:focus{ background:#f8fafc; outline:none; border-color:var(--nav-accent); }
+  .klResultTitle{ font-weight:600; }
+  .klResultSub{ font-size:.85rem; color:#6b7280; }
+  .klSelected{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:.75rem .85rem; border:2px solid var(--nav-bg); background:#fff5f5; border-radius:10px; }
+  .klSelected .klResultTitle{ color:var(--nav-bg); font-size:1.05rem; }
+
+  .klStatus{ border-radius:10px; padding:.75rem .85rem; margin-top:14px; font-size:.95rem; }
+  .klStatus.err{ background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+  .klStatus.info{ background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
+
+  /* Område + nøgletal */
+  .klFacts{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+  .klFact{ background:#f9fafb; border:1px solid #eef0f2; border-radius:10px; padding:.6rem .7rem; }
+  .klFact .lbl{ font-size:.75rem; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; }
+  .klFact .val{ font-size:1.15rem; font-weight:700; margin-top:2px; overflow-wrap:anywhere; }
+
+  /* Kontrakt-"piller" med farverne fra kundeliste_admin.html */
+  .kChip{ display:inline-block; padding:3px 10px; border-radius:999px; font-size:.85rem; font-weight:600; border:1px solid rgba(0,0,0,.08); white-space:nowrap; background:#eef0f2; color:#333; }
+  .kChip.none{ background:#fff; color:#9ca3af; border-style:dashed; font-weight:400; }
+  .klKontrakter{ display:grid; gap:6px; }
+  .klKRow{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:.45rem 0; border-bottom:1px solid #f1f2f4; }
+  .klKRow:last-child{ border-bottom:0; }
+  .klKRow b{ font-size:1.05rem; }
+
+  /* Adresser med salmonellastatus */
+  .klAdr{ border:2px solid #e5e7eb; border-radius:10px; padding:.65rem .75rem; margin-bottom:8px; }
+  .klAdr.red{ border-color:#dc2626; background:#fef2f2; }
+  .klAdr.green{ border-color:#16a34a; background:#f0fdf4; }
+  .klAdr.none{ border-color:#eab308; background:#fefce8; }
+  .klAdr .adr{ font-weight:600; }
+  .klAdr .chr{ font-size:.85rem; margin-top:4px; }
+  .salBadge{ display:inline-block; padding:1px 8px; border-radius:999px; font-size:.78rem; font-weight:700; }
+  .salBadge.ok{ background:#dcfce7; color:#166534; }
+  .salBadge.err{ background:#fee2e2; color:#991b1b; }
+  .salBadge.unk{ background:#f3f4f6; color:#6b7280; }
+
+  /* Produkter pr. adresse */
+  .klProdAdr{ font-weight:700; margin:12px 0 6px; color:var(--heading); display:flex; justify-content:space-between; gap:8px; }
+  .klProdAdr:first-child{ margin-top:0; }
+  .klProdAdr .muted{ font-weight:400; font-size:.85rem; }
+  .klProd{ border:1px solid #e5e7eb; border-radius:10px; padding:.6rem .7rem; margin-bottom:6px; }
+  .klProd.xx{ border-color:#fecaca; background:#fff7f7; }
+  .klProd .top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .klProd .navn{ font-weight:600; }
+  .klGrid{ display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:.88rem; margin-top:6px; }
+  .klGrid dt{ color:#6b7280; }
+  .klGrid dd{ margin:0; overflow-wrap:anywhere; }
+  .xxTag{ font-size:.75rem; color:#991b1b; font-weight:700; }
+
+  .klLinks{ display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  .klLinks a{ flex:1; min-height:46px; display:flex; align-items:center; justify-content:center; text-decoration:none; color:inherit; box-sizing:border-box; }
+
+  @media (max-width: 420px){
+    .klFacts{ grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Kundeopslag</div>
+    </div>
+    <div class="nav">
+      <span id="userLine" class="muted" style="color:#fff;opacity:.9"></span>
+      <span class="sep">|</span>
+      <a href="/kundeliste.html">Kundeliste</a>
+      <a href="/">← Til portal</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+
+<div class="container" style="padding-top:1rem">
+  <div class="klWrap">
+    <div id="status" class="klStatus info">Henter kunder…</div>
+
+    <!-- 1. Kunde -->
+    <section class="klTile" id="customerTile">
+      <div class="klTileHead"><h2>Kunde</h2></div>
+      <div id="customerSearchBox">
+        <input id="customerSearch" class="klInput" type="search" placeholder="Søg kundenavn, kundenr. eller postnr." autocomplete="off" disabled>
+        <div id="customerResults" class="klResults"></div>
+      </div>
+      <div id="selectedCustomer" class="klSelected" hidden>
+        <div>
+          <div class="klResultTitle" id="selName"></div>
+          <div class="klResultSub" id="selSub"></div>
+        </div>
+        <button type="button" class="btn" id="btnChange">Skift</button>
+      </div>
+    </section>
+
+    <div id="details" hidden>
+      <!-- Område -->
+      <section class="klTile">
+        <h2>Område</h2>
+        <div class="klFacts" id="facts"></div>
+      </section>
+
+      <!-- Kontrakt -->
+      <section class="klTile">
+        <div class="klTileHead"><h2>Kontrakt</h2><span class="muted" id="kontraktCount"></span></div>
+        <div class="klKontrakter" id="kontrakter"></div>
+      </section>
+
+      <!-- Adresser m. salmonellastatus -->
+      <section class="klTile">
+        <div class="klTileHead"><h2>Adresser</h2><span class="muted" id="salState"></span></div>
+        <div id="adresser"></div>
+      </section>
+
+      <!-- Produkter pr. adresse -->
+      <section class="klTile">
+        <div class="klTileHead"><h2>Produkter</h2><span class="muted" id="prodCount"></span></div>
+        <div id="produkter"></div>
+      </section>
+
+      <div class="klLinks">
+        <a class="btn" id="lnkKunde" href="#">Åbn fuld kundeside</a>
+      </div>
+    </div>
+    <div style="height:2rem"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const state = { kunder: [], kunde: null, adresser: [], produkter: [], sal: { state: 'idle', list: [] }, farver: {} };
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  }
+  function setStatus(type, msg) {
+    const s = $("status");
+    if (!msg) { s.hidden = true; return; }
+    s.hidden = false;
+    s.className = `klStatus ${type}`;
+    s.textContent = msg;
+  }
+  async function getJson(url) {
+    const r = await fetch(url, { cache: "no-store" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+  }
+
+  // Datoer ligger som dansk tekst (dd-mm-åååå) – må ikke gennem new Date()
+  function dateText(s) {
+    const v = String(s || "").trim();
+    if (!v) return "";
+    let m = /^(\d{1,2})[-./](\d{1,2})[-./](\d{4})$/.exec(v);
+    if (m) return `${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}-${m[3]}`;
+    m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    return v;
+  }
+  const isXX = p => /xx/i.test(String(p.installationsdato || ""));
+
+  // ── Bruger ───────────────────────────────────────────────────────────────
+  fetch("/.auth/me").then(r => r.json()).then(j => {
+    const p = j?.clientPrincipal;
+    $("userLine").textContent = p?.userDetails || "";
+  }).catch(() => {});
+
+  // ── Kontraktfarver ───────────────────────────────────────────────────────
+  function textOn(hex) {
+    const n = parseInt(String(hex).slice(1), 16);
+    return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.6 ? "#111827" : "#fff";
+  }
+  function kChip(name) {
+    if (!name) return '<span class="kChip none">Ingen kontrakt</span>';
+    const c = state.farver[String(name).toLowerCase()];
+    return `<span class="kChip"${c ? ` style="background:${c};color:${textOn(c)}"` : ""}>${esc(name)}</span>`;
+  }
+
+  // ── 1. Kundevalg ─────────────────────────────────────────────────────────
+  function renderCustomers() {
+    const q = $("customerSearch").value.trim().toLowerCase();
+    const box = $("customerResults");
+    if (q.length < 2) {
+      box.innerHTML = `<div class="muted" style="padding:6px 2px">Skriv mindst 2 tegn for at søge.</div>`;
+      return;
+    }
+    const hits = state.kunder
+      .filter(k => [k.navn, k.kundenr, ...(k.postnumre || [])].join(" ").toLowerCase().includes(q))
+      .slice(0, 40);
+    if (!hits.length) {
+      box.innerHTML = `<div class="muted" style="padding:6px 2px">Ingen kunder matcher "${esc(q)}".</div>`;
+      return;
+    }
+    box.innerHTML = hits.map(k => `
+      <div class="klResult" tabindex="0" data-nr="${esc(k.kundenr)}">
+        <div class="klResultTitle">${esc(k.navn)}${k.aktiv === false ? ' <span class="muted">(inaktiv)</span>' : ""}</div>
+        <div class="klResultSub">${esc(k.kundenr)}${k.omraade ? " · " + esc(k.omraade) : ""}${(k.postnumre || []).length ? " · " + esc(k.postnumre.join(", ")) : ""}</div>
+      </div>`).join("");
+  }
+
+  $("customerResults").addEventListener("click", e => {
+    const el = e.target.closest(".klResult");
+    if (el) selectCustomer(el.dataset.nr);
+  });
+  $("customerResults").addEventListener("keydown", e => {
+    const el = e.target.closest(".klResult");
+    if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); selectCustomer(el.dataset.nr); }
+  });
+  $("customerSearch").addEventListener("input", renderCustomers);
+  $("btnChange").addEventListener("click", changeCustomer);
+
+  function changeCustomer() {
+    state.kunde = null;
+    $("selectedCustomer").hidden = true;
+    $("customerSearchBox").hidden = false;
+    $("details").hidden = true;
+    history.replaceState(null, "", location.pathname);
+    $("customerSearch").focus();
+    renderCustomers();
+  }
+
+  async function selectCustomer(nr) {
+    const k = state.kunder.find(x => String(x.kundenr) === String(nr));
+    $("selName").textContent = k?.navn || nr;
+    $("selSub").textContent = nr + (k?.omraade ? " · " + k.omraade : "");
+    $("customerSearchBox").hidden = true;
+    $("selectedCustomer").hidden = false;
+    $("details").hidden = true;
+    history.replaceState(null, "", `${location.pathname}?kundenr=${encodeURIComponent(nr)}`);
+    setStatus("info", "Henter kundens oplysninger…");
+    try {
+      const j = await getJson(`/api/kunde?kundenr=${encodeURIComponent(nr)}`);
+      state.kunde = j.kunde || {};
+      state.adresser = j.adresser || [];
+      state.produkter = j.produkter || [];
+      $("selName").textContent = state.kunde.navn || k?.navn || nr;
+      $("lnkKunde").href = `/kunde.html?kundenr=${encodeURIComponent(nr)}`;
+      setStatus("", "");
+      $("details").hidden = false;
+      renderAll();
+      loadSalmonella();
+    } catch (e) {
+      setStatus("err", "Kunne ikke hente kunden: " + e.message);
+    }
+  }
+
+  // ── Visning ──────────────────────────────────────────────────────────────
+  function renderAll() {
+    renderFacts();
+    renderKontrakter();
+    renderAdresser();
+    renderProdukter();
+  }
+
+  function renderFacts() {
+    const k = state.kunde;
+    const aktive = state.produkter.filter(p => !isXX(p)).length;
+    $("facts").innerHTML = `
+      <div class="klFact"><div class="lbl">Område</div><div class="val">${esc(k.omraade || "–")}</div></div>
+      <div class="klFact"><div class="lbl">Adresser</div><div class="val">${state.adresser.length}</div></div>
+      <div class="klFact"><div class="lbl">Produkter</div><div class="val">${aktive}${aktive !== state.produkter.length ? ` <span class="muted" style="font-size:.8rem;font-weight:400">(+${state.produkter.length - aktive} projekt)</span>` : ""}</div></div>`;
+  }
+
+  function renderKontrakter() {
+    const byK = new Map();
+    state.produkter.forEach(p => { const n = String(p.kontrakt || "").trim(); byK.set(n, (byK.get(n) || 0) + 1); });
+    const list = [...byK.entries()].sort((a, b) => (!a[0]) - (!b[0]) || b[1] - a[1] || a[0].localeCompare(b[0], "da"));
+    const typer = list.filter(([n]) => n).length;
+    $("kontraktCount").textContent = typer ? `${typer} type${typer === 1 ? "" : "r"}` : "";
+    $("kontrakter").innerHTML = list.length
+      ? list.map(([n, c]) => `<div class="klKRow">${kChip(n)}<b>${c}</b></div>`).join("")
+      : '<div class="muted">Ingen produkter</div>';
+  }
+
+  // Salmonella: samme opslag og kobling til adresser som kunde.html
+  async function loadSalmonella() {
+    const chr = String(state.kunde?.chr || "").trim();
+    const adr = state.adresser.filter(a => a.adresse)
+      .map(a => `${String(a.adresse).replace(/[|;]/g, " ")}|${String(a.postnr || "").trim()}`).join(";");
+    if (!chr && !adr) { state.sal = { state: "nochr", list: [] }; return renderAdresser(); }
+    state.sal = { state: "loading", list: [] };
+    renderAdresser();
+    try {
+      const qs = new URLSearchParams();
+      if (chr) qs.set("chr", chr);
+      if (adr) qs.set("adr", adr);
+      const j = await getJson("/api/kunde-salmonella?" + qs.toString());
+      state.sal = { state: "ok", list: Array.isArray(j.besaetninger) ? j.besaetninger : [] };
+    } catch {
+      state.sal = { state: "error", list: [] };
+    }
+    renderAdresser();
+  }
+  const normAdr = s => String(s || "").toLowerCase().split(",")[0].replace(/[^a-z0-9æøå]+/g, "");
+  function addrMatch(adr, postnr, a) {
+    const ha = normAdr(adr), aa = normAdr(a.adresse);
+    if (!ha || !aa || ha !== aa) return false;
+    const hp = String(postnr || "").trim(), ap = String(a.postnr || "").trim();
+    return !hp || !ap || hp === ap;
+  }
+  function herdMatches(h, a) {
+    if (h.ejendomAdresse) return addrMatch(h.ejendomAdresse, h.ejendomPostnr, a);
+    if (h.brugerAdresse) return addrMatch(h.brugerAdresse, h.brugerPostnr, a);
+    return addrMatch(h.adresse, h.postnr, a);
+  }
+  const isFri = h => String(h.salmonellaStatus || "").trim().toLowerCase() === "fri";
+  const herdsFor = a => state.sal.state === "ok" ? state.sal.list.filter(h => herdMatches(h, a)) : [];
+
+  function renderAdresser() {
+    const st = state.sal.state;
+    $("salState").textContent = st === "loading" ? "Henter salmonella…" : st === "error" ? "Salmonella kunne ikke hentes" : st === "nochr" ? "Intet CHR-nr." : "";
+    if (!state.adresser.length) { $("adresser").innerHTML = '<div class="muted">Ingen adresser</div>'; return; }
+    $("adresser").innerHTML = state.adresser.map(a => {
+      const herds = herdsFor(a);
+      const cls = st !== "ok" ? "" : !herds.length ? " none" : herds.some(h => !isFri(h)) ? " red" : " green";
+      const chr = herds.length
+        ? herds.map(h => `<div class="chr">CHR ${esc(h.chr)} <span class="salBadge ${isFri(h) ? "ok" : h.salmonellaStatus ? "err" : "unk"}">${esc(h.salmonellaStatus || "Ukendt")}</span>${h.salmonellaDato ? ` <span class="muted">${esc(dateText(h.salmonellaDato))}</span>` : ""}</div>`).join("")
+        : st === "ok" ? '<div class="chr muted">Ingen CHR-nummer på adressen</div>' : "";
+      return `<div class="klAdr${cls}"><div class="adr">${esc(a.adresse || "–")}</div><div class="muted" style="font-size:.88rem">${esc([a.postnr, a.by].filter(Boolean).join(" "))}</div>${chr}</div>`;
+    }).join("");
+  }
+
+  function renderProdukter() {
+    const prods = state.produkter;
+    const aktive = prods.filter(p => !isXX(p)).length;
+    $("prodCount").textContent = prods.length ? `Aktive: ${aktive}` : "";
+    if (!prods.length) { $("produkter").innerHTML = '<div class="muted">Ingen produkter</div>'; return; }
+
+    // Gruppér pr. adresse (i samme rækkefølge som adresserne), ukendt adresse til sidst
+    const groups = state.adresser.map(a => ({ key: a.adressekey, titel: a.adresse || "Adresse", sub: [a.postnr, a.by].filter(Boolean).join(" "), items: [] }));
+    const byKey = new Map(groups.map(g => [g.key, g]));
+    const uden = { key: "", titel: "Uden adresse", sub: "", items: [] };
+    prods.forEach(p => (byKey.get(p.adressekey) || uden).items.push(p));
+    if (uden.items.length) groups.push(uden);
+
+    $("produkter").innerHTML = groups.filter(g => g.items.length).map(g => {
+      const items = g.items.slice().sort((a, b) =>
+        (isXX(a) - isXX(b)) || String(a.produkt || "").localeCompare(String(b.produkt || ""), "da") ||
+        String(a.serienr || "").localeCompare(String(b.serienr || ""), "da", { numeric: true }));
+      return `<div class="klProdAdr"><span>${esc(g.titel)}</span><span class="muted">${esc(g.sub)} · ${items.length}</span></div>` +
+        items.map(p => {
+          const garanti = [dateText(p.garantistart), dateText(p.garantiudloeb)].filter(Boolean).join(" – ");
+          return `<div class="klProd${isXX(p) ? " xx" : ""}">
+            <div class="top"><div class="navn">${esc(p.produkt || p.navn || "Produkt")}</div>${isXX(p) ? '<span class="xxTag">Projekt</span>' : ""}</div>
+            <dl class="klGrid">
+              <dt>Varenr.</dt><dd>${esc(p.produktnr || "–")}</dd>
+              <dt>S/N</dt><dd>${esc(p.serienr || "–")}</dd>
+              <dt>Inst. dato</dt><dd>${esc(dateText(p.installationsdato) || "–")}</dd>
+              <dt>Kontrakt</dt><dd>${p.kontrakt ? kChip(p.kontrakt) : "–"}</dd>
+              <dt>Garanti</dt><dd>${esc(garanti || "–")}</dd>
+            </dl>
+          </div>`;
+        }).join("");
+    }).join("");
+  }
+
+  // ── Start ────────────────────────────────────────────────────────────────
+  (async function init() {
+    try {
+      const [kj, fj] = await Promise.all([
+        getJson("/api/kunder?aktiv="),
+        getJson("/api/kontrakt-farver").catch(() => ({ farver: {} }))
+      ]);
+      state.kunder = (kj.kunder || []).sort((a, b) => String(a.navn).localeCompare(String(b.navn), "da"));
+      state.farver = Object.fromEntries(Object.entries(fj.farver || {}).map(([k, v]) => [k.toLowerCase(), v]));
+      setStatus("", "");
+      $("customerSearch").disabled = false;
+      const nr = new URLSearchParams(location.search).get("kundenr");
+      if (nr) selectCustomer(nr);
+      else { $("customerSearch").focus(); renderCustomers(); }
+    } catch (e) {
+      setStatus("err", "Kunne ikke hente kunder: " + e.message);
+    }
+  })();
+})();
+</script>
+</body>
+</html>
