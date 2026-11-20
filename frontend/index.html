@@ -248,8 +248,8 @@
 
 <script>
 // ── Status: personlige oplysninger ───────────────────────────────────────────
-// Viser hvor mange der har udfyldt privat adresse, privat telefon og
-// nødkontakter – og om man selv mangler. Klik åbner egne oplysninger.
+// Viser hvor mange der har udfyldt privat adresse og nødkontakter – og om
+// man selv mangler. Klik åbner egne oplysninger.
 (async function profileStatus() {
   const el = document.getElementById("profileStatus");
   if (!el) return;
@@ -262,7 +262,6 @@
     const pct = Math.round((d.complete / d.total) * 100);
     const missing = [];
     if (d.me && !d.me.adresse) missing.push("adresse");
-    if (d.me && !d.me.telefon) missing.push("telefon");
     if (d.me && !d.me.noed) missing.push("nødkontakt");
 
     let meHtml = "";
@@ -279,7 +278,7 @@
              aria-label="${d.complete} af ${d.total} har udfyldt"><span style="width:0%"></span></div>
       </div>
       ${meHtml}`;
-    el.title = "Privat adresse, privat telefon og nødkontakter – klik for at se eller udfylde dine egne";
+    el.title = "Privat adresse og nødkontakter – klik for at se eller udfylde dine egne";
     el.hidden = false;
     requestAnimationFrame(() => { el.querySelector(".psBar > span").style.width = pct + "%"; });
   } catch {

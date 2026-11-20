@@ -4,7 +4,7 @@
 // oplysninger? Returnerer KUN optællinger + den indloggedes egen status –
 // aldrig andres data.
 //
-// "Udfyldt" = privat adresse, privat telefon og mindst én nødkontakt.
+// "Udfyldt" = privat adresse og mindst én nødkontakt (privat telefon tæller ikke med).
 // Et felt, der er tomt, tæller som ikke udfyldt.
 // Kun aktive medlemmer af gruppen "Alle - lely center herrup" tælles med
 // (samme gruppe som personalelisten på herrup.html).
@@ -84,7 +84,7 @@ async function loadStatus() {
     if (s.adresse) adresse++;
     if (s.telefon) telefon++;
     if (s.noed) noed++;
-    if (s.adresse && s.telefon && s.noed) complete++;
+    if (s.adresse && s.noed) complete++;
   }
 
   const data = { total: members.size, complete, adresse, telefon, noed, members, byMail, updated: new Date().toISOString() };
@@ -113,7 +113,7 @@ module.exports = async function (context, req) {
         adresse: mine.adresse,
         telefon: mine.telefon,
         noed: mine.noed,
-        complete: mine.adresse && mine.telefon && mine.noed
+        complete: mine.adresse && mine.noed
       }
     });
   } catch (e) {
