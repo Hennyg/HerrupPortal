@@ -145,7 +145,7 @@
     .kcHead .sub { font-size:.82rem; color:#6b7280; }
     .kcClose { border:0; background:none; font-size:1.5rem; cursor:pointer; color:#6b7280; }
     .kcBody { padding:14px 18px; overflow:auto; }
-    .kcSum { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; margin-bottom:12px; }
+    .kcSum { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:8px; margin-bottom:12px; }
     .kcSum div { background:#f9fafb; border:1px solid #eef0f2; border-radius:10px; padding:.5rem .65rem; }
     .kcSum b { display:block; font-size:1.3rem; }
     .kcSum span { font-size:.75rem; color:#6b7280; }
@@ -160,6 +160,7 @@
     .kcDiff td.k { color:#15803d; } .kcDiff td.b { color:#b91c1c; }
     .kcNote { font-size:.76rem; color:#b45309; margin-top:2px; }
     .kcLink { font-size:.78rem; color:#374151; padding-left:.6rem; }
+    @media (max-width:900px) { .kcSum { grid-template-columns:repeat(4,1fr); } }
     @media (max-width:640px) { .kcSum { grid-template-columns:repeat(2,1fr); } .kcBtn { position:static; margin-top:.5rem; } }
     .modal-big-avatar {
       width:80px; height:80px; border-radius:50%; background:var(--nav-bg);
@@ -1914,7 +1915,9 @@
       document.getElementById("kcBody").innerHTML = `
         <div class="kcSum">
           <div><b>${j.kilde}</b><span>I kontakter@</span></div>
-          <div class="ok"><b>${j.fundet}</b><span>Fundet hos brugeren</span></div>
+          <div><b>${j.bruger}</b><span>Hos brugeren i alt</span></div>
+          <div class="ok"><b>${j.fundet}</b><span>Fra kontakter@ fundet hos brugeren</span></div>
+          <div><b>${Math.max(0, j.bruger - j.fundet)}</b><span>Brugerens egne (ikke fra kontakter@)</span></div>
           <div class="bad"><b>${j.antal.mangler}</b><span>Mangler hos brugeren</span></div>
           <div class="warn"><b>${j.antal.dubletter}</b><span>Dubletter</span></div>
           <div class="warn"><b>${j.antal.forskelle}</b><span>Med forskelle</span></div>
