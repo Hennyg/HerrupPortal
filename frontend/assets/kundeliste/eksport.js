@@ -233,8 +233,8 @@
     const kunder = [...filtered];
 
     if (niveau() === 'kunde') {
-      return { title, fields, unit: 'kunde', count: kunder.length,
-               rows: kunder.map(k => fields.map(f => f.blank ? '' : f.value(k))) };
+      const rows = udenTomme(fields, kunder.map(k => fields.map(f => f.blank ? '' : f.value(k))));
+      return { title, fields, unit: 'kunde', count: rows.length, rows };
     }
 
     const alle = await loadProdukter();
@@ -251,7 +251,17 @@
         rows.push(fields.map(f => f.blank ? '' : f.value(k, p)));
       }
     }
-    return { title, fields, rows, unit: 'produkt', count: rows.length };
+    const ikkeTomme = udenTomme(fields, rows);
+    return { title, fields, rows: ikkeTomme, unit: 'produkt', count: ikkeTomme.length };
+  }
+
+  // Fjern linjer, hvor alle valgte kolonner er tomme (fx kun "INFO Mail-adresse"
+  // valgt, og kunden har ingen mail). Tomme afkrydsnings-/bemærkningskolonner
+  // tæller ikke med. Er der KUN tomme kolonner valgt, beholdes alle linjer.
+  function udenTomme(fields, rows) {
+    const idx = fields.map((f, i) => f.blank ? -1 : i).filter(i => i >= 0);
+    if (!idx.length) return rows;
+    return rows.filter(r => idx.some(i => String(r[i] ?? '').trim() !== ''));
   }
   const antalTekst = d => `${d.count} ${d.unit === 'kunde' ? (d.count === 1 ? 'kunde' : 'kunder') : (d.count === 1 ? 'produkt' : 'produkter')}`;
 
