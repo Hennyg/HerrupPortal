@@ -20,6 +20,8 @@ window.KL_KOLONNER = [
   { key: 'produkter',      label: 'Antal produkter',      gruppe: 'Kunde' },
   { key: 'aktiv',          label: 'Aktiv',                gruppe: 'Kunde' },
   { key: 'importeret',     label: 'Sidst importeret',     gruppe: 'Kunde' },
+  { key: 'infomail',       label: 'INFO Mail-adresse',    gruppe: 'Kunde' },
+  { key: 'unicontanr',     label: 'Kundenr. Uniconta',    gruppe: 'Kunde' },
 
   { key: 'sa_aftaler',     label: 'Serviceaftaler',       gruppe: 'Serviceaftale' },
   { key: 'sa_antal',       label: 'Antal aftaler',        gruppe: 'Serviceaftale' },

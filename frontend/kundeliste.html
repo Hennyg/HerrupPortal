@@ -419,6 +419,15 @@
         sort: k => k.sidstImporteret || '', text: k => fmtDate(k.sidstImporteret),
         cell: k => `<td class="small" style="white-space:nowrap">${fmtDate(k.sidstImporteret)}</td>`
       },
+      // Fra regnearket via importen (lch_infomail / lch_unicontakundenr på kunden)
+      infomail: {
+        sort: k => k.infomail || '', text: k => k.infomail || '',
+        cell: k => `<td class="small">${k.infomail ? `<a class="link" href="mailto:${esc(k.infomail)}" onclick="event.stopPropagation()">${esc(k.infomail)}</a>` : ''}</td>`
+      },
+      unicontanr: {
+        sort: k => k.unicontaKundenr || '', text: k => k.unicontaKundenr || '',
+        cell: k => `<td class="small">${esc(k.unicontaKundenr || '')}</td>`
+      },
 
       // ── Serviceaftaler (fra lch_serviceaftaler) ──
       sa_aftaler: {
@@ -542,7 +551,7 @@
     // Valg i rullelisten gemmes som "=værdi" (præcis match), "=" = tom og
     // "=*" = udfyldt (alle med en værdi i kolonnen).
     const MAX_VALG = 40;
-    const NO_SELECT = new Set(['kundenr', 'navn', 'importeret', 'sa_note', 'rb_kommentar']);
+    const NO_SELECT = new Set(['kundenr', 'navn', 'importeret', 'infomail', 'unicontanr', 'sa_note', 'rb_kommentar']);
 
     // Værdierne i en kolonne for én kunde (flere ved fx kontrakter/aftaler)
     function colValues(k, key) {

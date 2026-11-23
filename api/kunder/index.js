@@ -1,4 +1,4 @@
-const { fetchAll } = require("../_dvKunde");
+const { fetchAll, dvFetch } = require("../_dvKunde");
 
 const TABLE = "cr1eb_lch_kundes";
 const PRODUKT_TABLE = "cr1eb_lch_kundeprodukts";
@@ -13,6 +13,27 @@ const SELECT = [
   "cr1eb_lch_sidst_importeret",
   "modifiedon"
 ].join(",");
+
+// Ekstra kundefelter, som importen fra regnearket skriver, HVIS kolonnen findes
+// i Dataverse (se Sync-NasExcel-To-Dataverse.ps1). Findes en kolonne ikke,
+// udelades den, så kundelisten ikke fejler.
+const EXTRA = {
+  infomail:        "cr1eb_lch_infomail",          // "INFO Mail-adresse"
+  unicontaKundenr: "cr1eb_lch_unicontakundenr"    // "Kundenr. Uniconta"
+};
+let extraOk = null;               // [{ key, field }] – slås op én gang
+async function extraFields() {
+  if (extraOk) return extraOk;
+  const ok = [];
+  for (const [key, field] of Object.entries(EXTRA)) {
+    try {
+      await dvFetch(`EntityDefinitions(LogicalName='cr1eb_lch_kunde')/Attributes(LogicalName='${field}')?$select=LogicalName`);
+      ok.push({ key, field });
+    } catch { /* kolonnen findes ikke */ }
+  }
+  extraOk = ok;
+  return ok;
+}
 
 function json(context, status, body) {
   context.res = { status, headers: { "Content-Type": "application/json; charset=utf-8" }, body };
@@ -123,7 +144,9 @@ module.exports = async function (context, req) {
     if (aktiv === "true" || flereAdresser) filter = "cr1eb_lch_aktiv eq true";
     if (aktiv === "false") filter = "cr1eb_lch_aktiv eq false";
 
-    const path = `${TABLE}?$select=${SELECT}${filter ? `&$filter=${encodeURIComponent(filter)}` : ""}&$orderby=cr1eb_lch_navn asc&$top=5000`;
+    const extra = await extraFields();
+    const select = [SELECT, ...extra.map(x => x.field)].join(",");
+    const path = `${TABLE}?$select=${select}${filter ? `&$filter=${encodeURIComponent(filter)}` : ""}&$orderby=cr1eb_lch_navn asc&$top=5000`;
     const [raw, info, sal, adr] = await Promise.all([
       fetchAll(path),
       produktInfo(context),
@@ -135,7 +158,11 @@ module.exports = async function (context, req) {
       return json(context, 502, { error: "Kunne ikke hente adresser til filteret 'Flere adresser'.", kunder: [] });
     }
 
-    let rows = raw.map(mapRow).map(k => {
+    let rows = raw.map(r => {
+      const k = mapRow(r);
+      for (const x of extra) k[x.key] = String(r[x.field] || "").trim();
+      return k;
+    }).map(k => {
       const nr = String(k.kundenr).trim();
       const m = info.kontrakter.get(nr) || null;
       return {
@@ -153,7 +180,7 @@ module.exports = async function (context, req) {
     }
 
     if (q.length >= 2) {
-      rows = rows.filter(k => [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt, ...k.serier, ...k.postnumre].join(" ").toLowerCase().includes(q));
+      rows = rows.filter(k => [k.kundenr, k.navn, k.omraade, k.kundestatus, k.kontrakt, k.infomail || "", ...k.serier, ...k.postnumre].join(" ").toLowerCase().includes(q));
     }
 
     json(context, 200, { kunder: rows, total: rows.length, salmonellaOk: !!sal });
