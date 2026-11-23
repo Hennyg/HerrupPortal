@@ -323,6 +323,7 @@ async function load(){
  setStatus('',''); document.getElementById('content').style.display='block'; render();
  loadSalmonella(j.kunde?.chr, j.adresser || []);
  loadKontraktFarver().then(render);
+ loadSalgsomraader().then(render);
  loadServiceaftaler(j.kunde?.kundenr || kundenr);
  loadRabat(j.kunde?.kundenr || kundenr);
  if (snFilter || openProductsOnLoad) openProdukter();
@@ -441,7 +442,7 @@ function render(){
  const activeCount = visibleProducts.filter(p=>!isXX(p)).length;
  const xxCount = visibleProducts.length - activeCount;
  document.getElementById('brandTitle').textContent = `${k.navn} (${k.kundenr})`; document.title = `Kunde – ${k.navn}`;
- document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresser.length}</div></div><div class="card rabatCard" id="rabatTile" onclick="openRabatHistorik()" title="Klik for historik">${rabatTileHtml()}</div><div class="card"><div class="label">Produkter</div><div class="value">${activeCount}</div></div><div class="card"><div class="label">Område</div><div class="value">${esc(k.omraade)}</div></div><div class="card"><div class="label">Salmonella${k.chr ? ` <span class="muted" style="font-weight:400">· CHR ${esc(k.chr)}</span>` : ''}</div><div id="salTile">${salTileHtml()}</div></div>`;
+ document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresser.length}</div></div><div class="card rabatCard" id="rabatTile" onclick="openRabatHistorik()" title="Klik for historik">${rabatTileHtml()}</div><div class="card"><div class="label">Produkter</div><div class="value">${activeCount}</div></div><div class="card omrCard"><div class="label">Serviceområde</div><div class="value">${esc(k.omraade || '–')}</div><div id="salgTile">${salgTileHtml(adresser)}</div></div><div class="card"><div class="label">Salmonella${k.chr ? ` <span class="muted" style="font-weight:400">· CHR ${esc(k.chr)}</span>` : ''}</div><div id="salTile">${salTileHtml()}</div></div>`;
  document.getElementById('kundeInfo').innerHTML = `<p><b>${esc(k.navn)}</b></p><p>Kundestatus: ${esc(k.kundestatus)}</p><p>Aktiv: ${k.aktiv?'Ja':'Nej'}</p><p>Sidst opdateret: ${fmtDateTime(k.sidstImporteret || k.modifiedon)}</p>`;
  document.getElementById('adresseInfo').innerHTML = renderAdresser(adresser);
  document.getElementById('produktTopCounts').innerHTML = `Aktive: ${activeCount}${xxCount ? ` · <span style="color:#b91c1c">Ikke aktive: ${xxCount}</span>` : ''}`;
@@ -618,6 +619,33 @@ async function loadUnicontaKunde(nr){
     loadRabat(u.kundenr);
     return true;
   } catch { return false; }
+}
+
+// ── Salgsområde ud fra adressernes postnumre (app settings salgnord/midt/ost/vest) ──
+let salgsomraader = null;            // [{ navn, intervaller: [[fra, til]] }]
+async function loadSalgsomraader(){
+  if (salgsomraader) return;
+  try {
+    const r = await fetch('/api/salgsomraader', { cache:'no-store' });
+    const j = await r.json();
+    salgsomraader = r.ok ? (j.omraader || []) : [];
+  } catch { salgsomraader = []; }
+}
+function salgFor(postnr){
+  const n = parseInt(String(postnr || '').trim(), 10);
+  if (!Number.isFinite(n) || !salgsomraader) return '';
+  return salgsomraader.find(o => o.intervaller.some(([a, b]) => n >= a && n <= b))?.navn || '';
+}
+function salgTileHtml(adresser){
+  const label = '<div class="label" style="margin-top:10px">Salgsområde</div>';
+  if (!salgsomraader) return label + '<div class="muted small">Henter…</div>';
+  // Valgt adresse → kun dens salgsområde; ellers alle adressernes (forskellige)
+  const valgt = state.selectedAdresseKey ? (adresser || []).filter(a => a.adressekey === state.selectedAdresseKey) : (adresser || []);
+  const omr = new Map();
+  valgt.forEach(a => { const s = salgFor(a.postnr); if (s) { if (!omr.has(s)) omr.set(s, new Set()); omr.get(s).add(String(a.postnr).trim()); } });
+  if (!omr.size) return label + '<div class="value muted" style="font-size:16px">–</div>';
+  if (omr.size === 1) return label + `<div class="value" style="font-size:18px">${esc([...omr.keys()][0])}</div>`;
+  return label + [...omr.entries()].map(([n, pn]) => `<div style="font-weight:700">${esc(n)} <span class="muted small" style="font-weight:400">(${esc([...pn].join(', '))})</span></div>`).join('');
 }
 
 // ── Kemi rabat (kort i øverste linje) ──
