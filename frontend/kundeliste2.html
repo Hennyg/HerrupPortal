@@ -420,7 +420,11 @@
         sort: k => k.sidstImporteret || '', text: k => fmtDate(k.sidstImporteret),
         cell: k => `<td class="small" style="white-space:nowrap">${fmtDate(k.sidstImporteret)}</td>`
       },
-      // Fra regnearket via importen (lch_infomail / lch_unicontakundenr på kunden)
+      // Fra regnearket via importen (lch_betaling / lch_infomail / lch_unicontakundenr på kunden)
+      betaling: {
+        sort: k => k.betaling || '', text: k => k.betaling || '',
+        cell: k => `<td class="small">${esc(k.betaling || '')}</td>`
+      },
       infomail: {
         sort: k => k.infomail || '', text: k => k.infomail || '',
         cell: k => `<td class="small">${k.infomail ? `<a class="link" href="mailto:${esc(k.infomail)}" onclick="event.stopPropagation()">${esc(k.infomail)}</a>` : ''}</td>`

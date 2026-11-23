@@ -19,6 +19,7 @@ const SELECT = [
 // udelades den, så kundelisten ikke fejler.
 const EXTRA = {
   infomail:        "cr1eb_lch_infomail",          // "INFO Mail-adresse"
+  betaling:        "cr1eb_lch_betaling",          // "Betaling"
   unicontaKundenr: "cr1eb_lch_unicontakundenr"    // "Kundenr. Uniconta"
 };
 let extraOk = null;               // [{ key, field }] – slås op én gang
