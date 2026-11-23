@@ -4,8 +4,9 @@
 //   Importér Excel – læs regnearket (alle ark med en "Kundenr."-kolonne), vis ændringer, importér
 //   Rabatstruktur – rabat-% pr. gruppe og købsgrænse + farve pr. gruppe
 //
-// Forudsætter globale: rows (kunder), esc, kundeUrl – findes på kundeliste2.html
-// og kundeliste_admin.html. openRabat('kunder' | 'import' | 'struktur').
+// Forudsætter globale: rows (kunder), esc, kundeUrl – findes på kundeliste.html
+// og kundeliste_admin.html. openRabat('kunder' | 'import' | 'struktur', { import: true|false }).
+// Excel-importen vises kun, når import ikke er slået fra (kundeliste.html slår den fra).
 (function () {
   const API = '/api/kunde-rabat';
   const YD = [['robot', 'Robot'], ['yverpleje', 'Yverpleje'], ['tank', 'Tank']];
@@ -227,7 +228,11 @@
   }
   wrap.querySelectorAll('.rbTabs button').forEach(b => b.onclick = () => tab(b.dataset.tab));
 
-  async function open(fane = 'kunder') {
+  let medImport = true;
+  async function open(fane = 'kunder', opts = {}) {
+    medImport = opts.import !== false;
+    wrap.querySelector('.rbTabs [data-tab=import]').hidden = !medImport;
+    if (!medImport && fane === 'import') fane = 'kunder';
     wrap.hidden = false;
     tab(fane);
     await load();
@@ -299,7 +304,7 @@
       .sort((a, b) => (a.navn || '').localeCompare(b.navn || '', 'da') || a.kundenr.localeCompare(b.kundenr));
     $('rbCount').textContent = `${list.length} af ${data.items.length} kunder`;
     $('rbBody').innerHTML = (ny ? rowHtml(ny, true) : '') + (list.map(r => rowHtml(r, false)).join('') ||
-      (ny ? '' : `<tr><td colspan="9" class="muted">${q || fg ? 'Ingen match' : 'Ingen kunder i rabatordningen endnu – brug fanen Importér Excel'}</td></tr>`));
+      (ny ? '' : `<tr><td colspan="9" class="muted">${q || fg ? 'Ingen match' : `Ingen kunder i rabatordningen endnu${medImport ? ' – brug fanen Importér Excel' : ''}`}</td></tr>`));
     wireRows();
     openHist.forEach(loadHist);
   }

@@ -3,7 +3,7 @@
 //   - adgangstjek (portal_admin / portal_kundeliste_admin)
 //   - kontraktfarver  (tabel lch_serviceaftaler_kontraktfarve)
 //   - aftaletekster   (tabel lch_serviceaftaler_aftalertekst)
-//   - serviceaftaler  (tabel lch_serviceaftaler) – oprettes fra kundeliste2.html
+//   - serviceaftaler  (tabel lch_serviceaftaler) – oprettes fra kundeliste.html
 //   - kolonnegrupper  (tabel lch_kundeliste_kolonnegruppe) – hvilke kolonner
 //                     hver afdeling ser i kundelisten
 // Alle tabeller ligger i Kundeliste-miljøet (KL_DV_URL) – samme som kunder/produkter.
@@ -248,6 +248,7 @@ async function listServiceaftaler(kundenr) {
     const a = tekster.get(r[`_${VAREOPSLAG_NAV}_value`]) || null;
     return {
       id: r[T.serviceaftale.id],
+      aftaleId: r[`_${VAREOPSLAG_NAV}_value`] || "",
       kundenr: r.cr1eb_lch_kundenr || "",
       varenr: r.cr1eb_lch_varenr || a?.varenr || "",
       servicetype: a?.servicetype || "",
@@ -273,7 +274,14 @@ async function postWithDates(set, body, dateFields) {
   }
 }
 
-async function createServiceaftale(input) {
+// Opret (uden id) eller ret (med id) en serviceaftale
+async function createServiceaftale(input) { return saveServiceaftale(input, null); }
+async function updateServiceaftale(id, input) {
+  if (!GUID.test(String(id || ""))) throw bad("Ugyldigt id");
+  return saveServiceaftale(input, id);
+}
+
+async function saveServiceaftale(input, id) {
   const kundenr   = String(input?.kundenr || "").trim();
   const aftaleId  = String(input?.aftaleId || "").trim();
   const startdato = String(input?.startdato || "").trim();
@@ -298,17 +306,35 @@ async function createServiceaftale(input) {
   const set = await entitySet(T.serviceaftale);
   const tekstSet = await entitySet(T.aftaletekst);
   const body = {
-    cr1eb_lch_name: makeKey("SA"),
     cr1eb_lch_kundenr: kundenr,
     cr1eb_lch_varenr: aftale.varenr,
     [`${VAREOPSLAG_NAV}@odata.bind`]: `/${tekstSet}(${aftaleId})`
   };
-  if (startdato) body.cr1eb_lch_startdato = startdato;
-  if (enddato)   body.cr1eb_lch_enddato = enddato;
-  if (note)      body.cr1eb_lch_note = note;
+  const datoer = ["cr1eb_lch_startdato", "cr1eb_lch_enddato"];
 
-  const created = await postWithDates(set, body, ["cr1eb_lch_startdato", "cr1eb_lch_enddato"]);
-  return { id: created?.[T.serviceaftale.id] || null };
+  if (!id) {
+    body.cr1eb_lch_name = makeKey("SA");
+    if (startdato) body.cr1eb_lch_startdato = startdato;
+    if (enddato)   body.cr1eb_lch_enddato = enddato;
+    if (note)      body.cr1eb_lch_note = note;
+    const created = await postWithDates(set, body, datoer);
+    return { id: created?.[T.serviceaftale.id] || null };
+  }
+
+  // Ret: tomme felter ryddes (null), så man også kan fjerne en dato eller note
+  body.cr1eb_lch_startdato = startdato || null;
+  body.cr1eb_lch_enddato = enddato || null;
+  body.cr1eb_lch_note = note || null;
+  try {
+    await dvFetch(`${set}(${id})`, { method: "PATCH", body });
+  } catch (e) {
+    // Kolonnen er "dato og klokkeslæt": send kl. 12:00 UTC (som ved oprettelse)
+    if (e.status !== 400 || !datoer.some(f => body[f])) throw e;
+    const b2 = { ...body };
+    for (const f of datoer) if (b2[f]) b2[f] = `${b2[f]}T12:00:00Z`;
+    await dvFetch(`${set}(${id})`, { method: "PATCH", body: b2 });
+  }
+  return { id };
 }
 
 // ── Kolonnegrupper ──────────────────────────────────────────────────────────
@@ -426,6 +452,6 @@ module.exports = {
   ADMIN_ROLES, isKundelisteAdmin,
   loadFarver, kontraktTyper, saveFarve,
   listAftaler, createAftale, updateAftale, deleteAftale,
-  listServiceaftaler, createServiceaftale,
+  listServiceaftaler, createServiceaftale, updateServiceaftale,
   listGrupper, saveGruppe, deleteGruppe, entraAfdelinger, userDepartment, gruppeForAfdeling
 };
