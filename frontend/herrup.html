@@ -158,6 +158,8 @@
     .kcTable td { border-bottom:1px solid #f1f2f4; padding:4px 8px 4px 0; vertical-align:top; overflow-wrap:anywhere; }
     .kcDiff td.f { color:#6b7280; white-space:nowrap; }
     .kcDiff td.k { color:#15803d; } .kcDiff td.b { color:#b91c1c; }
+    .kcNote { font-size:.76rem; color:#b45309; margin-top:2px; }
+    .kcLink { font-size:.78rem; color:#374151; padding-left:.6rem; }
     @media (max-width:640px) { .kcSum { grid-template-columns:repeat(2,1fr); } .kcBtn { position:static; margin-top:.5rem; } }
     .modal-big-avatar {
       width:80px; height:80px; border-radius:50%; background:var(--nav-bg);
@@ -937,7 +939,7 @@
           <div class="modal-badges" id="mBadges"></div>
         </div>
 <div id="mCurrentStatusCard"></div>
-        <button type="button" class="kcBtn" id="btnKontaktSammenlign" hidden onclick="openKontaktSammenlign()" title="Sammenlign brugerens Outlook-kontakter med kontakter@lcherrup.dk (kun portal_admin)">🔁 Sammenlign kontakter</button>
+        <button type="button" class="kcBtn" id="btnKontaktSammenlign" hidden onclick="openKontaktSammenlign()" title="Kontrollér at kontakterne fra kontakter@lcherrup.dk findes korrekt hos brugeren (kun portal_admin)">🔁 Sammenlign kontakter</button>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
       <div class="modal-tabs">
@@ -1888,29 +1890,42 @@
       const j = kcData;
       const q = (document.getElementById("kcSearch")?.value || "").trim().toLowerCase();
       const hit = x => !q || [x.navn, x.firma, x.mail, x.tlf].join(" ").toLowerCase().includes(q);
-      const liste = (arr) => arr.filter(hit).map(x => `<tr><td><b>${esc(x.navn)}</b></td><td>${esc(x.firma)}</td><td>${esc(x.tlf)}</td><td>${esc(x.mail)}</td></tr>`).join("")
-        || '<tr><td colspan="4" class="muted">Ingen</td></tr>';
       const flere = (n, vist) => n > vist ? `<div class="muted" style="font-size:.8rem;margin-top:4px">Viser ${vist} af ${n}</div>` : "";
+      const linkTxt = l => `<div class="kcLink">↳ ${esc(l.navn)}${l.firma ? ` <span class="muted">(${esc(l.firma)})</span>` : ""} – samme ${esc(l.via)}</div>`;
+
+      const mangler = j.mangler.filter(hit).map(x => `
+        <tr><td><b>${esc(x.navn)}</b>${x.andetNavn.length ? `<div class="kcNote">Findes måske hos brugeren under andet navn:</div>${x.andetNavn.map(linkTxt).join("")}` : ""}</td>
+            <td>${esc(x.firma)}</td><td>${esc(x.tlf)}</td><td>${esc(x.mail)}</td></tr>`).join("")
+        || '<tr><td colspan="4" class="muted">Ingen – alle kontakter fra kontakter@ findes hos brugeren</td></tr>';
+
+      const dubletter = j.dubletter.filter(hit).map(x => `
+        <tr><td><b>${esc(x.navn)}</b>
+              ${x.sammeNavn > 1 ? `<div class="kcNote">Findes ${x.sammeNavn} gange med samme navn</div>` : ""}
+              ${x.links.length ? `<div class="kcNote">Linket til brugerens egne kontakter:</div>${x.links.map(linkTxt).join("")}` : ""}</td>
+            <td>${esc(x.firma)}</td><td>${esc(x.tlf)}</td><td>${esc(x.mail)}</td></tr>`).join("")
+        || '<tr><td colspan="4" class="muted">Ingen dubletter</td></tr>';
+
       const forskelle = j.forskelle.filter(hit).map(x => `
         <tr><td colspan="3"><b>${esc(x.navn)}</b> <span class="muted">${esc(x.firma)}</span></td></tr>
         ${x.diff.map(d => `<tr class="kcDiff"><td class="f">${esc(d.felt)}</td><td class="k">${esc(d.kilde || "–")}</td><td class="b">${esc(d.bruger || "–")}</td></tr>`).join("")}`).join("")
-        || '<tr><td colspan="3" class="muted">Ingen</td></tr>';
+        || '<tr><td colspan="3" class="muted">Ingen forskelle</td></tr>';
+
       const scroll = document.getElementById("kcBody").scrollTop;
       document.getElementById("kcBody").innerHTML = `
         <div class="kcSum">
           <div><b>${j.kilde}</b><span>I kontakter@</span></div>
-          <div><b>${j.bruger}</b><span>Hos brugeren</span></div>
-          <div class="ok"><b>${j.ens}</b><span>Ens</span></div>
+          <div class="ok"><b>${j.fundet}</b><span>Fundet hos brugeren</span></div>
           <div class="bad"><b>${j.antal.mangler}</b><span>Mangler hos brugeren</span></div>
+          <div class="warn"><b>${j.antal.dubletter}</b><span>Dubletter</span></div>
           <div class="warn"><b>${j.antal.forskelle}</b><span>Med forskelle</span></div>
         </div>
         <input type="search" id="kcSearch" placeholder="Søg navn, firma, telefon, mail…" value="${esc(q)}" oninput="kcRender()">
-        <div class="kcSec"><h4>Mangler hos brugeren (${j.antal.mangler})</h4>
-          <table class="kcTable"><tr><th>Navn</th><th>Firma</th><th>Telefon</th><th>Mail</th></tr>${liste(j.mangler)}</table>${flere(j.antal.mangler, j.mangler.length)}</div>
+        <div class="kcSec"><h4 style="color:#b91c1c">Mangler hos brugeren (${j.antal.mangler})</h4>
+          <table class="kcTable"><tr><th>Navn</th><th>Firma</th><th>Telefon</th><th>Mail</th></tr>${mangler}</table>${flere(j.antal.mangler, j.mangler.length)}</div>
+        <div class="kcSec"><h4 style="color:#b45309">Dubletter (${j.antal.dubletter}) <span class="muted" style="font-weight:400">– samme navn flere gange, eller brugerens egen kontakt med samme telefon/mail</span></h4>
+          <table class="kcTable"><tr><th>Kontakt fra kontakter@</th><th>Firma</th><th>Telefon</th><th>Mail</th></tr>${dubletter}</table>${flere(j.antal.dubletter, j.dubletter.length)}</div>
         <div class="kcSec"><h4>Forskelle (${j.antal.forskelle}) – <span style="color:#15803d">kontakter@</span> / <span style="color:#b91c1c">brugeren</span></h4>
-          <table class="kcTable"><tr><th>Felt</th><th>kontakter@</th><th>Brugeren</th></tr>${forskelle}</table>${flere(j.antal.forskelle, j.forskelle.length)}</div>
-        <div class="kcSec"><h4>Kun hos brugeren (${j.antal.kunBruger}) <span class="muted" style="font-weight:400">– fx egne kontakter</span></h4>
-          <table class="kcTable"><tr><th>Navn</th><th>Firma</th><th>Telefon</th><th>Mail</th></tr>${liste(j.kunBruger)}</table>${flere(j.antal.kunBruger, j.kunBruger.length)}</div>`;
+          <table class="kcTable"><tr><th>Felt</th><th>kontakter@</th><th>Brugeren</th></tr>${forskelle}</table>${flere(j.antal.forskelle, j.forskelle.length)}</div>`;
       document.getElementById("kcBody").scrollTop = scroll;
       const s = document.getElementById("kcSearch");
       if (q) { s.focus(); s.setSelectionRange(q.length, q.length); }

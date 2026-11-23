@@ -4,7 +4,7 @@
 // Kun portal_admin.
 //
 //   GET ?action=me            → { admin }
-//   GET ?user=<objectId|mail> → { kilde, bruger, mangler, kunBruger, forskelle, ens }
+//   GET ?user=<objectId|mail> → { kilde, bruger, fundet, mangler, dubletter, forskelle, antal }
 //
 // Kræver Graph-applikationstilladelsen Contacts.Read på portalens app-registrering.
 // Kildepostkassen kan ændres med app setting KONTAKTER_MAILBOX.
@@ -79,33 +79,71 @@ function indeks(list) {
   return m;
 }
 
-function sammenlign(kilde, bruger) {
-  const ki = indeks(kilde), bi = indeks(bruger);
-  const mangler = [], kunBruger = [], forskelle = [];
-  let ens = 0;
+// Kun retningen kontakter@ → bruger kontrolleres. Brugerens egne kontakter
+// vises ikke, medmindre de er dubletter af en kontakt fra kontakter@.
+//   mangler:   kontakten findes ikke hos brugeren (heller ikke under andet navn)
+//   dubletter: brugeren har kontakten flere gange – med samme navn, eller som
+//              en anden kontakt, der er "linket" via samme telefon eller e-mail
+//   forskelle: kopien hos brugeren afviger fra kontakter@ (firma, tlf, mail …)
+function nogler(c) {
+  const f = felter(c);
+  return {
+    tlf: f["Telefon"] ? f["Telefon"].split(", ") : [],
+    mail: f["E-mail"] ? f["E-mail"].split(", ") : []
+  };
+}
+const navnAf = c => norm(c.displayName || [c.givenName, c.surname].filter(Boolean).join(" "));
 
-  for (const [k, kList] of ki) {
-    const bList = bi.get(k);
-    if (!bList) { kList.forEach(c => mangler.push(vis(c))); continue; }
-    // Samme navn: sammenlign første med første (dubletter nævnes)
-    const a = felter(kList[0]), b = felter(bList[0]);
-    const diff = Object.keys(a).filter(f => a[f] !== b[f])
-      .map(f => ({ felt: f, kilde: a[f], bruger: b[f] }));
-    if (diff.length) forskelle.push({ ...vis(kList[0]), diff });
-    else ens++;
-    if (kList.length !== bList.length) {
-      forskelle.push({ ...vis(kList[0]), diff: [{ felt: "Antal med samme navn", kilde: String(kList.length), bruger: String(bList.length) }] });
-    }
+function sammenlign(kilde, bruger) {
+  const byName = indeks(bruger);
+  const byTlf = new Map(), byMail = new Map();
+  for (const c of bruger) {
+    const n = nogler(c);
+    n.tlf.forEach(t => { if (t.length >= 6) { if (!byTlf.has(t)) byTlf.set(t, new Set()); byTlf.get(t).add(c); } });
+    n.mail.forEach(m => { if (!byMail.has(m)) byMail.set(m, new Set()); byMail.get(m).add(c); });
   }
-  for (const [k, bList] of bi) if (!ki.has(k)) bList.forEach(c => kunBruger.push(vis(c)));
+
+  const mangler = [], dubletter = [], forskelle = [];
+  let fundet = 0;
+
+  for (const k of kilde) {
+    const navn = navnAf(k);
+    if (!navn) continue;
+    const sammeNavn = byName.get(navn) || [];
+
+    // Andre kontakter hos brugeren, der deler telefon eller mail med kontakten ("links")
+    const n = nogler(k);
+    const links = new Map();                       // kontakt → hvad der linker
+    n.tlf.forEach(t => (byTlf.get(t) || []).forEach(c => { if (navnAf(c) !== navn) links.set(c, `tlf. ${t}`); }));
+    n.mail.forEach(m => (byMail.get(m) || []).forEach(c => { if (navnAf(c) !== navn && !links.has(c)) links.set(c, m); }));
+    const linkListe = [...links.entries()].map(([c, via]) => ({ ...vis(c), via }));
+
+    if (!sammeNavn.length) {
+      mangler.push({ ...vis(k), andetNavn: linkListe });
+      continue;
+    }
+    fundet++;
+
+    if (sammeNavn.length > 1 || linkListe.length) {
+      dubletter.push({
+        ...vis(k),
+        sammeNavn: sammeNavn.length,
+        links: linkListe
+      });
+    }
+
+    const a = felter(k), b = felter(sammeNavn[0]);
+    const diff = Object.keys(a).filter(f => a[f] !== b[f]).map(f => ({ felt: f, kilde: a[f], bruger: b[f] }));
+    if (diff.length) forskelle.push({ ...vis(k), diff });
+  }
 
   const sort = (x, y) => x.navn.localeCompare(y.navn, "da");
   return {
+    fundet,
     mangler: mangler.sort(sort).slice(0, MAX_LIST),
-    kunBruger: kunBruger.sort(sort).slice(0, MAX_LIST),
+    dubletter: dubletter.sort(sort).slice(0, MAX_LIST),
     forskelle: forskelle.sort(sort).slice(0, MAX_LIST),
-    ens,
-    antal: { mangler: mangler.length, kunBruger: kunBruger.length, forskelle: forskelle.length }
+    antal: { mangler: mangler.length, dubletter: dubletter.length, forskelle: forskelle.length }
   };
 }
 
