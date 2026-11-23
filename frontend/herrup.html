@@ -132,6 +132,33 @@
       background:transparent; font-size:1.4rem; cursor:pointer; color:#6b7280; line-height:1;
     }
     .modal-close:hover { color:#111; }
+    /* Sammenlign kontakter (kun portal_admin) */
+    .kcBtn { position:absolute; top:.85rem; right:3rem; appearance:none; border:1px solid #d1d5db; background:#fff;
+             border-radius:8px; padding:.3rem .65rem; font:inherit; font-size:.8rem; cursor:pointer; color:#374151; }
+    .kcBtn:hover { border-color:var(--nav-bg); color:var(--nav-bg); }
+    .kcBtn[hidden] { display:none; }
+    .kcBackdrop { position:fixed; inset:0; z-index:3000; background:rgba(17,24,39,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
+    .kcBackdrop[hidden] { display:none; }
+    .kcModal { background:#fff; border-radius:12px; width:min(980px,100%); max-height:90vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.3); }
+    .kcHead { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 18px; border-bottom:4px solid var(--nav-bg); }
+    .kcHead h3 { margin:0; font-size:1.05rem; }
+    .kcHead .sub { font-size:.82rem; color:#6b7280; }
+    .kcClose { border:0; background:none; font-size:1.5rem; cursor:pointer; color:#6b7280; }
+    .kcBody { padding:14px 18px; overflow:auto; }
+    .kcSum { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; margin-bottom:12px; }
+    .kcSum div { background:#f9fafb; border:1px solid #eef0f2; border-radius:10px; padding:.5rem .65rem; }
+    .kcSum b { display:block; font-size:1.3rem; }
+    .kcSum span { font-size:.75rem; color:#6b7280; }
+    .kcSum .warn b { color:#b45309; } .kcSum .bad b { color:#b91c1c; } .kcSum .ok b { color:#15803d; }
+    .kcBody input[type=search] { width:100%; box-sizing:border-box; border:1px solid #d1d5db; border-radius:8px; padding:.5rem .7rem; font:inherit; margin-bottom:10px; }
+    .kcSec { margin-bottom:14px; }
+    .kcSec h4 { margin:0 0 6px; font-size:.92rem; }
+    .kcTable { width:100%; border-collapse:collapse; font-size:.83rem; }
+    .kcTable th { text-align:left; color:#6b7280; font-weight:600; border-bottom:1px solid #e5e7eb; padding:4px 8px 4px 0; }
+    .kcTable td { border-bottom:1px solid #f1f2f4; padding:4px 8px 4px 0; vertical-align:top; overflow-wrap:anywhere; }
+    .kcDiff td.f { color:#6b7280; white-space:nowrap; }
+    .kcDiff td.k { color:#15803d; } .kcDiff td.b { color:#b91c1c; }
+    @media (max-width:640px) { .kcSum { grid-template-columns:repeat(2,1fr); } .kcBtn { position:static; margin-top:.5rem; } }
     .modal-big-avatar {
       width:80px; height:80px; border-radius:50%; background:var(--nav-bg);
       color:#fff; font-size:1.4rem; font-weight:700; display:flex; align-items:center;
@@ -886,6 +913,17 @@
   <div id="printArea"></div>
 
   <!-- ── Modal ──────────────────────────────────────────────────────────────── -->
+  <!-- Sammenlign kontakter (kun portal_admin) -->
+  <div class="kcBackdrop" id="kcBackdrop" hidden onclick="if(event.target===this)this.hidden=true">
+    <div class="kcModal" role="dialog" aria-modal="true" aria-labelledby="kcTitle">
+      <div class="kcHead">
+        <div><h3 id="kcTitle">Sammenlign kontakter</h3><div class="sub" id="kcSub"></div></div>
+        <button type="button" class="kcClose" onclick="document.getElementById('kcBackdrop').hidden=true" aria-label="Luk">×</button>
+      </div>
+      <div class="kcBody" id="kcBody"></div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="modalBackdrop" onclick="closeModalOnBackdrop(event)">
     <div class="modal" id="modal">
       <div class="modal-header">
@@ -899,6 +937,7 @@
           <div class="modal-badges" id="mBadges"></div>
         </div>
 <div id="mCurrentStatusCard"></div>
+        <button type="button" class="kcBtn" id="btnKontaktSammenlign" hidden onclick="openKontaktSammenlign()" title="Sammenlign brugerens Outlook-kontakter med kontakter@lcherrup.dk (kun portal_admin)">🔁 Sammenlign kontakter</button>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
       <div class="modal-tabs">
@@ -1812,12 +1851,79 @@
     }
 
     // ── Modal ──────────────────────────────────────────────────────────────────
+    // ── Sammenlign kontakter (kun portal_admin – tjekkes på serveren) ──────────
+    let kcAdmin = null;
+    async function kcCheckAdmin() {
+      if (kcAdmin !== null) return kcAdmin;
+      try {
+        const r = await fetch("/api/kontakt-sammenlign?action=me", { cache: "no-store" });
+        kcAdmin = r.ok ? !!(await r.json()).admin : false;
+      } catch { kcAdmin = false; }
+      return kcAdmin;
+    }
+    let kcData = null;
+    async function openKontaktSammenlign() {
+      const u = currentModalUser;
+      if (!u) return;
+      const bg = document.getElementById("kcBackdrop");
+      const body = document.getElementById("kcBody");
+      document.getElementById("kcTitle").textContent = `Sammenlign kontakter – ${u.displayName || ""}`;
+      document.getElementById("kcSub").textContent = "Henter kontakter fra Outlook…";
+      body.innerHTML = '<p class="muted">Henter og sammenligner kontakter. Det kan tage nogle sekunder…</p>';
+      bg.hidden = false;
+      try {
+        const id = u.id || u.mail || u.userPrincipalName;
+        const r = await fetch(`/api/kontakt-sammenlign?user=${encodeURIComponent(id)}`, { cache: "no-store" });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || r.status);
+        kcData = j;
+        document.getElementById("kcSub").textContent = `${j.kildeMailbox} (${j.kilde} kontakter) ↔ ${u.mail || u.userPrincipalName || ""} (${j.bruger} kontakter)`;
+        kcRender();
+      } catch (e) {
+        document.getElementById("kcSub").textContent = "";
+        body.innerHTML = `<p style="color:#b91c1c">Fejl: ${esc(e.message)}</p>`;
+      }
+    }
+    function kcRender() {
+      const j = kcData;
+      const q = (document.getElementById("kcSearch")?.value || "").trim().toLowerCase();
+      const hit = x => !q || [x.navn, x.firma, x.mail, x.tlf].join(" ").toLowerCase().includes(q);
+      const liste = (arr) => arr.filter(hit).map(x => `<tr><td><b>${esc(x.navn)}</b></td><td>${esc(x.firma)}</td><td>${esc(x.tlf)}</td><td>${esc(x.mail)}</td></tr>`).join("")
+        || '<tr><td colspan="4" class="muted">Ingen</td></tr>';
+      const flere = (n, vist) => n > vist ? `<div class="muted" style="font-size:.8rem;margin-top:4px">Viser ${vist} af ${n}</div>` : "";
+      const forskelle = j.forskelle.filter(hit).map(x => `
+        <tr><td colspan="3"><b>${esc(x.navn)}</b> <span class="muted">${esc(x.firma)}</span></td></tr>
+        ${x.diff.map(d => `<tr class="kcDiff"><td class="f">${esc(d.felt)}</td><td class="k">${esc(d.kilde || "–")}</td><td class="b">${esc(d.bruger || "–")}</td></tr>`).join("")}`).join("")
+        || '<tr><td colspan="3" class="muted">Ingen</td></tr>';
+      const scroll = document.getElementById("kcBody").scrollTop;
+      document.getElementById("kcBody").innerHTML = `
+        <div class="kcSum">
+          <div><b>${j.kilde}</b><span>I kontakter@</span></div>
+          <div><b>${j.bruger}</b><span>Hos brugeren</span></div>
+          <div class="ok"><b>${j.ens}</b><span>Ens</span></div>
+          <div class="bad"><b>${j.antal.mangler}</b><span>Mangler hos brugeren</span></div>
+          <div class="warn"><b>${j.antal.forskelle}</b><span>Med forskelle</span></div>
+        </div>
+        <input type="search" id="kcSearch" placeholder="Søg navn, firma, telefon, mail…" value="${esc(q)}" oninput="kcRender()">
+        <div class="kcSec"><h4>Mangler hos brugeren (${j.antal.mangler})</h4>
+          <table class="kcTable"><tr><th>Navn</th><th>Firma</th><th>Telefon</th><th>Mail</th></tr>${liste(j.mangler)}</table>${flere(j.antal.mangler, j.mangler.length)}</div>
+        <div class="kcSec"><h4>Forskelle (${j.antal.forskelle}) – <span style="color:#15803d">kontakter@</span> / <span style="color:#b91c1c">brugeren</span></h4>
+          <table class="kcTable"><tr><th>Felt</th><th>kontakter@</th><th>Brugeren</th></tr>${forskelle}</table>${flere(j.antal.forskelle, j.forskelle.length)}</div>
+        <div class="kcSec"><h4>Kun hos brugeren (${j.antal.kunBruger}) <span class="muted" style="font-weight:400">– fx egne kontakter</span></h4>
+          <table class="kcTable"><tr><th>Navn</th><th>Firma</th><th>Telefon</th><th>Mail</th></tr>${liste(j.kunBruger)}</table>${flere(j.antal.kunBruger, j.kunBruger.length)}</div>`;
+      document.getElementById("kcBody").scrollTop = scroll;
+      const s = document.getElementById("kcSearch");
+      if (q) { s.focus(); s.setSelectionRange(q.length, q.length); }
+    }
+
     function openModal(userId) {
       const u = byId.get(userId);
       if (!u) return;
       currentModalUser = u;
       editMode = false;
       currentPrivateData = null;
+      // Knappen "Sammenlign kontakter" kun for portal_admin
+      kcCheckAdmin().then(ok => { document.getElementById("btnKontaktSammenlign").hidden = !ok; });
       const editBtnReset = document.getElementById("btnEditPrivat");
       editBtnReset.textContent = "Rediger";
       editBtnReset.classList.remove("cancel");
