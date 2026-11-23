@@ -1900,7 +1900,7 @@
 
       const dubletter = j.dubletter.filter(hit).map(x => `
         <tr><td><b>${esc(x.navn)}</b>
-              ${x.sammeNavn > 1 ? `<div class="kcNote">Findes ${x.sammeNavn} gange med samme navn</div>` : ""}
+              ${x.sammeNavn > (x.iKilde || 1) ? `<div class="kcNote">Brugeren har ${x.sammeNavn} med dette navn – kontakter@ har ${x.iKilde || 1}</div>` : ""}
               ${x.links.length ? `<div class="kcNote">Linket til brugerens egne kontakter:</div>${x.links.map(linkTxt).join("")}` : ""}</td>
             <td>${esc(x.firma)}</td><td>${esc(x.tlf)}</td><td>${esc(x.mail)}</td></tr>`).join("")
         || '<tr><td colspan="4" class="muted">Ingen dubletter</td></tr>';
@@ -1922,7 +1922,7 @@
         <input type="search" id="kcSearch" placeholder="Søg navn, firma, telefon, mail…" value="${esc(q)}" oninput="kcRender()">
         <div class="kcSec"><h4 style="color:#b91c1c">Mangler hos brugeren (${j.antal.mangler})</h4>
           <table class="kcTable"><tr><th>Navn</th><th>Firma</th><th>Telefon</th><th>Mail</th></tr>${mangler}</table>${flere(j.antal.mangler, j.mangler.length)}</div>
-        <div class="kcSec"><h4 style="color:#b45309">Dubletter (${j.antal.dubletter}) <span class="muted" style="font-weight:400">– samme navn flere gange, eller brugerens egen kontakt med samme telefon/mail</span></h4>
+        <div class="kcSec"><h4 style="color:#b45309">Dubletter (${j.antal.dubletter}) <span class="muted" style="font-weight:400">– flere med samme navn end i kontakter@, eller brugerens egen kontakt med samme telefon/mail</span></h4>
           <table class="kcTable"><tr><th>Kontakt fra kontakter@</th><th>Firma</th><th>Telefon</th><th>Mail</th></tr>${dubletter}</table>${flere(j.antal.dubletter, j.dubletter.length)}</div>
         <div class="kcSec"><h4>Forskelle (${j.antal.forskelle}) – <span style="color:#15803d">kontakter@</span> / <span style="color:#b91c1c">brugeren</span></h4>
           <table class="kcTable"><tr><th>Felt</th><th>kontakter@</th><th>Brugeren</th></tr>${forskelle}</table>${flere(j.antal.forskelle, j.forskelle.length)}</div>`;

@@ -81,65 +81,95 @@ function indeks(list) {
 
 // Kun retningen kontakter@ → bruger kontrolleres. Brugerens egne kontakter
 // vises ikke, medmindre de er dubletter af en kontakt fra kontakter@.
-//   mangler:   kontakten findes ikke hos brugeren (heller ikke under andet navn)
-//   dubletter: brugeren har kontakten flere gange – med samme navn, eller som
-//              en anden kontakt, der er "linket" via samme telefon eller e-mail
-//   forskelle: kopien hos brugeren afviger fra kontakter@ (firma, tlf, mail …)
+//
+// 1) Parring: kontakter med samme navn parres én-til-én, bedste match først
+//    (samme mail/telefon). kontakter@ kan selv have flere kontakter med samme
+//    navn (fx gårdnavn med flere personer) – de tælles hver for sig.
+// 2) mangler:   kontakter@-kontakt uden makker hos brugeren
+//    dubletter: brugeren har FLERE med navnet end kontakter@, eller brugeren har
+//               en EGEN kontakt (ikke parret med noget fra kontakter@) med samme
+//               telefon eller mail ("link")
+//    forskelle: den parrede kopi afviger fra kontakter@
 function nogler(c) {
   const f = felter(c);
   return {
-    tlf: f["Telefon"] ? f["Telefon"].split(", ") : [],
+    tlf: f["Telefon"] ? f["Telefon"].split(", ").filter(t => t.length >= 6) : [],
     mail: f["E-mail"] ? f["E-mail"].split(", ") : []
   };
 }
 const navnAf = c => norm(c.displayName || [c.givenName, c.surname].filter(Boolean).join(" "));
 
+function score(k, b) {
+  const fk = felter(k), fb = felter(b);
+  if (Object.keys(fk).every(f => fk[f] === fb[f])) return 100;
+  const nk = nogler(k), nb = nogler(b);
+  let p = 0;
+  if (nk.mail.some(m => nb.mail.includes(m))) p += 10;
+  if (nk.tlf.some(t => nb.tlf.includes(t))) p += 10;
+  if (fk["Firma"] && fk["Firma"] === fb["Firma"]) p += 2;
+  return p;
+}
+
 function sammenlign(kilde, bruger) {
-  const byName = indeks(bruger);
+  const kGrp = indeks(kilde), bGrp = indeks(bruger);
+  const makker = new Map();            // kontakter@-kontakt → brugerens kopi
+  const parret = new Set();            // brugerens kontakter, der er en kopi
+  const ekstraSammeNavn = new Map();   // navn → antal ekstra hos brugeren
+
+  // 1) Parring pr. navn – bedste par først
+  for (const [navn, kList] of kGrp) {
+    const bList = (bGrp.get(navn) || []).slice();
+    const par = [];
+    for (const k of kList) for (const b of bList) par.push({ k, b, s: score(k, b) });
+    par.sort((x, y) => y.s - x.s);
+    for (const { k, b } of par) {
+      if (makker.has(k) || parret.has(b)) continue;
+      makker.set(k, b); parret.add(b);
+    }
+    if (bList.length > kList.length) ekstraSammeNavn.set(navn, bList.length - kList.length);
+  }
+
+  // Brugerens egne kontakter (ikke kopier) indekseret på telefon og mail
+  const egne = bruger.filter(b => !parret.has(b));
   const byTlf = new Map(), byMail = new Map();
-  for (const c of bruger) {
+  for (const c of egne) {
     const n = nogler(c);
-    n.tlf.forEach(t => { if (t.length >= 6) { if (!byTlf.has(t)) byTlf.set(t, new Set()); byTlf.get(t).add(c); } });
+    n.tlf.forEach(t => { if (!byTlf.has(t)) byTlf.set(t, new Set()); byTlf.get(t).add(c); });
     n.mail.forEach(m => { if (!byMail.has(m)) byMail.set(m, new Set()); byMail.get(m).add(c); });
+  }
+  function linksFor(k) {
+    const n = nogler(k), links = new Map();
+    n.tlf.forEach(t => (byTlf.get(t) || []).forEach(c => links.set(c, `tlf. ${t}`)));
+    n.mail.forEach(m => (byMail.get(m) || []).forEach(c => { if (!links.has(c)) links.set(c, m); }));
+    // Kontakter med samme navn tælles under "flere med samme navn", ikke som links
+    return [...links.entries()].filter(([c]) => navnAf(c) !== navnAf(k)).map(([c, via]) => ({ ...vis(c), via }));
   }
 
   const mangler = [], dubletter = [], forskelle = [];
-  let fundet = 0;
-
+  const ekstraVist = new Set();
   for (const k of kilde) {
     const navn = navnAf(k);
     if (!navn) continue;
-    const sammeNavn = byName.get(navn) || [];
+    const links = linksFor(k);
+    const b = makker.get(k);
 
-    // Andre kontakter hos brugeren, der deler telefon eller mail med kontakten ("links")
-    const n = nogler(k);
-    const links = new Map();                       // kontakt → hvad der linker
-    n.tlf.forEach(t => (byTlf.get(t) || []).forEach(c => { if (navnAf(c) !== navn) links.set(c, `tlf. ${t}`); }));
-    n.mail.forEach(m => (byMail.get(m) || []).forEach(c => { if (navnAf(c) !== navn && !links.has(c)) links.set(c, m); }));
-    const linkListe = [...links.entries()].map(([c, via]) => ({ ...vis(c), via }));
+    if (!b) { mangler.push({ ...vis(k), andetNavn: links }); continue; }
 
-    if (!sammeNavn.length) {
-      mangler.push({ ...vis(k), andetNavn: linkListe });
-      continue;
-    }
-    fundet++;
-
-    if (sammeNavn.length > 1 || linkListe.length) {
-      dubletter.push({
-        ...vis(k),
-        sammeNavn: sammeNavn.length,
-        links: linkListe
-      });
+    // Ekstra med samme navn nævnes kun én gang pr. navn
+    const ekstra = !ekstraVist.has(navn) ? (ekstraSammeNavn.get(navn) || 0) : 0;
+    if (ekstra) ekstraVist.add(navn);
+    if (ekstra || links.length) {
+      dubletter.push({ ...vis(k), sammeNavn: ekstra ? (kGrp.get(navn).length + ekstra) : 1, iKilde: kGrp.get(navn).length, links });
     }
 
-    const a = felter(k), b = felter(sammeNavn[0]);
-    const diff = Object.keys(a).filter(f => a[f] !== b[f]).map(f => ({ felt: f, kilde: a[f], bruger: b[f] }));
+    const a = felter(k), c = felter(b);
+    const diff = Object.keys(a).filter(f => a[f] !== c[f]).map(f => ({ felt: f, kilde: a[f], bruger: c[f] }));
     if (diff.length) forskelle.push({ ...vis(k), diff });
   }
 
   const sort = (x, y) => x.navn.localeCompare(y.navn, "da");
   return {
-    fundet,
+    fundet: makker.size,
     mangler: mangler.sort(sort).slice(0, MAX_LIST),
     dubletter: dubletter.sort(sort).slice(0, MAX_LIST),
     forskelle: forskelle.sort(sort).slice(0, MAX_LIST),
