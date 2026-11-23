@@ -414,6 +414,17 @@
         sort: k => k.kontrakt, text: k => k.kontrakt, values: k => Object.keys(k.kontraktAntal || {}),
         cell: k => `<td class="small" title="${esc(kontraktTitle(k))}">${kontraktChips(k)}</td>`
       },
+      // Adresser: én linje pr. adresse (samme rækkefølge som Postnr./By-linjerne)
+      adresse: {
+        sort: k => (k.adresser || [])[0]?.adresse || '', text: k => (k.adresser || []).map(a => a.adresse).join(' '),
+        values: k => (k.adresser || []).map(a => a.adresse),
+        cell: k => `<td class="small">${(k.adresser || []).map(a => `<div class="saLine">${esc(a.adresse || '–')}</div>`).join('')}</td>`
+      },
+      by: {
+        sort: k => (k.adresser || [])[0]?.by || '', text: k => (k.adresser || []).map(a => a.by).join(' '),
+        values: k => (k.adresser || []).map(a => a.by),
+        cell: k => `<td class="small">${(k.adresser || []).map(a => `<div class="saLine">${esc(a.by || '–')}</div>`).join('')}</td>`
+      },
       postnr: {
         sort: k => (k.postnumre || [])[0] || '', text: k => (k.postnumre || []).join(' '), values: k => k.postnumre || [],
         cell: k => `<td class="small">${esc((k.postnumre || []).join(', '))}</td>`
@@ -570,7 +581,7 @@
     // Valg i rullelisten gemmes som "=værdi" (præcis match), "=" = tom og
     // "=*" = udfyldt (alle med en værdi i kolonnen).
     const MAX_VALG = 40;
-    const NO_SELECT = new Set(['kundenr', 'navn', 'importeret', 'infomail', 'unicontanr', 'sa_note', 'rb_kommentar']);
+    const NO_SELECT = new Set(['kundenr', 'navn', 'adresse', 'importeret', 'infomail', 'unicontanr', 'sa_note', 'rb_kommentar']);
 
     // Værdierne i en kolonne for én kunde (flere ved fx kontrakter/aftaler)
     function colValues(k, key) {

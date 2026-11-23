@@ -29,6 +29,15 @@
   };
   KUNDE_FELTER.forEach(f => { if (pretty[f.id]) f.value = k => cleanText(pretty[f.id](k)); });
 
+  // Adresse / Postnr. / By: alle kundens adresser ved "én linje pr. kunde",
+  // men kun produktets egen adresse ved "én linje pr. produkt"
+  const adrFelt = { 'k:adresse': 'adresse', 'k:postnr': 'postnr', 'k:by': 'by' };
+  KUNDE_FELTER.forEach(f => {
+    const a = adrFelt[f.id];
+    if (!a) return;
+    f.value = (k, p) => cleanText(p ? p[a] : (k.adresser || []).map(x => x[a]).filter(Boolean).join(' / '));
+  });
+
   const dk = s => {             // datoer fra Excel/Dataverse som dd-mm-åååå
     const v = String(s || '').trim();
     let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);

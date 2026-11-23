@@ -94,20 +94,27 @@ async function produktInfo(context) {
 // Returnerer null ved fejl.
 async function adresseInfo(context) {
   try {
-    const rows = await fetchAll(`${ADRESSE_TABLE}?$select=_cr1eb_lch_kunde_value,cr1eb_lch_postnr`);
+    const rows = await fetchAll(`${ADRESSE_TABLE}?$select=_cr1eb_lch_kunde_value,cr1eb_lch_adresse,cr1eb_lch_postnr,cr1eb_lch_by`);
     const antal = new Map();
     const postnr = new Map();
+    const adresser = new Map();     // kunde-id -> [{ adresse, postnr, by }]
     for (const a of rows) {
       const id = a._cr1eb_lch_kunde_value;
       if (!id) continue;
       antal.set(id, (antal.get(id) || 0) + 1);
+      if (!adresser.has(id)) adresser.set(id, []);
+      adresser.get(id).push({
+        adresse: String(a.cr1eb_lch_adresse || "").trim(),
+        postnr: String(a.cr1eb_lch_postnr || "").trim(),
+        by: String(a.cr1eb_lch_by || "").trim()
+      });
       const pn = String(a.cr1eb_lch_postnr || "").trim();
       if (pn) {
         if (!postnr.has(id)) postnr.set(id, new Set());
         postnr.get(id).add(pn);
       }
     }
-    return { antal, postnr };
+    return { antal, postnr, adresser };
   } catch (e) {
     context.log("kunder: kunne ikke hente adresser", e.message);
     return null;
@@ -171,7 +178,8 @@ module.exports = async function (context, req) {
         // Besætninger på kundens adresser, der ikke er salmonella-fri
         salmonella: sal ? (sal.get(nr) || []) : [],
         antalAdresser: adr ? (adr.antal.get(k.id) || 0) : null,
-        postnumre: adr ? [...(adr.postnr.get(k.id) || [])] : []
+        postnumre: adr ? [...(adr.postnr.get(k.id) || [])] : [],
+        adresser: adr ? (adr.adresser.get(k.id) || []) : []
       };
     });
 
