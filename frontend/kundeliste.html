@@ -16,8 +16,10 @@
       border:1px solid #d1d5db; border-radius:6px; padding:0 8px;
       font:inherit; font-size:13px; font-weight:400; background:#fff; cursor:text;
     }
+    .dataTable thead th select.colFilter { padding:0 4px; cursor:pointer; }
+    .dataTable thead th .colFilter.isSet { border-color:var(--red); background:#fdf2f2; font-weight:600; }
     .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
-    /* Knap: kun kunder med produkter, hvor installationsdato er xx-xx-xxxx */
+    /* Knap "Projekt": kun kunder med produkter, hvor installationsdato er xx-xx-xxxx */
     #btnSal.active { background:#fee2e2; border-color:#dc2626; color:#991b1b; font-weight:700; }
     #btnXX.active { background:#fdf2f2; border-color:var(--red); color:var(--red); font-weight:700; }
     /* Salmonella på mindst én af kundens adresser */
@@ -35,6 +37,70 @@
     @media (max-width: 640px) {
       .navExtra { display: none !important; }
     }
+    /* Admin-linje under navbar */
+    .adminBar { flex:0 0 auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff;
+                border-bottom:1px solid var(--border); padding:8px 12px; }
+    .adminBar[hidden] { display:none; }
+    .adminBarLabel { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+    /* Popup: opret serviceaftale */
+    .saBackdrop { position:fixed; inset:0; z-index:200; background:rgba(17,24,39,.5); display:flex; align-items:center; justify-content:center; padding:16px; }
+    .saBackdrop[hidden] { display:none; }
+    .saModal { background:#fff; border-radius:12px; width:min(1100px, 100%); height:min(760px, 92vh); display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.3); }
+    .saListView, .saFormView { flex:1; min-height:0; display:flex; flex-direction:column; }
+    .saListView[hidden], .saFormView[hidden] { display:none; }
+    .saFormView .saBody { flex:1; max-width:640px; width:100%; margin:0 auto; }
+    .saListBar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 18px; border-bottom:1px solid var(--border); }
+    .saListBar input { height:36px; border:1px solid #d1d5db; border-radius:8px; padding:0 10px; font:inherit; font-size:14px; min-width:260px; }
+    .saListBar input:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
+    /* Tabellen ruller; overskriftslinjen står fast */
+    .saTableWrap { flex:1; min-height:0; overflow:auto; }
+    .saTable { width:100%; border-collapse:collapse; font-size:13px; }
+    .saTable thead th { position:sticky; top:0; z-index:1; background:#f9fafb; text-align:left; padding:9px 10px;
+                        border-bottom:1px solid #d1d5db; white-space:nowrap; font-weight:700; color:#374151; }
+    .saTable td { padding:8px 10px; border-bottom:1px solid #eee; vertical-align:top; }
+    .saTable tbody tr { cursor:default; }
+    .saTable td.note { max-width:260px; color:#4b5563; }
+    .saTable tr.udlobet td { color:#9ca3af; }
+    .saHead { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:4px solid var(--red); }
+    .saHead h2 { margin:0; font-size:18px; }
+    .saClose { border:0; background:none; font-size:26px; line-height:1; cursor:pointer; color:#6b7280; }
+    .saBody { padding:10px 18px; overflow:auto; display:grid; gap:6px; align-content:start; }
+    .saBody label { display:block; font-size:12px; font-weight:600; color:#374151; margin-bottom:2px; }
+    .saBody input, .saBody select, .saBody textarea { width:100%; height:32px; border:1px solid #d1d5db; border-radius:7px; padding:0 9px; font:inherit; font-size:14px; background:#fff; }
+    .saBody textarea { height:48px; padding:6px 9px; resize:vertical; }
+    .saBody .saHint { font-size:12px; margin-top:2px; }
+    .saBody input:focus, .saBody select:focus, .saBody textarea:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
+    .saRow2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .saRow2 > [hidden] { display:none; }
+    .saKundeNavn { font-size:12px; margin-top:2px; min-height:1em; }
+    .saExisting { border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:#fafafa; font-size:13px; }
+    .saExisting table { width:100%; border-collapse:collapse; }
+    .saExisting td, .saExisting th { padding:4px 6px; text-align:left; border-bottom:1px solid #eee; }
+    .saExisting tr { cursor:default; }
+    .saFoot { display:flex; align-items:center; gap:10px; padding:12px 18px; border-top:1px solid var(--border); }
+    .saFoot .msg { flex:1; font-size:13px; }
+    .saFoot .msg.ok { color:#15803d; } .saFoot .msg.err { color:#991b1b; }
+    .btn.primary { background:var(--red); border-color:var(--red); color:#fff; }
+    .btn.primary:hover { background:var(--red-dark); }
+    .btn:disabled { opacity:.5; cursor:default; }
+    @media (max-width:560px) { .saRow2 { grid-template-columns:1fr; } }
+    /* Serviceaftale-kolonner: én linje pr. aftale */
+    /* Én linje pr. aftale – samme højde i alle serviceaftale-kolonner, så
+       datoerne står ud for den aftale, de hører til */
+    .saLine { white-space:nowrap; height:24px; line-height:24px; overflow:hidden; text-overflow:ellipsis; }
+    .saLine .saChip { margin:0; line-height:18px; vertical-align:middle; }
+    .saLine.udlobet { color:#9ca3af; }
+    .saChip { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; margin:1px 4px 1px 0; background:#e0f2fe; color:#075985; white-space:nowrap; }
+    .saChip.udlobet { background:#f3f4f6; color:#9ca3af; text-decoration:line-through; }
+    /* Kemi rabat-kolonner */
+    .rbBadge { display:inline-block; min-width:24px; text-align:center; padding:1px 8px; border-radius:999px; font-weight:700; font-size:12px; background:#eef0f2; }
+    td.rbYes { text-align:center; color:#15803d; font-weight:700; }
+    /* Kunder der kun findes i Uniconta (vises kun ved søgning) */
+    .uniTag { display:inline-block; padding:0 6px; border-radius:999px; font-size:11px; background:#ede9fe; color:#5b21b6; font-weight:600; margin-left:4px; }
+    #tbody tr.uniRow td { background:#faf9ff; }
+    /* Kontrakt: én farvet "pille" pr. kontrakttype (farver styres på kundeliste_admin.html) */
+    .kChip { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600;
+             margin:1px 4px 1px 0; border:1px solid rgba(0,0,0,.08); white-space:nowrap; background:#eef0f2; color:#333; }
   </style>
 </head>
 <body>
@@ -54,6 +120,13 @@
   </div>
   <div class="nav-accent"></div>
 </div>
+  <!-- Admin-linje: kun portal_admin / portal_kundeliste_admin -->
+  <div class="adminBar" id="adminBar" hidden>
+    <span class="adminBarLabel">Admin</span>
+    <button type="button" class="btn" id="btnServiceaftaler">Serviceaftaler</button>
+    <button type="button" class="btn" id="btnRabat">Kemi rabat</button>
+  </div>
+
   <main class="pageWrap">
     <section class="toolbar">
       <input id="q" type="search" placeholder="Søg kundenr, navn, postnr., område, status, kontrakt – eller serienr. for at gå til produktet" style="min-width:320px" autocomplete="off" />
@@ -62,49 +135,113 @@
         <option value="">Alle</option>
         <option value="false">Inaktive</option>
         <option value="flereadresser">Flere adresser</option>
+        <option value="uniconta">Uniconta aktiv</option>
+        <option value="uniconta_inaktiv">Uniconta inaktiv</option>
       </select>
+      <select id="kolGruppe" title="Hvilke kolonner der vises. Automatisk = ud fra din afdeling"></select>
       <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
-      <button type="button" class="btn" id="btnXX" title="Vis kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (fx planlagte projekter, der ikke er aktive endnu)">xx-xx-xxxx</button>
+      <button type="button" class="btn" id="btnXX" title="Vis kun projekter: kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (planlagte projekter, der ikke er aktive endnu)">Projekt</button>
       <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
       <div class="toolbarSpacer"></div>
       <div id="countText" class="muted small"></div>
+      <button type="button" id="btnEksport" title="Udskriv, kopiér eller hent de viste kunder som Excel – med valgfri kolonner, produkter og options">🖨️ Udskriv liste</button>
       <button id="btnRefresh">Opdater</button>
     </section>
     <div class="snHint" id="snHint" hidden></div>
     <div class="listLegend">
       <span id="activeFilter" class="activeFilter" hidden></span>
       <span><span class="lg lgSal"></span>Rød baggrund på kundenr. = salmonella (ikke "Fri") på mindst én af kundens adresser. Hold musen over for CHR-nr. <span id="salStatus" class="muted"></span></span>
-      <span><b>xx-xx-xxxx</b> = kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (markeres ikke i listen)</span>
+      <span><b>Projekt</b> = kun kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (markeres ikke i listen)</span>
     </div>
     <div id="status" class="status loading"><div class="spinner"></div> Henter kunder...</div>
     <section class="tableWrap">
       <table class="dataTable">
-        <thead><tr>
-          <th class="sortable" data-sort="kundenr"><span class="colLabel">Kundenr.</span><input class="colFilter" type="search" data-col="kundenr" placeholder="Filtrér…" autocomplete="off"></th>
-          <th class="sortable" data-sort="navn"><span class="colLabel">Navn</span><input class="colFilter" type="search" data-col="navn" placeholder="Filtrér…" autocomplete="off"></th>
-          <th class="sortable" data-sort="omraade"><span class="colLabel">Område</span><input class="colFilter" type="search" data-col="omraade" placeholder="Filtrér…" autocomplete="off"></th>
-          <th class="sortable" data-sort="kundestatus"><span class="colLabel">Kundestatus</span><input class="colFilter" type="search" data-col="kundestatus" placeholder="Filtrér…" autocomplete="off"></th>
-          <th class="sortable" data-sort="kontrakt"><span class="colLabel">Kontrakt</span><input class="colFilter" type="search" data-col="kontrakt" placeholder="Filtrér…" autocomplete="off"></th>
-          <th style="vertical-align:bottom;"><button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button></th>
-        </tr></thead>
+        <!-- Kolonnerne bygges ud fra brugerens kolonnegruppe (se buildHead) -->
+        <thead><tr id="headRow"></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </section>
   </main>
+
+  <!-- Popup: serviceaftaler (liste + opret) -->
+  <div class="saBackdrop" id="saBackdrop" hidden>
+    <div class="saModal" role="dialog" aria-modal="true" aria-labelledby="saTitle">
+      <div class="saHead">
+        <h2 id="saTitle">Serviceaftaler</h2>
+        <button type="button" class="saClose" id="saClose" aria-label="Luk">×</button>
+      </div>
+
+      <!-- Liste over alle serviceaftaler -->
+      <div class="saListView" id="saListView">
+        <div class="saListBar">
+          <button type="button" class="btn primary" id="saNew">＋ Serviceaftale</button>
+          <input type="search" id="saSearch" placeholder="Søg kunde, varenr., servicetype…" autocomplete="off" />
+          <span class="muted small" id="saCount"></span>
+          <span class="small" id="saListMsg" style="color:#15803d;font-weight:600"></span>
+        </div>
+        <div class="saTableWrap">
+          <table class="saTable">
+            <thead><tr><th>Kundenr.</th><th>Kunde</th><th>Varenr.</th><th>Servicetype</th><th>Afdeling</th><th>Start</th><th>Slut</th><th>Note</th><th></th></tr></thead>
+            <tbody id="saListBody"><tr><td colspan="9" class="muted">Henter…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Opret ny serviceaftale -->
+      <div class="saFormView" id="saFormView" hidden>
+        <div class="saBody">
+          <div>
+            <label for="saKunde">Kunde</label>
+            <input id="saKunde" list="saKundeList" placeholder="Skriv kundenr. eller navn…" autocomplete="off" />
+            <datalist id="saKundeList"></datalist>
+            <div class="saKundeNavn muted" id="saKundeNavn"></div>
+          </div>
+          <div>
+            <label for="saAftale">Aftale</label>
+            <select id="saAftale"><option value="">Henter aftaletekster…</option></select>
+          </div>
+          <div class="saRow2">
+            <div><label for="saStart">Startdato</label><input type="date" id="saStart" /></div>
+            <div id="saSlutWrap" hidden>
+              <label for="saSlut">Slutdato</label><input type="date" id="saSlut" />
+              <div class="saHint muted" id="saSlutHint"></div>
+            </div>
+          </div>
+          <div>
+            <label for="saNote">Note</label>
+            <textarea id="saNote" maxlength="2000"></textarea>
+          </div>
+          <div class="saExisting" id="saExisting" hidden></div>
+        </div>
+        <div class="saFoot">
+          <button type="button" class="btn" id="saBack">← Tilbage til listen</button>
+          <span class="msg" id="saMsg"></span>
+          <button type="button" class="btn primary" id="saSave">Opret</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="/assets/kundeliste/common.js"></script>
+  <script src="/assets/kundeliste/kolonner.js"></script>
   <script>
     let rows = [], filtered = [], sortKey = 'navn', sortDir = 1;
-    let onlyXX = false;            // knappen "xx-xx-xxxx"
+    let onlyXX = false;            // knappen "Projekt" (installationsdato xx-xx-xxxx)
     let onlySal = false;           // knappen "Salmonella"
     let salOk = true;              // kunne salmonella hentes?
-    const FILTER_COLS = ['kundenr', 'navn', 'omraade', 'kundestatus', 'kontrakt'];
+    const FILTER_COLS = KL_KOLONNER.map(c => c.key);   // alle kolonner kan filtreres (kun de viste bruges)
+    let activeCols = [...KL_STANDARD_KOLONNER];         // kolonner der vises lige nu
     const colFilters = {}; // kolonne -> filtertekst (gemmes i URL'en som f_<kolonne>)
     restoreStateFromUrl();
     initUser();
     // Admin-link i navbar: kun portal_admin / portal_kundeliste_admin
     fetch('/api/kundeliste-admin?action=me', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
-      .then(j => { if (j?.admin) document.getElementById('adminNavLink').hidden = false; })
+      .then(j => {
+        if (!j?.admin) return;
+        document.getElementById('adminNavLink').hidden = false;
+        document.getElementById('adminBar').hidden = false;
+      })
       .catch(() => {});
     document.getElementById('btnRefresh').onclick = load;
     document.getElementById('q').oninput = () => { syncUrlState(); render(); scheduleSnJump(); };
@@ -117,23 +254,7 @@
     document.getElementById('aktiv').onchange = () => { syncUrlState(); load(); };
     document.getElementById('btnXX').onclick = () => { onlyXX = !onlyXX; syncUrlState(); render(); };
     document.getElementById('btnSal').onclick = () => { onlySal = !onlySal; syncUrlState(); render(); };
-    document.querySelectorAll('.colFilter').forEach(inp => {
-      inp.value = colFilters[inp.dataset.col] || '';
-      inp.addEventListener('click', e => e.stopPropagation()); // klik i feltet må ikke sortere
-      inp.addEventListener('input', () => { colFilters[inp.dataset.col] = inp.value; syncUrlState(); render(); });
-    });
-    document.getElementById('btnClearFilters').onclick = () => {
-      FILTER_COLS.forEach(c => { delete colFilters[c]; });
-      document.querySelectorAll('.colFilter').forEach(i => { i.value = ''; });
-      syncUrlState(); render();
-    };
-    document.querySelectorAll('th.sortable').forEach(th => th.onclick = () => {
-      const nextKey = th.dataset.sort;
-      if (sortKey === nextKey) sortDir *= -1;
-      else { sortKey = nextKey; sortDir = 1; }
-      syncUrlState();
-      render();
-    });
+    buildHead();
 
     function restoreStateFromUrl() {
       const p = new URLSearchParams(location.search);
@@ -158,18 +279,83 @@
       if (onlySal) p.set('sal', '1');
       FILTER_COLS.forEach(c => { if ((colFilters[c] || '').trim()) p.set('f_' + c, colFilters[c]); });
       const qs = p.toString();
-      history.replaceState(null, '', qs ? `/kundeliste.html?${qs}` : '/kundeliste.html');
+      history.replaceState(null, '', qs ? `${location.pathname}?${qs}` : location.pathname);
     }
 
+    // Farver til Kontrakt-kolonnen: { "<kontrakttype>": "#rrggbb" }
+    let kontraktFarver = {};
+    async function loadFarver() {
+      try {
+        const r = await fetch('/api/kontrakt-farver', { cache: 'no-store' });
+        const j = await r.json();
+        kontraktFarver = Object.fromEntries(Object.entries(j.farver || {}).map(([k, v]) => [k.toLowerCase(), v]));
+      } catch { kontraktFarver = {}; }
+    }
+    // Sort eller hvid tekst afhængigt af hvor lys baggrunden er
+    function textOn(hex) {
+      const n = parseInt(String(hex).slice(1), 16);
+      const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6 ? '#111827' : '#ffffff';
+    }
+    // Én pille pr. kontrakttype, flest produkter først
+    function kontraktChips(k) {
+      const typer = Object.entries(k.kontraktAntal || {}).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'da')).map(([n]) => n);
+      return typer.map(t => {
+        const c = kontraktFarver[t.toLowerCase()];
+        return `<span class="kChip"${c ? ` style="background:${c};color:${textOn(c)}"` : ''}>${esc(t)}</span>`;
+      }).join('');
+    }
+
+    let kolCfgLoaded = null;       // kolonnegrupper hentes kun første gang
     async function load() {
       setStatus('loading','<div class="spinner"></div> Henter kunder...');
-      await Promise.all([loadKunder(), loadLastImport()]);
+      await Promise.all([loadKunder(), loadLastImport(), loadFarver(), kolCfgLoaded || (kolCfgLoaded = loadKolonner())]);
+      await Promise.all([ensureSa(), ensureRb()]);
       setStatus('', '');
+      buildHead();                   // filter-rullelister bygges ud fra de hentede kunder
       render();
+      loadUniconta();                // i baggrunden – bruges kun ved søgning
+    }
+
+    // ── Uniconta-debitorer ─────────────────────────────────────────────────
+    // Hentes i baggrunden efter kundelisten (serveren cacher dem i 15 min).
+    // Med tomt søgefelt vises kun kundelisten. Søges der, vises også
+    // Uniconta-debitorer, der IKKE er i kundelisten – med distrikt som område.
+    let uniKunder = null;
+    let uniPromise = null;
+    const visUniconta = () => document.getElementById('aktiv').value.startsWith('uniconta');
+    // En Uniconta-debitor som række i kundelisten (distrikt vises som område)
+    const uniRow = u => ({ kundenr: u.kundenr, navn: u.navn, omraade: u.distrikt, uniconta: true,
+                           kontraktAntal: {}, serier: [], postnumre: [], salmonella: [] });
+    function loadUniconta() {
+      if (uniKunder) return Promise.resolve();
+      if (uniPromise) return uniPromise;
+      uniPromise = fetch('/api/kundeliste-uniconta', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(j => { uniKunder = (j.kunder || []).filter(u => !u.iKundeliste); })
+        .catch(() => { uniKunder = []; })
+        .finally(() => { uniPromise = null; if (document.getElementById('q').value.trim() && !visUniconta()) render(); });
+      return uniPromise;
+    }
+    function uniTreffer(q) {
+      if (!uniKunder || q.length < 2 || onlyXX || onlySal || visUniconta()) return [];
+      const iListe = new Set(rows.map(k => String(k.kundenr)));
+      return uniKunder
+        .filter(u => u.aktiv !== false && !iListe.has(u.kundenr) && [u.kundenr, u.konto, u.navn, u.distrikt].join(' ').toLowerCase().includes(q))
+        .map(uniRow);
     }
 
     async function loadKunder() {
       const aktiv = document.getElementById('aktiv').value;
+      // "Uniconta": kun debitorer, der findes i Uniconta men ikke i kundelisten
+      if (aktiv === 'uniconta' || aktiv === 'uniconta_inaktiv') {
+        await loadUniconta();
+        const vilAktive = aktiv === 'uniconta';
+        rows = (uniKunder || []).filter(u => (u.aktiv !== false) === vilAktive).map(uniRow);
+        salOk = true;
+        document.getElementById('salStatus').textContent = '';
+        return;
+      }
       const r = await fetch('/api/kunder?aktiv=' + encodeURIComponent(aktiv));
       const j = await r.json();
       if (!r.ok || j.error) throwStatus('Fejl: ' + esc(j.error || r.status));
@@ -195,15 +381,293 @@
     function throwStatus(msg) { setStatus('error', msg); throw new Error(msg); }
     function setStatus(cls, html) { const el=document.getElementById('status'); el.className='status '+cls; el.innerHTML=html; el.style.display=html?'flex':'none'; }
 
+    // ── Kolonner ────────────────────────────────────────────────────────────
+    // Hver kolonne: hvad der sorteres/filtreres på, og hvordan cellen tegnes.
+    // Nye kolonner tilføjes her OG i /assets/kundeliste/kolonner.js.
+    const COLDEF = {
+      kundenr: {
+        sort: k => k.kundenr, text: k => k.kundenr,
+        cell: k => `<td class="small muted${hasSal(k) ? ' kundenrSal' : ''}"${hasSal(k) ? ` title="${esc(salTitle(k))}"` : ''}>${esc(k.kundenr)}</td>`
+      },
+      navn: {
+        sort: k => k.navn, text: k => k.navn,
+        cell: k => `<td><a class="link" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">${esc(k.navn)}</a>${k.uniconta ? '<span class="uniTag" title="Findes kun i Uniconta – ikke i kundelisten">Uniconta</span>' : ''}</td>`
+      },
+      omraade:     { sort: k => k.omraade, text: k => k.omraade, cell: k => `<td>${esc(k.omraade)}</td>` },
+      kundestatus: { sort: k => k.kundestatus, text: k => k.kundestatus, cell: k => `<td>${esc(k.kundestatus)}</td>` },
+      kontrakt: {
+        sort: k => k.kontrakt, text: k => k.kontrakt, values: k => Object.keys(k.kontraktAntal || {}),
+        cell: k => `<td class="small" title="${esc(kontraktTitle(k))}">${kontraktChips(k)}</td>`
+      },
+      postnr: {
+        sort: k => (k.postnumre || [])[0] || '', text: k => (k.postnumre || []).join(' '), values: k => k.postnumre || [],
+        cell: k => `<td class="small">${esc((k.postnumre || []).join(', '))}</td>`
+      },
+      adresser: {
+        sort: k => String(k.antalAdresser ?? '').padStart(4, '0'), text: k => String(k.antalAdresser ?? ''),
+        cell: k => `<td class="num">${k.antalAdresser ?? ''}</td>`
+      },
+      produkter: {
+        sort: k => String((k.serier || []).length).padStart(5, '0'), text: k => String((k.serier || []).length),
+        cell: k => `<td class="num">${(k.serier || []).length || ''}</td>`
+      },
+      aktiv: {
+        sort: k => k.aktiv ? '1' : '0', text: k => k.aktiv ? 'aktiv ja' : 'inaktiv nej', values: k => [k.aktiv ? 'Ja' : 'Nej'],
+        cell: k => `<td>${k.aktiv ? 'Ja' : '<span class="muted">Nej</span>'}</td>`
+      },
+      importeret: {
+        sort: k => k.sidstImporteret || '', text: k => fmtDate(k.sidstImporteret),
+        cell: k => `<td class="small" style="white-space:nowrap">${fmtDate(k.sidstImporteret)}</td>`
+      },
+
+      // ── Serviceaftaler (fra lch_serviceaftaler) ──
+      sa_aftaler: {
+        sort: k => saFor(k).map(a => a.servicetype || a.varenr).join(' '),
+        text: k => saFor(k).map(a => `${a.servicetype} ${a.varenr}`).join(' '),
+        values: k => saFor(k).map(a => a.servicetype || a.varenr),
+        cell: k => `<td>${saFor(k).map(a =>
+          `<div class="saLine"><span class="saChip${saUdlobet(a) ? ' udlobet' : ''}" title="${esc(saTitle(a))}">${esc(a.servicetype || a.varenr || 'Aftale')}</span></div>`).join('')}</td>`
+      },
+      sa_antal: {
+        sort: k => String(saFor(k).length).padStart(4, '0'), text: k => String(saFor(k).length || ''),
+        cell: k => `<td class="num">${saFor(k).length || ''}</td>`
+      },
+      sa_varenr:      saLines(a => a.varenr),
+      sa_servicetype: saLines(a => a.servicetype),
+      sa_afdeling:    saLines(a => a.afdeling),
+      sa_start:       saLines(a => fmtDate(a.startdato), a => a.startdato),
+      sa_slut:        saLines(a => fmtDate(a.enddato), a => a.enddato),
+      sa_note:        saLines(a => a.note, null, 'small'),
+
+      // ── Kemi rabat (fra lch_rabat_grupper) ──
+      rb_gruppe: {
+        sort: k => String(rbFor(k)?.gruppe ?? '').padStart(3, '0'), text: k => String(rbFor(k)?.gruppe ?? ''),
+        cell: k => { const g = rbFor(k)?.gruppe; if (g === null || g === undefined) return '<td></td>';
+          const c = rbFarve(g); return `<td><span class="rbBadge"${c ? ` style="background:${c};color:${textOn(c)}"` : ''}>${esc(g)}</span></td>`; }
+      },
+      rb_robot: rbYd('robot'),
+      rb_yver:  rbYd('yverpleje'),
+      rb_tank:  rbYd('tank'),
+      rb_aendring:  { sort: k => rbFor(k)?.rabatchange || '', text: k => rbFor(k)?.rabatchange || '', cell: k => `<td class="small">${esc(rbFor(k)?.rabatchange || '')}</td>` },
+      rb_kommentar: { sort: k => rbFor(k)?.kommentar || '', text: k => rbFor(k)?.kommentar || '', cell: k => `<td class="small">${esc(rbFor(k)?.kommentar || '')}</td>` }
+    };
+
+    // ── Kemi rabat-data ────────────────────────────────────────────────────
+    // Hentes kun, når en rb_-kolonne vises.
+    let rbByKunde = null, rbStruktur = [], rbLoading = null;
+    const usesRb = () => activeCols.some(c => c.startsWith('rb_'));
+    const rbFor = k => (rbByKunde && rbByKunde.get(String(k.kundenr))) || null;
+    const rbFarve = g => rbStruktur.find(s => s.gruppe === Number(g) && s.farve)?.farve || '';
+    // Ja/nej-kolonne: ✓ i cellen, "Ja"/"Nej" i filter-rullelisten
+    function rbYd(f) {
+      return {
+        sort: k => rbFor(k)?.[f] ? '1' : '0',
+        text: k => rbFor(k) ? (rbFor(k)[f] ? 'Ja' : 'Nej') : '',
+        cell: k => `<td class="rbYes">${rbFor(k)?.[f] ? '✓' : ''}</td>`
+      };
+    }
+    async function ensureRb() {
+      if (rbByKunde || !usesRb()) return;
+      if (!rbLoading) {
+        rbLoading = fetch('/api/kunde-rabat?action=kolonner', { cache: 'no-store' })
+          .then(r => r.json())
+          .then(j => { rbByKunde = new Map((j.items || []).map(r => [String(r.kundenr), r])); rbStruktur = j.struktur || []; })
+          .catch(() => { rbByKunde = new Map(); })
+          .finally(() => { rbLoading = null; });
+      }
+      await rbLoading;
+    }
+
+    // ── Serviceaftale-data ─────────────────────────────────────────────────
+    // Hentes kun, når en serviceaftale-kolonne vises (eller efter oprettelse).
+    let saByKunde = null;            // kundenr -> [aftaler], nyeste start først
+    let saLoading = null;
+    const usesSa = () => activeCols.some(c => c.startsWith('sa_'));
+    const saFor = k => (saByKunde && saByKunde.get(String(k.kundenr))) || [];
+    const saUdlobet = a => !!a.enddato && a.enddato < new Date().toISOString().slice(0, 10);
+    function saTitle(a) {
+      return [a.varenr && `Varenr. ${a.varenr}`, a.afdeling, a.startdato && `Start ${fmtDate(a.startdato)}`,
+              a.enddato && `Slut ${fmtDate(a.enddato)}`, saUdlobet(a) && 'UDLØBET', a.note].filter(Boolean).join('\n');
+    }
+    // Celle med én linje pr. aftale (samme rækkefølge i alle sa_-kolonner)
+    function saLines(get, sortGet, cls = '') {
+      return {
+        sort: k => saFor(k).map(a => (sortGet || get)(a) || '').join(' '),
+        text: k => saFor(k).map(a => get(a) || '').join(' '),
+        values: k => saFor(k).map(a => get(a)),
+        cell: k => `<td class="${cls}">${saFor(k).map(a =>
+          `<div class="saLine${saUdlobet(a) ? ' udlobet' : ''}">${esc(get(a) || '–')}</div>`).join('')}</td>`
+      };
+    }
+    function buildSaMap(items) {
+      const m = new Map();
+      for (const a of items || []) {
+        const nr = String(a.kundenr || '').trim();
+        if (!nr) continue;
+        if (!m.has(nr)) m.set(nr, []);
+        m.get(nr).push(a);
+      }
+      for (const list of m.values()) list.sort((a, b) => (b.startdato || '').localeCompare(a.startdato || ''));
+      saByKunde = m;
+    }
+    async function ensureSa() {
+      if (saByKunde || !usesSa()) return;
+      if (!saLoading) {
+        saLoading = fetch('/api/kunde-serviceaftaler', { cache: 'no-store' })
+          .then(r => r.json())
+          .then(j => buildSaMap(j.items))
+          .catch(() => { saByKunde = new Map(); })
+          .finally(() => { saLoading = null; });
+      }
+      await saLoading;
+    }
+    // (funktion, ikke const – buildHead() kaldes tidligt i scriptet)
+    function colLabel(key) { return KL_KOLONNER.find(c => c.key === key)?.label || key; }
+
     function sortValue(row, key) {
-      if (key === 'aktiv') return row.aktiv ? '1' : '0';
-      return row[key] || '';
+      const d = COLDEF[key];
+      return d ? (d.sort(row) || '') : (row[key] || '');
     }
 
     // Den tekst en kolonne filtreres på (samme som der vises)
     function filterText(row, col) {
-      return String(row[col] || '');
+      const d = COLDEF[col];
+      return String(d ? (d.text(row) || '') : (row[col] || ''));
     }
+
+    // Overskriftslinjen med sortering + filterfelt pr. kolonne
+    // ── Kolonnefiltre ──
+    // Har en kolonne få forskellige værdier (fx Område: Nord, Syd, Øst …),
+    // bliver filteret en rulleliste med værdierne. Ellers et tekstfelt.
+    // Valg i rullelisten gemmes som "=værdi" (præcis match), "=" = tom og
+    // "=*" = udfyldt (alle med en værdi i kolonnen).
+    const MAX_VALG = 40;
+    const NO_SELECT = new Set(['kundenr', 'navn', 'importeret', 'sa_note', 'rb_kommentar']);
+
+    // Værdierne i en kolonne for én kunde (flere ved fx kontrakter/aftaler)
+    function colValues(k, key) {
+      const d = COLDEF[key];
+      const v = d?.values ? d.values(k) : [d ? d.text(k) : k[key]];
+      return v.map(x => String(x ?? '').trim()).filter(Boolean);
+    }
+    // Forskellige værdier i kolonnen på tværs af alle hentede kunder – eller null
+    function distinctValues(key) {
+      if (!rows.length || NO_SELECT.has(key)) return null;   // (ingen kunder endnu = første buildHead)
+      if (key.startsWith('sa_') && !saByKunde) return null;
+      if (key.startsWith('rb_') && !rbByKunde) return null;
+      const set = new Map();
+      let tomme = false;
+      for (const k of rows) {
+        const vals = colValues(k, key);
+        if (!vals.length) tomme = true;
+        for (const v of vals) {
+          set.set(v.toLowerCase(), v);
+          if (set.size > MAX_VALG) return null;
+        }
+      }
+      if (!set.size) return null;
+      return { values: [...set.values()].sort((a, b) => a.localeCompare(b, 'da', { numeric: true })), tomme };
+    }
+    function matchFilter(k, key, f) {
+      f = String(f || '').trim();
+      if (f === '=*') return colValues(k, key).length > 0;
+      if (f.startsWith('=')) {
+        const want = f.slice(1).toLowerCase();
+        const vals = colValues(k, key).map(v => v.toLowerCase());
+        return want === '' ? vals.length === 0 : vals.includes(want);
+      }
+      return filterText(k, key).toLowerCase().includes(f.toLowerCase());
+    }
+
+    function filterControl(key) {
+      const d = distinctValues(key);
+      const cur = colFilters[key] || '';
+      if (!d) return `<input class="colFilter" type="search" data-col="${key}" placeholder="Filtrér…" autocomplete="off">`;
+      // Et gammelt fritekst-filter (fx fra URL'en) bevares som valgmulighed
+      const fri = cur && !cur.startsWith('=') ? `<option value="${esc(cur)}" selected>Indeholder "${esc(cur)}"</option>` : '';
+      return `<select class="colFilter colSelect" data-col="${key}">
+        <option value="">Alle</option>${fri}
+        ${d.tomme ? `<option value="=*"${cur === '=*' ? ' selected' : ''}>– Udfyldt –</option>` : ''}
+        ${d.values.map(v => `<option value="=${esc(v)}"${cur.toLowerCase() === ('=' + v).toLowerCase() ? ' selected' : ''}>${esc(v)}</option>`).join('')}
+        ${d.tomme ? `<option value="="${cur === '=' ? ' selected' : ''}>– Tom –</option>` : ''}
+      </select>`;
+    }
+
+    function buildHead() {
+      document.getElementById('headRow').innerHTML =
+        activeCols.map(key => `<th class="sortable" data-sort="${key}"><span class="colLabel">${esc(colLabel(key))}</span>${filterControl(key)}</th>`).join('') +
+        `<th style="vertical-align:bottom;"><button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button></th>`;
+
+      document.querySelectorAll('.colFilter').forEach(inp => {
+        if (inp.tagName === 'INPUT') inp.value = colFilters[inp.dataset.col] || '';
+        inp.classList.toggle('isSet', !!(colFilters[inp.dataset.col] || '').trim());
+        inp.addEventListener('click', e => e.stopPropagation()); // klik i feltet må ikke sortere
+        inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
+          colFilters[inp.dataset.col] = inp.value;
+          inp.classList.toggle('isSet', !!inp.value.trim());
+          syncUrlState(); render();
+        });
+      });
+      document.getElementById('btnClearFilters').onclick = () => {
+        FILTER_COLS.forEach(c => { delete colFilters[c]; });
+        document.querySelectorAll('.colFilter').forEach(i => { i.value = ''; i.classList.remove('isSet'); });
+        syncUrlState(); render();
+      };
+      document.querySelectorAll('th.sortable').forEach(th => th.onclick = () => {
+        const nextKey = th.dataset.sort;
+        if (sortKey === nextKey) sortDir *= -1;
+        else { sortKey = nextKey; sortDir = 1; }
+        syncUrlState();
+        render();
+      });
+    }
+
+    // ── Kolonnegrupper (pr. afdeling) ──────────────────────────────────────
+    // Automatisk: gruppen for brugerens afdeling (eller standardgruppen).
+    // Brugeren kan vælge en anden gruppe i toolbaren – valget huskes i browseren.
+    let kolCfg = { afdeling: '', gruppeId: null, grupper: [] };
+    const KOL_KEY = 'kundeliste_kolonnegruppe';
+
+    async function loadKolonner() {
+      try {
+        const r = await fetch('/api/kundeliste-kolonner', { cache: 'no-store' });
+        kolCfg = await r.json();
+      } catch { kolCfg = { afdeling: '', gruppeId: null, grupper: [] }; }
+      renderKolSelect();
+      applyKolonner();
+    }
+
+    function renderKolSelect() {
+      const sel = document.getElementById('kolGruppe');
+      const auto = kolCfg.grupper.find(g => g.id === kolCfg.gruppeId);
+      sel.hidden = !kolCfg.grupper.length;
+      sel.innerHTML =
+        `<option value="">Automatisk${auto ? ` (${esc(auto.navn)})` : ''}</option>` +
+        kolCfg.grupper.map(g => `<option value="${esc(g.id)}">${esc(g.navn)}</option>`).join('');
+      let valgt = '';
+      try { valgt = localStorage.getItem(KOL_KEY) || ''; } catch {}
+      sel.value = kolCfg.grupper.some(g => g.id === valgt) ? valgt : '';
+      sel.title = `Kolonnevisning. Automatisk = ud fra din afdeling${kolCfg.afdeling ? ` (${kolCfg.afdeling})` : ''}`;
+    }
+
+    function applyKolonner() {
+      const valgt = document.getElementById('kolGruppe').value || kolCfg.gruppeId;
+      const g = kolCfg.grupper.find(x => x.id === valgt);
+      const cols = (g?.kolonner || []).filter(k => COLDEF[k]);
+      activeCols = cols.length ? cols : [...KL_STANDARD_KOLONNER];
+      buildHead();
+      render();
+      if (usesSa() && !saByKunde) ensureSa().then(() => { buildHead(); render(); });
+      if (usesRb() && !rbByKunde) ensureRb().then(() => { buildHead(); render(); });
+    }
+
+    document.getElementById('kolGruppe').onchange = e => {
+      try {
+        if (e.target.value) localStorage.setItem(KOL_KEY, e.target.value);
+        else localStorage.removeItem(KOL_KEY);
+      } catch {}
+      applyKolonner();
+    };
 
     // Tooltip: antal produkter pr. kontrakttype
     function kontraktTitle(k) {
@@ -280,37 +744,275 @@
 
     function render() {
       const q = document.getElementById('q').value.trim().toLowerCase();
-      const active = FILTER_COLS.filter(c => (colFilters[c] || '').trim());
+      const active = activeCols.filter(c => (colFilters[c] || '').trim());
       filtered = rows.filter(k =>
-        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv',...(k.postnumre || [])].join(' ').toLowerCase().includes(q)) &&
-        active.every(c => filterText(k, c).toLowerCase().includes(colFilters[c].trim().toLowerCase())) &&
+        (!q || [k.kundenr,k.navn,k.omraade,k.kundestatus,k.kontrakt,k.aktiv?'aktiv':'inaktiv',...(k.postnumre || []),
+                ...saFor(k).map(a => `${a.varenr} ${a.servicetype}`)].join(' ').toLowerCase().includes(q)) &&
+        active.every(c => matchFilter(k, c, colFilters[c])) &&
         (!onlyXX || k.harXX) &&
         (!onlySal || hasSal(k))
       );
+      const uni = uniTreffer(q).filter(k => active.every(c => matchFilter(k, c, colFilters[c])));
+      filtered.push(...uni);
       document.getElementById('btnXX').classList.toggle('active', onlyXX);
       document.getElementById('btnSal').classList.toggle('active', onlySal);
       // Vis i den grå linje, hvilken filtrering der er aktiv
-      const aktive = [onlySal ? 'Salmonella' : '', onlyXX ? 'xx-xx-xxxx i inst.dato' : ''].filter(Boolean);
+      const aktive = [visUniconta() ? (document.getElementById('aktiv').value === 'uniconta' ? 'UNICONTA DEBITORER – AKTIVE' : 'UNICONTA DEBITORER – INAKTIVE') : '', onlySal ? 'Salmonella' : '', onlyXX ? 'Projekt' : ''].filter(Boolean);
       const af = document.getElementById('activeFilter');
       af.hidden = !aktive.length;
       af.textContent = aktive.length ? `Aktiv filtrering: ${aktive.join(' + ')}` : '';
       document.getElementById('btnClearFilters').style.display = active.length ? '' : 'none';
       filtered.sort((a,b)=>String(sortValue(a, sortKey)).localeCompare(String(sortValue(b, sortKey)),'da',{numeric:true})*sortDir);
       document.querySelectorAll('th.sortable').forEach(th => th.classList.toggle('sort-active', th.dataset.sort === sortKey));
-      document.getElementById('countText').textContent = `${filtered.length} af ${rows.length} kunder${onlySal || onlyXX ? ' (filtreret)' : ''}`;
+      document.getElementById('countText').textContent = `${filtered.length - uni.length} af ${rows.length} kunder${onlySal || onlyXX ? ' (filtreret)' : ''}${uni.length ? ` + ${uni.length} fra Uniconta` : ''}${q && !uniKunder ? ' · henter Uniconta…' : ''}`;
       renderSnHint();
       document.getElementById('tbody').innerHTML = filtered.map(k => {
+        if (k.uniconta) return `<tr class="clickable-row uniRow" onclick="openKunde('${esc(k.kundenr)}')">
+        ${activeCols.map(c => COLDEF[c].cell(k)).join('')}
+        <td style="white-space:nowrap;"><a class="btn" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()" title="Kunden findes kun i Uniconta – viser kemi rabat">Åbn</a></td>
+      </tr>`;
         return `<tr class="clickable-row" onclick="openKunde('${esc(k.kundenr)}')">
-        <td class="small muted${hasSal(k) ? ' kundenrSal' : ''}"${hasSal(k) ? ` title="${esc(salTitle(k))}"` : ''}>${esc(k.kundenr)}</td>
-        <td><a class="link" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">${esc(k.navn)}</a></td>
-        <td>${esc(k.omraade)}</td>
-        <td>${esc(k.kundestatus)}</td>
-        <td class="small" title="${esc(kontraktTitle(k))}">${esc(k.kontrakt || '')}</td>
+        ${activeCols.map(c => COLDEF[c].cell(k)).join('')}
         <td style="white-space:nowrap;"><a class="btn" href="/kundeinfo.html?kundenr=${encodeURIComponent(k.kundenr)}" onclick="event.stopPropagation()">Info</a> <a class="btn" href="${esc(kundeUrl(k.kundenr))}" onclick="event.stopPropagation()">Åbn</a> <a class="btn" href="${esc(produktUrl(k.kundenr))}" onclick="event.stopPropagation()" title="Åbn kundens produktliste">Produkt</a></td>
       </tr>`;
-      }).join('') || '<tr><td colspan="6" class="muted">Ingen kunder</td></tr>';
+      }).join('') || `<tr><td colspan="${activeCols.length + 1}" class="muted">Ingen kunder</td></tr>`;
     }
+    // ── Serviceaftaler: popup med liste over alle + opret ny ────────────────
+    const SA_API = '/api/kundeliste-admin';
+    let saAftaler = null;            // aftaletekster (hentes første gang)
+    let saAlle = [];                 // alle serviceaftaler
+    let saKundenr = '';
+
+    async function saApi(qs, opts = {}) {
+      const r = await fetch(`${SA_API}?${qs}`, { cache: 'no-store', ...opts });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      return j;
+    }
+    function saMsg(text, cls = '') { const el = document.getElementById('saMsg'); el.className = 'msg ' + cls; el.textContent = text; }
+    const kundeNavn = nr => rows.find(k => String(k.kundenr) === String(nr))?.navn || '';
+    const today = () => new Date().toISOString().slice(0, 10);
+
+    // "12345 – Kundenavn" → kunden (eller et rent kundenr.)
+    function saFindKunde(v) {
+      v = String(v || '').trim();
+      if (!v) return null;
+      const nr = v.split(' – ')[0].trim().toLowerCase();
+      return rows.find(k => String(k.kundenr).toLowerCase() === nr) || null;
+    }
+
+    // ── Liste ──
+    async function saOpen() {
+      document.getElementById('saBackdrop').hidden = false;
+      saShowList();
+      await saLoadList();
+    }
+    function saClose() { document.getElementById('saBackdrop').hidden = true; }
+
+    function saShowList() {
+      document.getElementById('saTitle').textContent = 'Serviceaftaler';
+      document.getElementById('saFormView').hidden = true;
+      document.getElementById('saListView').hidden = false;
+      document.getElementById('saSearch').focus();
+    }
+
+    async function saLoadList() {
+      const tb = document.getElementById('saListBody');
+      tb.innerHTML = '<tr><td colspan="9" class="muted">Henter…</td></tr>';
+      try {
+        saAlle = (await saApi('action=serviceaftaler')).items || [];
+        saRenderList();
+      } catch (e) {
+        tb.innerHTML = `<tr><td colspan="9" class="muted">Fejl: ${esc(e.message)}</td></tr>`;
+      }
+    }
+
+    function saRenderList() {
+      const q = document.getElementById('saSearch').value.trim().toLowerCase();
+      const list = saAlle
+        .map(a => ({ ...a, navn: kundeNavn(a.kundenr) }))
+        .filter(a => !q || [a.kundenr, a.navn, a.varenr, a.servicetype, a.afdeling, a.note].join(' ').toLowerCase().includes(q))
+        .sort((a, b) => a.navn.localeCompare(b.navn, 'da') || String(a.kundenr).localeCompare(String(b.kundenr), 'da', { numeric: true }));
+      document.getElementById('saCount').textContent = `${list.length} af ${saAlle.length} aftaler`;
+      const t = today();
+      document.getElementById('saListBody').innerHTML = list.map(a => `
+        <tr${a.enddato && a.enddato < t ? ' class="udlobet" title="Udløbet"' : ''}>
+          <td>${esc(a.kundenr)}</td>
+          <td>${a.navn ? `<a class="link" href="${esc(kundeUrl(a.kundenr))}">${esc(a.navn)}</a>` : '<span class="muted">–</span>'}</td>
+          <td>${esc(a.varenr)}</td>
+          <td>${esc(a.servicetype)}</td>
+          <td>${esc(a.afdeling)}</td>
+          <td style="white-space:nowrap">${fmtDate(a.startdato)}</td>
+          <td style="white-space:nowrap">${fmtDate(a.enddato)}</td>
+          <td class="note">${esc(a.note)}</td>
+          <td style="text-align:right"><button type="button" class="btn" data-ret="${esc(a.id)}">Ret</button></td>
+        </tr>`).join('') || `<tr><td colspan="9" class="muted">${q ? 'Ingen match' : 'Ingen serviceaftaler endnu'}</td></tr>`;
+      document.querySelectorAll('#saListBody [data-ret]').forEach(b => b.onclick = () => saShowForm(saAlle.find(a => a.id === b.dataset.ret)));
+    }
+
+    // ── Opret ──
+    // Tømmer alle felter i formularen
+    function saResetForm() {
+      ['saKunde', 'saAftale', 'saStart', 'saSlut', 'saNote'].forEach(id => { document.getElementById(id).value = ''; });
+      document.getElementById('saKundeNavn').textContent = '';
+      saKundenr = '';
+      saShowExisting();
+      saUpdateSlut();
+      saMsg('');
+    }
+
+    let saEdit = null;               // serviceaftalen der rettes (null = ny)
+
+    // Ny (uden argument) eller ret en eksisterende aftale
+    async function saShowForm(edit) {
+      saEdit = edit && edit.id ? edit : null;
+      document.getElementById('saTitle').textContent = saEdit ? 'Ret serviceaftale' : 'Ny serviceaftale';
+      document.getElementById('saSave').textContent = saEdit ? 'Gem ændringer' : 'Opret';
+      document.getElementById('saListView').hidden = true;
+      document.getElementById('saFormView').hidden = false;
+      document.getElementById('saListMsg').textContent = '';
+      saResetForm();
+      document.getElementById('saKundeList').innerHTML = rows
+        .map(k => `<option value="${esc(k.kundenr)} – ${esc(k.navn)}"></option>`).join('');
+      document.getElementById('saKunde').focus();
+      if (!saAftaler) {
+        try {
+          saAftaler = (await saApi('action=aftaletekster')).items || [];
+        } catch (e) { saMsg('Kunne ikke hente aftaletekster: ' + e.message, 'err'); return; }
+      }
+      const sel = document.getElementById('saAftale');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Vælg aftale…</option>' + saAftaler.map(a =>
+        `<option value="${esc(a.id)}">${esc([a.varenr, a.servicetype, a.afdeling, a.varighed !== '' ? `${a.varighed} år` : ''].filter(Boolean).join(' · ') || '(tom)')}</option>`).join('');
+      sel.value = cur;
+      if (saEdit) saFillEdit();
+      saUpdateSlut(true);
+    }
+
+    // Udfyld formularen med aftalen, der rettes
+    function saFillEdit() {
+      const a = saEdit;
+      const k = rows.find(x => String(x.kundenr) === String(a.kundenr));
+      document.getElementById('saKunde').value = k ? `${k.kundenr} – ${k.navn}` : a.kundenr;
+      document.getElementById('saKundeNavn').textContent = k ? `${k.navn}${k.omraade ? ' · ' + k.omraade : ''}` : '';
+      document.getElementById('saAftale').value = a.aftaleId || '';
+      document.getElementById('saStart').value = a.startdato || '';
+      document.getElementById('saSlut').value = a.enddato || '';
+      document.getElementById('saNote').value = a.note || '';
+      saKundenr = a.kundenr;
+      saShowExisting();
+    }
+
+    // ── Slutdato ud fra aftalens varighed (antal år) ──
+    // Tom varighed → slutdato skjules og sendes ikke.
+    // Ellers: startdato + varighed × 12 måneder (kan rettes bagefter).
+    function saAddYears(iso, years) {
+      const [y, m, d] = iso.split('-').map(Number);
+      const ty = y + years;
+      const last = new Date(Date.UTC(ty, m, 0)).getUTCDate();
+      return `${ty}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+    }
+    function saValgtAftale() {
+      const id = document.getElementById('saAftale').value;
+      return (saAftaler || []).find(a => a.id === id) || null;
+    }
+    function saUpdateSlut(behold) {
+      const a = saValgtAftale();
+      const wrap = document.getElementById('saSlutWrap');
+      const slut = document.getElementById('saSlut');
+      const hint = document.getElementById('saSlutHint');
+      const v = a && a.varighed !== '' ? Number(a.varighed) : null;
+      if (v === null || !Number.isFinite(v)) {
+        wrap.hidden = true; slut.value = ''; hint.textContent = '';
+        return;
+      }
+      wrap.hidden = false;
+      const start = document.getElementById('saStart').value;
+      // Ved "Ret" beholdes den gemte slutdato, indtil start eller aftale ændres
+      if (start && !(behold === true && slut.value)) slut.value = saAddYears(start, v);
+      hint.textContent = `${v} år${v ? ` (${v * 12} mdr.)` : ''} efter startdato`;
+    }
+
+    function saShowExisting() {
+      const box = document.getElementById('saExisting');
+      if (!saKundenr) { box.hidden = true; return; }
+      const items = saAlle.filter(a => String(a.kundenr) === String(saKundenr));
+      box.hidden = false;
+      box.innerHTML = items.length
+        ? `<b>Kundens serviceaftaler (${items.length})</b><table><tr><th>Varenr.</th><th>Servicetype</th><th>Start</th><th>Slut</th></tr>${
+            items.map(a => `<tr><td>${esc(a.varenr)}</td><td>${esc(a.servicetype)}</td><td>${fmtDate(a.startdato)}</td><td>${fmtDate(a.enddato)}</td></tr>`).join('')}</table>`
+        : '<span class="muted">Kunden har ingen serviceaftaler endnu.</span>';
+    }
+
+    document.getElementById('btnServiceaftaler').onclick = saOpen;
+    document.getElementById('saNew').onclick = () => saShowForm();
+    document.getElementById('saBack').onclick = saShowList;
+    document.getElementById('saSearch').oninput = saRenderList;
+    document.getElementById('saClose').onclick = saClose;
+    document.getElementById('saBackdrop').addEventListener('click', e => { if (e.target.id === 'saBackdrop') saClose(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('saBackdrop').hidden) saClose(); });
+
+    document.getElementById('saAftale').addEventListener('change', saUpdateSlut);
+    document.getElementById('saStart').addEventListener('change', saUpdateSlut);
+
+    document.getElementById('saKunde').addEventListener('input', () => {
+      const k = saFindKunde(document.getElementById('saKunde').value);
+      const nr = k ? k.kundenr : '';
+      document.getElementById('saKundeNavn').textContent = k ? `${k.navn}${k.omraade ? ' · ' + k.omraade : ''}` : '';
+      if (nr !== saKundenr) { saKundenr = nr; saShowExisting(); }
+    });
+
+    document.getElementById('saSave').onclick = async () => {
+      const k = saFindKunde(document.getElementById('saKunde').value);
+      const body = {
+        kundenr: k ? k.kundenr : '',
+        aftaleId: document.getElementById('saAftale').value,
+        startdato: document.getElementById('saStart').value,
+        enddato: document.getElementById('saSlutWrap').hidden ? '' : document.getElementById('saSlut').value,
+        note: document.getElementById('saNote').value.trim()
+      };
+      if (!body.kundenr) { saMsg('Vælg en kunde fra listen', 'err'); return; }
+      if (!body.aftaleId) { saMsg('Vælg en aftale', 'err'); return; }
+      if (body.startdato && body.enddato && body.enddato < body.startdato) { saMsg('Slutdato ligger før startdato', 'err'); return; }
+
+      const btn = document.getElementById('saSave');
+      btn.disabled = true;
+      saMsg('Opretter…');
+      try {
+        await saApi(saEdit ? `action=serviceaftaler&id=${encodeURIComponent(saEdit.id)}` : 'action=serviceaftaler', {
+          method: saEdit ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const varRet = !!saEdit;
+        saEdit = null;
+        saAlle = (await saApi('action=serviceaftaler')).items || [];
+        buildSaMap(saAlle);        // kundelistens serviceaftale-kolonner opdateres med det samme
+        render();
+        // Tilbage til listen med en tom formular til næste gang
+        const navn = kundeNavn(body.kundenr) || body.kundenr;
+        saResetForm();
+        saShowList();
+        saRenderList();
+        const lm = document.getElementById('saListMsg');
+        lm.textContent = `✓ Serviceaftale ${varRet ? 'rettet' : 'oprettet'} for ${navn}`;
+        setTimeout(() => { if (lm.textContent.includes(navn)) lm.textContent = ''; }, 5000);
+      } catch (e) {
+        saMsg('Fejl: ' + e.message, 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
     load().catch(e => setStatus('error', e.message));
+  </script>
+  <script src="/assets/kundeliste/udstyr.js"></script>
+  <script src="/assets/kundeliste/eksport.js"></script>
+  <script src="/assets/kundeliste/rabat.js"></script>
+  <script>
+    document.getElementById('btnEksport').onclick = () => openEksport();
+    // Excel-importen ligger kun på admin-siden
+    document.getElementById('btnRabat').onclick = () => openRabat('kunder', { import: false });
   </script>
 </body>
 </html>
