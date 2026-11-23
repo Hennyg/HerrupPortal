@@ -17,6 +17,21 @@
       font:inherit; font-size:13px; font-weight:400; background:#fff; cursor:text;
     }
     .dataTable thead th select.colFilter { padding:0 4px; cursor:pointer; }
+    /* Checkliste-filtre */
+    .dataTable thead th .colMulti { text-align:left; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:22px;
+      background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E") no-repeat right 8px center; }
+    .dataTable thead th .colMulti.isSet { background-color:#fdf2f2; }
+    .multiPop { position:fixed; z-index:150; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.18);
+                max-width:340px; display:flex; flex-direction:column; font-size:13px; }
+    .multiPop[hidden] { display:none; }
+    .multiPop .multiSearch { margin:8px 8px 4px; height:30px; border:1px solid #d1d5db; border-radius:6px; padding:0 8px; font:inherit; }
+    .multiList { max-height:300px; overflow:auto; padding:4px 0; }
+    .multiList label { display:flex; align-items:center; gap:6px; padding:4px 10px; cursor:pointer; }
+    .multiList label:hover { background:#f9fafb; }
+    .multiList label[hidden] { display:none; }
+    .multiList label.special span { color:#6b7280; font-style:italic; }
+    .multiFoot { display:flex; justify-content:space-between; border-top:1px solid #eee; padding:6px 8px; }
+    .multiFoot button { border:0; background:none; color:var(--red); cursor:pointer; font:inherit; font-size:13px; }
     .dataTable thead th .colFilter.isSet { border-color:var(--red); background:#fdf2f2; font-weight:600; }
     .dataTable thead th .colFilter:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
     /* Knap "Projekt": kun kunder med produkter, hvor installationsdato er xx-xx-xxxx */
@@ -581,8 +596,12 @@
       if (!set.size) return null;
       return { values: [...set.values()].sort((a, b) => a.localeCompare(b, 'da', { numeric: true })), tomme };
     }
+    // Flere valg i en checkliste gemmes som "=Nord||=Øst" (= én af dem)
+    const SEP = '||';
+    const valgFra = f => String(f || '').split(SEP).map(x => x.trim()).filter(x => x.startsWith('='));
     function matchFilter(k, key, f) {
       f = String(f || '').trim();
+      if (f.includes(SEP)) return f.split(SEP).some(t => matchFilter(k, key, t));
       if (f === '=*') return colValues(k, key).length > 0;
       if (f.startsWith('=')) {
         const want = f.slice(1).toLowerCase();
@@ -596,15 +615,65 @@
       const d = distinctValues(key);
       const cur = colFilters[key] || '';
       if (!d) return `<input class="colFilter" type="search" data-col="${key}" placeholder="Filtrér…" autocomplete="off">`;
-      // Et gammelt fritekst-filter (fx fra URL'en) bevares som valgmulighed
-      const fri = cur && !cur.startsWith('=') ? `<option value="${esc(cur)}" selected>Indeholder "${esc(cur)}"</option>` : '';
-      return `<select class="colFilter colSelect" data-col="${key}">
-        <option value="">Alle</option>${fri}
-        ${d.tomme ? `<option value="=*"${cur === '=*' ? ' selected' : ''}>– Udfyldt –</option>` : ''}
-        ${d.values.map(v => `<option value="=${esc(v)}"${cur.toLowerCase() === ('=' + v).toLowerCase() ? ' selected' : ''}>${esc(v)}</option>`).join('')}
-        ${d.tomme ? `<option value="="${cur === '=' ? ' selected' : ''}>– Tom –</option>` : ''}
-      </select>`;
+      // Checkliste: knappen viser de valgte, klik åbner listen (se openMulti)
+      return `<button type="button" class="colFilter colMulti" data-col="${key}">${esc(multiLabel(cur))}</button>`;
     }
+    function multiLabel(cur) {
+      if (!cur) return 'Alle';
+      if (!cur.startsWith('=')) return `Indeholder "${cur}"`;   // gammelt fritekst-filter fra URL
+      const v = valgFra(cur).map(t => t === '=*' ? 'Udfyldt' : t === '=' ? 'Tom' : t.slice(1));
+      return v.length <= 2 ? v.join(', ') : `${v.length} valgt`;
+    }
+
+    // ── Checkliste-popup til kolonnefiltre ───────────────────────────────
+    const multiPop = document.createElement('div');
+    multiPop.className = 'multiPop';
+    multiPop.hidden = true;
+    document.body.appendChild(multiPop);
+    let multiKey = null;
+
+    function openMulti(btn) {
+      const key = btn.dataset.col;
+      if (multiKey === key && !multiPop.hidden) { closeMulti(); return; }
+      multiKey = key;
+      const d = distinctValues(key) || { values: [], tomme: false };
+      const valgt = new Set(valgFra(colFilters[key]).map(t => t.toLowerCase()));
+      const item = (val, label, cls = '') => `<label class="${cls}"><input type="checkbox" value="${esc(val)}"${valgt.has(val.toLowerCase()) ? ' checked' : ''}> <span>${esc(label)}</span></label>`;
+      multiPop.innerHTML = `
+        ${d.values.length > 10 ? '<input type="search" class="multiSearch" placeholder="Søg…" autocomplete="off">' : ''}
+        <div class="multiList">
+          ${d.tomme ? item('=*', '– Udfyldt –', 'special') : ''}
+          ${d.values.map(v => item('=' + v, v)).join('')}
+          ${d.tomme ? item('=', '– Tom –', 'special') : ''}
+        </div>
+        <div class="multiFoot"><button type="button" data-a="ryd">Ryd</button><button type="button" data-a="luk">Luk</button></div>`;
+      const apply = () => {
+        const v = [...multiPop.querySelectorAll('.multiList input:checked')].map(i => i.value);
+        colFilters[key] = v.join(SEP);
+        btn.textContent = multiLabel(colFilters[key]);
+        btn.classList.toggle('isSet', v.length > 0);
+        syncUrlState(); render();
+      };
+      multiPop.querySelectorAll('.multiList input').forEach(i => i.onchange = apply);
+      multiPop.querySelector('[data-a=ryd]').onclick = () => { multiPop.querySelectorAll('.multiList input').forEach(i => i.checked = false); apply(); };
+      multiPop.querySelector('[data-a=luk]').onclick = closeMulti;
+      const s = multiPop.querySelector('.multiSearch');
+      if (s) s.oninput = () => {
+        const q = s.value.trim().toLowerCase();
+        multiPop.querySelectorAll('.multiList label').forEach(l => { l.hidden = !!q && !l.textContent.toLowerCase().includes(q); });
+      };
+      multiPop.hidden = false;
+      const r = btn.getBoundingClientRect();
+      multiPop.style.minWidth = Math.max(r.width, 200) + 'px';
+      const w = multiPop.offsetWidth, h = multiPop.offsetHeight;
+      multiPop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px';
+      multiPop.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + 'px';
+      if (s) s.focus();
+    }
+    function closeMulti() { multiPop.hidden = true; multiKey = null; }
+    document.addEventListener('click', e => { if (!multiPop.hidden && !e.target.closest('.multiPop, .colMulti')) closeMulti(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMulti(); });
+    document.querySelector('.tableWrap')?.addEventListener('scroll', closeMulti);
 
     function buildHead() {
       document.getElementById('headRow').innerHTML =
@@ -615,7 +684,8 @@
         if (inp.tagName === 'INPUT') inp.value = colFilters[inp.dataset.col] || '';
         inp.classList.toggle('isSet', !!(colFilters[inp.dataset.col] || '').trim());
         inp.addEventListener('click', e => e.stopPropagation()); // klik i feltet må ikke sortere
-        inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
+        if (inp.classList.contains('colMulti')) { inp.addEventListener('click', () => openMulti(inp)); return; }
+        inp.addEventListener('input', () => {
           colFilters[inp.dataset.col] = inp.value;
           inp.classList.toggle('isSet', !!inp.value.trim());
           syncUrlState(); render();
@@ -623,7 +693,11 @@
       });
       document.getElementById('btnClearFilters').onclick = () => {
         FILTER_COLS.forEach(c => { delete colFilters[c]; });
-        document.querySelectorAll('.colFilter').forEach(i => { i.value = ''; i.classList.remove('isSet'); });
+        document.querySelectorAll('.colFilter').forEach(i => {
+          if (i.classList.contains('colMulti')) i.textContent = 'Alle'; else i.value = '';
+          i.classList.remove('isSet');
+        });
+        closeMulti();
         syncUrlState(); render();
       };
       document.querySelectorAll('th.sortable').forEach(th => th.onclick = () => {
