@@ -275,8 +275,11 @@
     try {
       const j = await getJson(`/api/kunde?kundenr=${encodeURIComponent(nr)}`);
       state.kunde = j.kunde || {};
-      state.adresser = j.adresser || [];
-      state.produkter = j.produkter || [];
+      // Projekter (inst. dato xx-xx-xxxx) og inaktive produkter vises ikke, og
+      // adresser uden produkter udelades
+      state.produkter = (j.produkter || []).filter(p => p.aktiv !== false && !isXX(p));
+      const medProdukter = new Set(state.produkter.map(p => p.adressekey));
+      state.adresser = (j.adresser || []).filter(a => medProdukter.has(a.adressekey));
       // Kun én adresse: den er valgt. Flere: brugeren vælger selv
       state.valgtAdresse = state.adresser.length === 1 ? state.adresser[0].adressekey : "";
       $("selName").textContent = state.kunde.navn || k?.navn || nr;
@@ -303,7 +306,7 @@
     $("facts").innerHTML = `
       <div class="klFact"><div class="lbl">Område</div><div class="val">${esc(k.omraade || "–")}</div></div>
       <div class="klFact"><div class="lbl">Adresser</div><div class="val">${state.adresser.length}</div></div>
-      <div class="klFact"><div class="lbl">Produkter</div><div class="val">${aktive}${aktive !== state.produkter.length ? ` <span class="muted" style="font-size:.8rem;font-weight:400">(+${state.produkter.length - aktive} projekt)</span>` : ""}</div></div>`;
+      <div class="klFact"><div class="lbl">Produkter</div><div class="val">${aktive}</div></div>`;
   }
 
   function renderKontrakter() {
@@ -434,7 +437,7 @@
   })();
 })();
 </script>
-  <!-- Brugsstatistik: sidevisning til statistik.html -->
-  <script src="/assets/track.js" defer></script>
+<!-- Brugsstatistik: sidevisning til statistik.html -->
+<script src="/assets/track.js" defer></script>
 </body>
 </html>

@@ -129,6 +129,7 @@
     #prodDetailView[hidden], #prodListView[hidden] { display:none; }
     #prodListView { flex:1; min-height:0; display:flex; flex-direction:column; }
 
+    .adrFaktura { display:inline-block; margin-top:4px; font-size:12px; font-weight:600; color:#1f6c7a; background:#e6f3f5; border-radius:999px; padding:1px 8px; }
     /* Anden række tiles: Kontrakter + Serviceaftaler */
     .detailGrid.detailGrid2 { grid-template-columns:1fr 1fr; }
     @media (max-width: 900px) { .detailGrid.detailGrid2 { grid-template-columns:1fr; } }
@@ -319,7 +320,7 @@ async function load(){
    if (kundenr && await loadUnicontaKunde(kundenr)) return;
    return setStatus('error','Fejl: '+esc(j.error || r.status));
  }
- state = { kunde:j.kunde, adresser:j.adresser||[], produkter:j.produkter||[], selectedAdresseKey:'' };
+ state = { kunde:j.kunde, adresser:visteAdresser(j.kunde, j.adresser||[], j.produkter||[]), produkter:j.produkter||[], selectedAdresseKey:'' };
  setStatus('',''); document.getElementById('content').style.display='block'; render();
  loadSalmonella(j.kunde?.chr, j.adresser || []);
  loadKontraktFarver().then(render);
@@ -442,7 +443,7 @@ function render(){
  const activeCount = visibleProducts.filter(p=>!isXX(p)).length;
  const xxCount = visibleProducts.length - activeCount;
  document.getElementById('brandTitle').textContent = `${k.navn} (${k.kundenr})`; document.title = `Kunde – ${k.navn}`;
- document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresser.length}</div></div><div class="card rabatCard" id="rabatTile" onclick="openRabatHistorik()" title="Klik for historik">${rabatTileHtml()}</div><div class="card"><div class="label">Produkter</div><div class="value">${activeCount}</div></div><div class="card omrCard"><div class="label">Serviceområde</div><div class="value">${esc(k.omraade || '–')}</div><div id="salgTile">${salgTileHtml(adresser)}</div></div><div class="card"><div class="label">Salmonella${k.chr ? ` <span class="muted" style="font-weight:400">· CHR ${esc(k.chr)}</span>` : ''}</div><div id="salTile">${salTileHtml()}</div></div>`;
+ document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresseAntal(adresser)}</div></div><div class="card rabatCard" id="rabatTile" onclick="openRabatHistorik()" title="Klik for historik">${rabatTileHtml()}</div><div class="card"><div class="label">Produkter</div><div class="value">${activeCount}</div></div><div class="card omrCard"><div class="label">Serviceområde</div><div class="value">${esc(k.omraade || '–')}</div><div id="salgTile">${salgTileHtml(adresser)}</div></div><div class="card"><div class="label">Salmonella${k.chr ? ` <span class="muted" style="font-weight:400">· CHR ${esc(k.chr)}</span>` : ''}</div><div id="salTile">${salTileHtml()}</div></div>`;
  document.getElementById('kundeInfo').innerHTML = `<p><b>${esc(k.navn)}</b></p><p>Kundestatus: ${esc(k.kundestatus)}</p><p>Aktiv: ${k.aktiv?'Ja':'Nej'}</p><p>Sidst opdateret: ${fmtDateTime(k.sidstImporteret || k.modifiedon)}</p>`;
  document.getElementById('adresseInfo').innerHTML = renderAdresser(adresser);
  document.getElementById('produktTopCounts').innerHTML = `Aktive: ${activeCount}${xxCount ? ` · <span style="color:#b91c1c">Ikke aktive: ${xxCount}</span>` : ''}`;
@@ -474,6 +475,21 @@ function herdAddrMatch(adr, postnr, a){
 const isFri = h => String(h.salmonellaStatus || '').trim().toLowerCase() === 'fri';
 function herdsFor(a){ return sal.state === 'ok' ? sal.list.filter(h => herdMatchesAddress(h, a)) : []; }
 
+// Kun adresser med (aktive) produkter vises. Faktureringsadressen ("Kunde …"-
+// linjen i regnearket, kunde.fakturaAdressekey) vises altid – med en note –
+// men tælles ikke med i antal adresser, hvis der ingen produkter er på den.
+// Adresser hvis produkter er flyttet til en anden adresse forsvinder dermed.
+function visteAdresser(kunde, adresser, produkter){
+  const antal = new Map();
+  produkter.filter(p => p.aktiv).forEach(p => antal.set(p.adressekey, (antal.get(p.adressekey) || 0) + 1));
+  const fKey = String(kunde?.fakturaAdressekey || '');
+  return adresser
+    .map(a => ({ ...a, antalProdukter: antal.get(a.adressekey) || 0, faktura: !!fKey && a.adressekey === fKey }))
+    .filter(a => a.antalProdukter > 0 || a.faktura);
+}
+// Antal "rigtige" adresser (med produkter) – en tom faktureringsadresse tæller ikke
+const adresseAntal = adresser => adresser.filter(a => a.antalProdukter > 0).length;
+
 function renderAdresser(adresser){
   if (!adresser.length) return '<p class="muted">Ingen adresser</p>';
   const buttons = adresser.length > 1 ? `<div class="addressChoice"><button class="btn ${state.selectedAdresseKey===''?'active':''}" onclick="setAddress('')">Alle adresser</button>${adresser.map(a=>`<button class="btn ${state.selectedAdresseKey===a.adressekey?'active':''}" onclick="setAddress('${escAttr(a.adressekey)}')">${esc(a.adresse)}</button>`).join('')}</div>` : '';
@@ -489,7 +505,8 @@ function renderAdresser(adresser){
     const multi = adresser.length > 1;
     const sel = state.selectedAdresseKey === a.adressekey;
     const click = multi ? ` onclick="toggleAddress('${escAttr(a.adressekey)}')" title="${sel ? 'Vis alle adresser' : 'Vis kun produkter på denne adresse'}"` : '';
-    return `<div class="adrBox${cls}${multi ? ' clickable' : ''}${sel ? ' selected' : ''}"${click}><b>${esc(a.adresse)}</b><br>${esc(a.postnr)} ${esc(a.by)}${chrInfo}</div>`;
+    const fakt = a.faktura ? `<div class="adrFaktura">Faktureringsadresse${a.antalProdukter ? '' : ' – ingen produkter her'}</div>` : '';
+    return `<div class="adrBox${cls}${multi ? ' clickable' : ''}${sel ? ' selected' : ''}"${click}><b>${esc(a.adresse)}</b><br>${esc(a.postnr)} ${esc(a.by)}${fakt}${chrInfo}</div>`;
   }).join('');
   return buttons + list + salAdrLegend(adresser);
 }

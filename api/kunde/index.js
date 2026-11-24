@@ -9,6 +9,19 @@ function json(context, status, body) {
 }
 function esc(s) { return String(s || "").replace(/'/g, "''"); }
 
+// Faktureringsadressen ("Kunde …"-linjen i regnearket) gemmes af importen i
+// cr1eb_lch_fakturaadressekey på kunden – hvis kolonnen findes i Dataverse.
+const FAKTURA_FIELD = "cr1eb_lch_fakturaadressekey";
+let fakturaOk = null;
+async function harFakturaFelt() {
+  if (fakturaOk !== null) return fakturaOk;
+  try {
+    await dvFetch(`EntityDefinitions(LogicalName='cr1eb_lch_kunde')/Attributes(LogicalName='${FAKTURA_FIELD}')?$select=LogicalName`);
+    fakturaOk = true;
+  } catch { fakturaOk = false; }
+  return fakturaOk;
+}
+
 function mapKunde(r) {
   return {
     id: r.cr1eb_lch_kundeid,
@@ -82,11 +95,13 @@ module.exports = async function (context, req) {
       ? `cr1eb_lch_kundeid eq ${id}`
       : `cr1eb_lch_kundenr eq '${esc(kundenr)}'`;
 
-    const kundeData = await dvFetch(`${KUNDE_TABLE}?$select=cr1eb_lch_kundeid,cr1eb_lch_kundenr,cr1eb_lch_navn,cr1eb_lch_chr,cr1eb_lch_omraade,cr1eb_lch_kundestatus,cr1eb_lch_aktiv,cr1eb_lch_sidst_importeret,modifiedon&$filter=${encodeURIComponent(kundeFilter)}&$top=1`);
+    const faktura = await harFakturaFelt();
+    const kundeData = await dvFetch(`${KUNDE_TABLE}?$select=cr1eb_lch_kundeid,cr1eb_lch_kundenr,cr1eb_lch_navn,cr1eb_lch_chr,cr1eb_lch_omraade,cr1eb_lch_kundestatus,cr1eb_lch_aktiv,cr1eb_lch_sidst_importeret,modifiedon${faktura ? "," + FAKTURA_FIELD : ""}&$filter=${encodeURIComponent(kundeFilter)}&$top=1`);
     const kunde = (kundeData.value || [])[0];
     if (!kunde) return json(context, 404, { error: "Kunde ikke fundet" });
 
     const k = mapKunde(kunde);
+    k.fakturaAdressekey = faktura ? String(kunde[FAKTURA_FIELD] || "").trim() : "";
     const adresseFilter = `_cr1eb_lch_kunde_value eq '${k.id}'`;
     const produktFilter = `cr1eb_lch_kundenr eq '${esc(k.kundenr)}'`;
 
@@ -100,6 +115,3 @@ module.exports = async function (context, req) {
     json(context, e.status || 500, { error: e.message, stack: e.stack });
   }
 };
-
-
-
