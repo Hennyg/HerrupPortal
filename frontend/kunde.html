@@ -34,8 +34,7 @@
     /* 5 tiles i toppen (kundenr, adresser, produkter, område, salmonella) */
     #summary.cards { grid-template-columns: repeat(6, minmax(140px, 1fr)); }
     #summary .salCard { grid-column: span 2; }
-    #summary .salCard #salTile { columns: 2; column-gap: 18px; }
-    #summary .salCard .salLine { break-inside: avoid; }
+
     #summary .duo { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     @media (max-width: 900px) { #summary .salCard { grid-column: auto; } }
     /* Kemi rabat-kortet */
@@ -134,6 +133,7 @@
     #prodDetailView[hidden], #prodListView[hidden] { display:none; }
     #prodListView { flex:1; min-height:0; display:flex; flex-direction:column; }
 
+    .adrRaw { font-size:11px; color:#9ca3af; margin:0 0 4px; overflow-wrap:anywhere; }
     .adrFaktura { display:inline-block; margin-top:4px; font-size:12px; font-weight:600; color:#1f6c7a; background:#e6f3f5; border-radius:999px; padding:1px 8px; }
     /* Anden række tiles: Kontrakter + Serviceaftaler */
     .detailGrid.detailGrid2 { grid-template-columns:1fr 1fr; }
@@ -539,8 +539,11 @@ function salAdrLegend(adresser){
     <div><span class="lg lgYellow"></span>Gul ramme: ingen CHR-nummer på adressen</div>
     ${unmatched.length ? `<div class="adrUnmatched">Kunne ikke kobles til en adresse:<br>${unmatched.map(h => {
       const adr = [h.adresse, [h.postnr, h.by].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-      const raw = `Ejendom: ${h.ejendomAdresse || '–'} ${h.ejendomPostnr || ''} | Bruger: ${h.brugerAdresse || '–'} ${h.brugerPostnr || ''}`;
-      return `<span title="${escAttr(raw)}"><span class="${isFri(h) ? 'txtGreen' : 'txtRed'}">CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}</span>${adr ? ` – ${esc(adr)}` : ''}</span>`;
+      // Viser hvad besætningstabellen har som ejendoms- og brugeradresse, så man
+      // kan se, hvorfor den ikke kunne kobles ("[…]" viser mellemrum/skjulte tegn)
+      const vis = v => `[${String(v ?? '')}]`;
+      const raw = `ejendom ${vis(h.ejendomAdresse)} ${vis(h.ejendomPostnr)} · bruger ${vis(h.brugerAdresse)} ${vis(h.brugerPostnr)}`;
+      return `<span class="${isFri(h) ? 'txtGreen' : 'txtRed'}">CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}</span>${adr ? ` – ${esc(adr)}` : ''}<div class="adrRaw">${esc(raw)}</div>`;
     }).join('<br>')}</div>` : ''}
   </div>`;
 }
