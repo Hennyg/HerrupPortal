@@ -33,6 +33,11 @@
 
     /* 5 tiles i toppen (kundenr, adresser, produkter, område, salmonella) */
     #summary.cards { grid-template-columns: repeat(6, minmax(140px, 1fr)); }
+    #summary .salCard { grid-column: span 2; }
+    #summary .salCard #salTile { columns: 2; column-gap: 18px; }
+    #summary .salCard .salLine { break-inside: avoid; }
+    #summary .duo { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media (max-width: 900px) { #summary .salCard { grid-column: auto; } }
     /* Kemi rabat-kortet */
     .rabatCard { cursor:pointer; }
     .rabatCard:hover { border-color:var(--red); }
@@ -320,7 +325,7 @@ async function load(){
    if (kundenr && await loadUnicontaKunde(kundenr)) return;
    return setStatus('error','Fejl: '+esc(j.error || r.status));
  }
- state = { kunde:j.kunde, adresser:visteAdresser(j.kunde, j.adresser||[], j.produkter||[]), produkter:j.produkter||[], selectedAdresseKey:'' };
+ state = { kunde:j.kunde, adresser:visteAdresser(j.kunde, j.adresser||[], j.produkter||[]), adresserAlle:j.adresser||[], produkter:j.produkter||[], selectedAdresseKey:'' };
  setStatus('',''); document.getElementById('content').style.display='block'; render();
  loadSalmonella(j.kunde?.chr, j.adresser || []);
  loadKontraktFarver().then(render);
@@ -443,7 +448,13 @@ function render(){
  const activeCount = visibleProducts.filter(p=>!isXX(p)).length;
  const xxCount = visibleProducts.length - activeCount;
  document.getElementById('brandTitle').textContent = `${k.navn} (${k.kundenr})`; document.title = `Kunde – ${k.navn}`;
- document.getElementById('summary').innerHTML = `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div><div class="card"><div class="label">Adresser</div><div class="value">${adresseAntal(adresser)}</div></div><div class="card rabatCard" id="rabatTile" onclick="openRabatHistorik()" title="Klik for historik">${rabatTileHtml()}</div><div class="card"><div class="label">Produkter</div><div class="value">${activeCount}</div></div><div class="card omrCard"><div class="label">Serviceområde</div><div class="value">${esc(k.omraade || '–')}</div><div id="salgTile">${salgTileHtml(adresser)}</div></div><div class="card"><div class="label">Salmonella${k.chr ? ` <span class="muted" style="font-weight:400">· CHR ${esc(k.chr)}</span>` : ''}</div><div id="salTile">${salTileHtml()}</div></div>`;
+ // Kundenr. | Adresser + Produkter | Kemi rabat | Service-/salgsområde | Salmonella (2 felter bred)
+ document.getElementById('summary').innerHTML =
+   `<div class="card"><div class="label">Kundenr.</div><div class="value">${esc(k.kundenr)}</div></div>` +
+   `<div class="card"><div class="duo"><div><div class="label">Adresser</div><div class="value">${adresseAntal(adresser)}</div></div><div><div class="label">Produkter</div><div class="value">${activeCount}</div></div></div></div>` +
+   `<div class="card rabatCard" id="rabatTile" onclick="openRabatHistorik()" title="Klik for historik">${rabatTileHtml()}</div>` +
+   `<div class="card omrCard"><div class="label">Serviceområde</div><div class="value">${esc(k.omraade || '–')}</div><div id="salgTile">${salgTileHtml(adresser)}</div></div>` +
+   `<div class="card salCard"><div class="label">Salmonella${k.chr ? ` <span class="muted" style="font-weight:400">· CHR ${esc(k.chr)}</span>` : ''}</div><div id="salTile">${salTileHtml()}</div></div>`;
  document.getElementById('kundeInfo').innerHTML = `<p><b>${esc(k.navn)}</b></p><p>Kundestatus: ${esc(k.kundestatus)}</p><p>Aktiv: ${k.aktiv?'Ja':'Nej'}</p><p>Sidst opdateret: ${fmtDateTime(k.sidstImporteret || k.modifiedon)}</p>`;
  document.getElementById('adresseInfo').innerHTML = renderAdresser(adresser);
  document.getElementById('produktTopCounts').innerHTML = `Aktive: ${activeCount}${xxCount ? ` · <span style="color:#b91c1c">Ikke aktive: ${xxCount}</span>` : ''}`;
@@ -488,6 +499,7 @@ function visteAdresser(kunde, adresser, produkter){
   const fKey = String(kunde?.fakturaAdressekey || '');
   return adresser
     .map(a => ({ ...a, antalProdukter: antal.get(a.adressekey) || 0, faktura: !!fKey && a.adressekey === fKey }))
+    .filter(a => a.aktiv !== false || a.faktura)
     .filter(a => a.antalProdukter > 0 || a.faktura);
 }
 // Antal "rigtige" adresser (med produkter) – en tom faktureringsadresse tæller ikke
@@ -517,14 +529,18 @@ function renderAdresser(adresser){
 // Forklaring nederst i Adresser-tile'n (+ besætninger der ikke kunne kobles)
 function salAdrLegend(adresser){
   if (sal.state !== 'ok') return '';
-  const unmatched = salSort(sal.list.filter(h => !adresser.some(a => herdMatchesAddress(h, a))));
+  // Besætninger på adresser, der er skjult (ingen produkter / ikke længere i
+  // kundelisten), nævnes ikke – kun dem der slet ikke kan kobles til en adresse
+  const skjulte = (state.adresserAlle || []).filter(a => !adresser.some(v => v.adressekey === a.adressekey));
+  const unmatched = salSort(sal.list.filter(h => !adresser.some(a => herdMatchesAddress(h, a)) && !skjulte.some(a => herdMatchesAddress(h, a))));
   return `<div class="adrLegend">
     <div><span class="lg lgRed"></span>Rød ramme: salmonella på en besætning (CHR) på adressen</div>
     <div><span class="lg lgGreen"></span>Grøn ramme: besætningen på adressen er fri</div>
     <div><span class="lg lgYellow"></span>Gul ramme: ingen CHR-nummer på adressen</div>
     ${unmatched.length ? `<div class="adrUnmatched">Kunne ikke kobles til en adresse:<br>${unmatched.map(h => {
       const adr = [h.adresse, [h.postnr, h.by].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-      return `<span class="${isFri(h) ? 'txtGreen' : 'txtRed'}">CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}</span>${adr ? ` – ${esc(adr)}` : ''}`;
+      const raw = `Ejendom: ${h.ejendomAdresse || '–'} ${h.ejendomPostnr || ''} | Bruger: ${h.brugerAdresse || '–'} ${h.brugerPostnr || ''}`;
+      return `<span title="${escAttr(raw)}"><span class="${isFri(h) ? 'txtGreen' : 'txtRed'}">CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}</span>${adr ? ` – ${esc(adr)}` : ''}</span>`;
     }).join('<br>')}</div>` : ''}
   </div>`;
 }
