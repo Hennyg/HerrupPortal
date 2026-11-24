@@ -457,6 +457,7 @@ function render(){
 // En besætning kobles til en adresse, når postnr er ens (hvis begge har et)
 // og vejnavn + husnummer er ens (store/små bogstaver, mellemrum og
 // tegnsætning ignoreres; "Asfergvej 28, Asferg" matcher "Asfergvej 28").
+function pn4(v){ return (String(v ?? '').match(/\d{4}/) || [''])[0]; }
 function normAdr(s){ return String(s || '').toLowerCase().split(',')[0].replace(/[^a-z0-9æøå]+/g, ''); }
 function herdMatchesAddress(h, a){
   // Ejendommens adresse = hvor besætningen står. Brugerens adresse er ejerens
@@ -469,7 +470,9 @@ function herdMatchesAddress(h, a){
 function herdAddrMatch(adr, postnr, a){
   const ha = normAdr(adr), aa = normAdr(a.adresse);
   if (!ha || !aa || ha !== aa) return false;
-  const hp = String(postnr || '').trim(), ap = String(a.postnr || '').trim();
+  // Kun selve postnummeret (4 cifre) sammenlignes – så "9500", " 9500" og
+  // "9500 Hobro" (postnr og by i samme felt) regnes for ens
+  const hp = pn4(postnr), ap = pn4(a.postnr);
   return !hp || !ap || hp === ap;
 }
 const isFri = h => String(h.salmonellaStatus || '').trim().toLowerCase() === 'fri';

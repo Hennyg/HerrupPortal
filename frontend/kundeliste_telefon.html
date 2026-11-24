@@ -343,7 +343,9 @@
   function addrMatch(adr, postnr, a) {
     const ha = normAdr(adr), aa = normAdr(a.adresse);
     if (!ha || !aa || ha !== aa) return false;
-    const hp = String(postnr || "").trim(), ap = String(a.postnr || "").trim();
+    // Kun selve postnummeret (4 cifre) sammenlignes – "9500 Hobro" = "9500"
+    const pn4 = v => (String(v ?? "").match(/\d{4}/) || [""])[0];
+    const hp = pn4(postnr), ap = pn4(a.postnr);
     return !hp || !ap || hp === ap;
   }
   function herdMatches(h, a) {
