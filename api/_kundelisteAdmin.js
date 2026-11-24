@@ -226,6 +226,13 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const bad = msg => Object.assign(new Error(msg), { status: 400 });
 
 // "2026-02-29" + 1 år → "2027-02-28" (sidste dag i måneden, hvis datoen ikke findes)
+// Slutdato = startdato + varighed i år – 1 dag (fx 01-12-2026 + 1 år → 30-11-2027)
+function slutFraStart(iso, years) {
+  const d = new Date(addYears(iso, years) + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 function addYears(iso, years) {
   const [y, m, d] = iso.split("-").map(Number);
   const ty = y + years;
@@ -301,7 +308,7 @@ async function saveServiceaftale(input, id) {
   // ingen slutdato med, beregnes den: startdato + varighed × 12 måneder.
   const varighed = aftale.varighed === "" ? null : Number(aftale.varighed);
   if (varighed === null || !Number.isFinite(varighed)) enddato = "";
-  else if (!enddato && startdato) enddato = addYears(startdato, varighed);
+  else if (!enddato && startdato) enddato = slutFraStart(startdato, varighed);
 
   const set = await entitySet(T.serviceaftale);
   const tekstSet = await entitySet(T.aftaletekst);
@@ -448,7 +455,43 @@ function gruppeForAfdeling(grupper, afdeling) {
       || null;
 }
 
+// Ret eksisterende serviceaftaler, hvis slutdato er beregnet efter den gamle
+// regel (startdato + varighed) – så den bliver startdato + varighed – 1 dag.
+// Aftaler med en manuelt rettet slutdato røres ikke.
+async function retSlutdatoer(udfoer) {
+  const [aftaler, tekster] = await Promise.all([listServiceaftaler(), listAftaler()]);
+  const varighed = new Map(tekster.filter(t => t.varighed !== "" && Number.isFinite(Number(t.varighed))).map(t => [t.id, Number(t.varighed)]));
+  const kandidater = [];
+  for (const a of aftaler) {
+    const v = varighed.get(a.aftaleId);
+    if (v === undefined || !a.startdato || !a.enddato) continue;
+    if (a.enddato === addYears(a.startdato, v)) {
+      kandidater.push({ id: a.id, kundenr: a.kundenr, servicetype: a.servicetype, startdato: a.startdato, fra: a.enddato, til: slutFraStart(a.startdato, v) });
+    }
+  }
+  let rettet = 0;
+  const fejl = [];
+  if (udfoer) {
+    const set = await entitySet(T.serviceaftale);
+    for (const k of kandidater) {
+      try {
+        try {
+          await dvFetch(`${set}(${k.id})`, { method: "PATCH", body: { cr1eb_lch_enddato: k.til } });
+        } catch (e) {
+          if (e.status !== 400) throw e;
+          await dvFetch(`${set}(${k.id})`, { method: "PATCH", body: { cr1eb_lch_enddato: `${k.til}T12:00:00Z` } });
+        }
+        rettet++;
+      } catch (e) {
+        fejl.push(`${k.kundenr}: ${e.message}`);
+      }
+    }
+  }
+  return { antal: kandidater.length, kandidater: kandidater.slice(0, 200), rettet, fejl };
+}
+
 module.exports = {
+  retSlutdatoer,
   ADMIN_ROLES, isKundelisteAdmin,
   loadFarver, kontraktTyper, saveFarve,
   listAftaler, createAftale, updateAftale, deleteAftale,

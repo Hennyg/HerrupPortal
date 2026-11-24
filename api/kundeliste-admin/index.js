@@ -10,6 +10,9 @@
 //   DELETE ?action=aftaletekster&id=<guid>
 //   GET    ?action=serviceaftaler[&kundenr=<nr>] → { items: [...] }  (uden kundenr = alle)
 //   POST   ?action=serviceaftaler          body { kundenr, aftaleId, startdato, enddato, note }
+//   PATCH  ?action=serviceaftaler&id=<guid> body { samme felter }  (ret en serviceaftale)
+//   GET    ?action=ret-slutdatoer           → hvilke aftaler der rettes (slutdato = varighed – 1 dag)
+//   POST   ?action=ret-slutdatoer           → udfør rettelsen
 //   GET    ?action=kolonnegrupper          → { items: [{ id, navn, afdelinger, kolonner, standard }] }
 //   POST   ?action=kolonnegrupper[&id=<guid>] body { navn, afdelinger, kolonner, standard }  (uden id = ny)
 //   DELETE ?action=kolonnegrupper&id=<guid>
@@ -65,6 +68,13 @@ module.exports = async function (context, req) {
     if (action === "serviceaftaler") {
       if (method === "GET")  return N.json(context, 200, { items: await A.listServiceaftaler(req.query.kundenr) });
       if (method === "POST") return N.json(context, 200, await A.createServiceaftale(req.body || {}));
+      if (method === "PATCH") return N.json(context, 200, await A.updateServiceaftale(String(req.query.id || ""), req.body || {}));
+    }
+
+    // ── Ret slutdatoer (gammel regel → varighed – 1 dag) ──
+    if (action === "ret-slutdatoer") {
+      if (method === "GET")  return N.json(context, 200, await A.retSlutdatoer(false));
+      if (method === "POST") return N.json(context, 200, await A.retSlutdatoer(true));
     }
 
     // ── Kolonnegrupper ──

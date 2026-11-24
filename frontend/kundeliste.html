@@ -1004,11 +1004,14 @@
     // ── Slutdato ud fra aftalens varighed (antal år) ──
     // Tom varighed → slutdato skjules og sendes ikke.
     // Ellers: startdato + varighed × 12 måneder (kan rettes bagefter).
+    // Slutdato = startdato + varighed i år – 1 dag (fx 01-12-2026 + 1 år → 30-11-2027)
     function saAddYears(iso, years) {
       const [y, m, d] = iso.split('-').map(Number);
       const ty = y + years;
       const last = new Date(Date.UTC(ty, m, 0)).getUTCDate();
-      return `${ty}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+      const dt = new Date(Date.UTC(ty, m - 1, Math.min(d, last)));
+      dt.setUTCDate(dt.getUTCDate() - 1);
+      return dt.toISOString().slice(0, 10);
     }
     function saValgtAftale() {
       const id = document.getElementById('saAftale').value;
@@ -1028,7 +1031,7 @@
       const start = document.getElementById('saStart').value;
       // Ved "Ret" beholdes den gemte slutdato, indtil start eller aftale ændres
       if (start && !(behold === true && slut.value)) slut.value = saAddYears(start, v);
-      hint.textContent = `${v} år${v ? ` (${v * 12} mdr.)` : ''} efter startdato`;
+      hint.textContent = `${v} år${v ? ` (${v * 12} mdr.)` : ''} efter startdato – 1 dag`;
     }
 
     function saShowExisting() {

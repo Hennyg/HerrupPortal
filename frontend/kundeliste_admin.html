@@ -157,6 +157,7 @@
           <h2>📄 Aftaletekster (serviceaftaler)</h2>
           <span id="aftaleMsg" class="msg"></span>
           <input type="search" id="aftaleSearch" class="search" placeholder="Søg varenr., servicetype, afdeling…" autocomplete="off" />
+          <button type="button" class="btn" id="btnRetSlut" title="Ret slutdato på eksisterende serviceaftaler til startdato + varighed – 1 dag">Ret slutdatoer</button>
           <button type="button" class="btn primary" id="btnNyAftale">＋ Ny aftaletekst</button>
         </div>
         <p class="muted">Tabellen <code>lch_serviceaftaler_aftalertekst</code>. Ret direkte i felterne og tryk Gem på rækken. Alle felter må være tomme, men mindst ét skal udfyldes. <b>Varighed</b> er antal år aftalen løber – fx 1 giver slutdato 12 måneder efter startdato. Tom varighed = ingen slutdato.</p>
@@ -462,6 +463,26 @@
       renderAftaler();
     };
     document.getElementById('aftaleSearch').oninput = renderAftaler;
+
+    // Ret slutdatoer på eksisterende serviceaftaler (gammel regel → varighed – 1 dag)
+    document.getElementById('btnRetSlut').onclick = async () => {
+      const btn = document.getElementById('btnRetSlut');
+      btn.disabled = true;
+      setMsg('aftaleMsg', 'Finder aftaler…');
+      try {
+        const p = await api('ret-slutdatoer');
+        if (!p.antal) { setMsg('aftaleMsg', 'Ingen aftaler skal rettes ✓', 'ok'); return; }
+        const eks = p.kandidater.slice(0, 5).map(k => `${k.kundenr} ${k.servicetype}: ${fmtDate(k.fra)} → ${fmtDate(k.til)}`).join('\n');
+        if (!confirm(`${p.antal} serviceaftaler har slutdato = startdato + varighed.\nDe rettes til én dag tidligere, fx:\n\n${eks}${p.antal > 5 ? '\n…' : ''}\n\nAftaler med en manuelt rettet slutdato røres ikke. Fortsæt?`)) { setMsg('aftaleMsg', ''); return; }
+        setMsg('aftaleMsg', `Retter ${p.antal} aftaler…`);
+        const r = await api('ret-slutdatoer', { method: 'POST', body: {} });
+        setMsg('aftaleMsg', `Rettet ✓ ${r.rettet} af ${r.antal}${r.fejl.length ? ` – ${r.fejl.length} fejl: ${r.fejl[0]}` : ''}`, r.fejl.length ? 'err' : 'ok');
+      } catch (e) {
+        setMsg('aftaleMsg', 'Fejl: ' + e.message, 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    };
 
     // ── Kolonnegrupper ──────────────────────────────────────────────────────
     let grupper = [];                // [{ id, navn, afdelinger, kolonner, standard }]
