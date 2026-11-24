@@ -505,6 +505,15 @@ function visteAdresser(kunde, adresser, produkter){
 // Antal "rigtige" adresser (med produkter) – en tom faktureringsadresse tæller ikke
 const adresseAntal = adresser => adresser.filter(a => a.antalProdukter > 0).length;
 
+// Midlertidig fejlsøgning: viser adressens rå værdier og evt. "mærkelige" tegn
+// (alt andet end a-z, 0-9, æøå, mellemrum, komma, punktum, bindestreg) som U+xxxx
+function adrDebug(a){
+  const odd = s => [...String(s ?? '')].filter(ch => !/[a-z0-9æøåA-ZÆØÅ ,.\-]/.test(ch))
+    .map(ch => `U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`);
+  const o = [...odd(a.adresse), ...odd(a.postnr)];
+  return `<div class="adrRaw">adresse [${esc(String(a.adresse ?? ''))}] [${esc(String(a.postnr ?? ''))}] · normaliseret [${esc(normAdr(a.adresse))}] [${esc(pn4(a.postnr))}]${o.length ? ` · særlige tegn: ${esc(o.join(' '))}` : ''}</div>`;
+}
+
 function renderAdresser(adresser){
   if (!adresser.length) return '<p class="muted">Ingen adresser</p>';
   const buttons = adresser.length > 1 ? `<div class="addressChoice"><button class="btn ${state.selectedAdresseKey===''?'active':''}" onclick="setAddress('')">Alle adresser</button>${adresser.map(a=>`<button class="btn ${state.selectedAdresseKey===a.adressekey?'active':''}" onclick="setAddress('${escAttr(a.adressekey)}')">${esc(a.adresse)}</button>`).join('')}</div>` : '';
@@ -516,7 +525,7 @@ function renderAdresser(adresser){
     const cls = noChr ? ' salNone' : !herds.length ? '' : herds.some(h => !isFri(h)) ? ' salRed' : ' salGreen';
     const chrInfo = herds.length
       ? `<div class="adrChr">${salSort(herds).map(h => `CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}${h.salmonellaDato ? ` ${esc(dateText(h.salmonellaDato))}` : ''}`).join('<br>')}</div>`
-      : noChr ? '<div class="adrNoChr">Ingen CHR-nummer på denne adresse</div>' : '';
+      : noChr ? `<div class="adrNoChr">Ingen CHR-nummer på denne adresse</div>${adrDebug(a)}` : '';
     const multi = adresser.length > 1;
     const sel = state.selectedAdresseKey === a.adressekey;
     const click = multi ? ` onclick="toggleAddress('${escAttr(a.adressekey)}')" title="${sel ? 'Vis alle adresser' : 'Vis kun produkter på denne adresse'}"` : '';
@@ -542,7 +551,7 @@ function salAdrLegend(adresser){
       // Viser hvad besætningstabellen har som ejendoms- og brugeradresse, så man
       // kan se, hvorfor den ikke kunne kobles ("[…]" viser mellemrum/skjulte tegn)
       const vis = v => `[${String(v ?? '')}]`;
-      const raw = `ejendom ${vis(h.ejendomAdresse)} ${vis(h.ejendomPostnr)} · bruger ${vis(h.brugerAdresse)} ${vis(h.brugerPostnr)}`;
+      const raw = `ejendom ${vis(h.ejendomAdresse)} ${vis(h.ejendomPostnr)} · bruger ${vis(h.brugerAdresse)} ${vis(h.brugerPostnr)} · normaliseret ${vis(normAdr(h.ejendomAdresse || h.brugerAdresse))} ${vis(pn4(h.ejendomPostnr || h.brugerPostnr))}`;
       return `<span class="${isFri(h) ? 'txtGreen' : 'txtRed'}">CHR ${esc(h.chr)} · ${esc(h.salmonellaStatus || 'Ukendt')}</span>${adr ? ` – ${esc(adr)}` : ''}<div class="adrRaw">${esc(raw)}</div>`;
     }).join('<br>')}</div>` : ''}
   </div>`;
