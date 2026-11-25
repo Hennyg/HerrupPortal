@@ -30,6 +30,12 @@ function smsRoles() {
     .split(/[,;]/).map(s => s.trim().toLowerCase()).filter(Boolean);
 }
 const ADMIN_ROLES = ["portal_admin", "portal_herrup_portal_admin"];
+// Brugere med SMS-adgang uden om rollerne (mail/UPN). Kan overstyres med
+// miljøvariablen SMS_USERS (kommasepareret).
+function smsUsers() {
+  return String(process.env.SMS_USERS || "avf@lcherrup.dk")
+    .split(/[,;]/).map(s => s.trim().toLowerCase()).filter(Boolean);
+}
 const SMS_PRICE = Number(process.env.SMS_PRICE || "0.37");
 const SVEVE_BASE = (process.env.SVEVE_BASE_URL || "https://api.sveve.dk").replace(/\/+$/, "");
 
@@ -164,7 +170,8 @@ async function requireAccess(context, req, { admin = false } = {}) {
   }
 
   const allowed = admin ? ADMIN_ROLES : [...smsRoles(), ...ADMIN_ROLES];
-  if (!user.roles.some(r => allowed.includes(r))) {
+  const directUser = !admin && smsUsers().includes(String(user.email || "").toLowerCase());
+  if (!directUser && !user.roles.some(r => allowed.includes(r))) {
     json(context, 403, { error: admin ? "Kræver admin-rolle" : "Du har ikke adgang til SMS service", roles: user.roles });
     return null;
   }
