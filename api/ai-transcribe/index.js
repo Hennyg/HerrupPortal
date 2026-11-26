@@ -6,6 +6,8 @@
 // POST /api/ai-transcribe   body (JSON): { name, mime, data }  – data er base64
 // App settings: CHATGTP_AI_KEY, valgfri CHATGTP_TRANSCRIBE_MODEL
 
+const { logAi } = require("../_aiLog");   // tokenforbrug pr. kald (ikke indholdet)
+
 const MAX_BYTES = 24 * 1024 * 1024;
 const OPENAI_TIMEOUT_MS = 40000; // under SWA's 45 sek., så vi selv når at svare med en fejl
 const ALLOWED_EXT = ["flac", "m4a", "mp3", "mp4", "mpeg", "mpga", "oga", "ogg", "wav", "webm"];
@@ -84,6 +86,13 @@ module.exports = async function (context, req) {
         message: data?.error?.message || `OpenAI returnerede ${r.status}`
       });
     }
+
+    // Hver lydstykke (ca. 1 min) er et kald – opgave = filnavnet tages ikke med
+    await logAi(context, req, {
+      kilde: "ai-transcribe", opgave: "lyd",
+      model: process.env.CHATGTP_TRANSCRIBE_MODEL || "gpt-4o-transcribe",
+      usage: data.usage
+    });
 
     return json(context, 200, { text: String(data.text || "").trim() });
   } catch (e) {

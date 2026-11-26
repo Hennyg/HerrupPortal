@@ -6,6 +6,7 @@
 //   POST { message }  →  { suggestions: [{ id, type, find, replace, all, reason }], before, after }
 const fetch = globalThis.fetch;
 const S = require("../_sms");
+const { logAi } = require("../_aiLog");   // tokenforbrug pr. kald (ikke indholdet)
 
 // Almindelige tegn, der ikke er i GSM-7, og hvad de bør erstattes med.
 const CHAR_MAP = {
@@ -65,7 +66,7 @@ function extractOutputText(data) {
   return parts.join("\n").trim();
 }
 
-async function aiSuggestions(text, apiKey) {
+async function aiSuggestions(text, apiKey, context, req) {
   const instructions = [
     "Du korrekturlæser SMS-beskeder, som Lely Center Herrup sender til kunder (landmænd) og medarbejdere.",
     "Find stavefejl, grammatikfejl og formuleringer, der kan gøres klarere eller kortere, så SMS'en fylder mindre.",
@@ -119,6 +120,7 @@ async function aiSuggestions(text, apiKey) {
   let data = null;
   try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
   if (!r.ok) throw new Error(data?.error?.message || `OpenAI svarede ${r.status}`);
+  await logAi(context, req, { kilde: "sms-ai", opgave: "kontrol", model: data.model, usage: data.usage, responseId: data.id });
 
   let parsed = null;
   const out = extractOutputText(data).replace(/^```json|```$/g, "").trim();
@@ -147,7 +149,7 @@ module.exports = async function (context, req) {
     aiError = "Mangler app setting: CHATGTP_AI_KEY";
   } else {
     try {
-      lang = await aiSuggestions(text, apiKey);
+      lang = await aiSuggestions(text, apiKey, context, req);
     } catch (e) {
       aiError = e.message;
       context.log.warn("sms-ai:", e.message);

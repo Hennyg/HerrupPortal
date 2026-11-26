@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI-forbrug – Herrup Portalen</title>
+<meta name="theme-color" content="#c30a14">
+<link rel="stylesheet" href="/assets/app.css?v=20260930-bd1" />
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+
+<style>
+  .statbar { background: var(--accent-bar); color: #fff; text-align: center; font-weight: 700; padding: .7rem 1rem; }
+  .toolbar { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .range { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .range input { border: 1px solid #d1d5db; border-radius: 6px; padding: .4rem; }
+  .range .btn.on { background: var(--nav-bg); color: #fff; border-color: transparent; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .card { background: #f9fafb; border-radius: 10px; padding: 12px 14px; }
+  .card .v { font-size: 1.6rem; font-weight: 700; color: var(--heading); }
+  .card .k { font-size: .85rem; color: #6b7280; }
+  .card .s { font-size: .78rem; color: #6b7280; margin-top: 2px; }
+
+  h2 { color: var(--heading); font-size: 1.15rem; margin: 0 0 10px; }
+  .sub { font-size: .85rem; color: #6b7280; margin: -6px 0 10px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 0 1rem; }
+  .tbl-wrap { overflow-x: auto; }
+  table.t { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  table.t th, table.t td { padding: 6px 8px; border-bottom: 1px solid var(--divider); text-align: left; }
+  table.t th { color: #6b7280; font-weight: 600; font-size: .78rem; }
+  table.t td.n, table.t th.n { text-align: right; white-space: nowrap; }
+  table.t tr.hot td { background: #fff7e0; }
+  .bar { height: 10px; background: #eef1f6; border-radius: 5px; min-width: 60px; }
+  .bar > span { display: block; height: 100%; border-radius: 5px; background: var(--nav-accent); }
+
+  .days { display: flex; align-items: flex-end; gap: 2px; height: 160px; padding-top: 6px; }
+  .days .d { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; min-width: 3px; cursor: default; }
+  .days .d .tk { background: var(--nav-accent); border-radius: 3px 3px 0 0; }
+  .days .d.max .tk { background: var(--nav-bg); }
+  .axis { display: flex; justify-content: space-between; font-size: .75rem; color: #6b7280; margin-top: 4px; }
+  .hours { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; align-items: end; height: 110px; }
+  .hours div { background: var(--nav-accent); border-radius: 2px 2px 0 0; }
+  .hours-axis { display: grid; grid-template-columns: repeat(24, 1fr); font-size: .65rem; color: #6b7280; text-align: center; }
+  .note { background: #fff7e0; border-radius: 8px; padding: 8px 12px; margin-top: 10px; font-size: .9rem; }
+  .err { color: #b91c1c; font-weight: 600; }
+  .tag { display: inline-block; font-size: .72rem; padding: 1px 7px; border-radius: 999px; background: #eef1f6; color: #374151; margin-left: 4px; white-space: nowrap; }
+  .user-filter { border: 1px solid #d1d5db; border-radius: 6px; padding: .4rem .6rem; width: 100%; max-width: 320px; margin-bottom: 8px; }
+</style>
+</head>
+
+<body>
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="brand">
+      <div class="logo" aria-label="Herrup Portal"></div>
+      <div>Herrup Portalen</div>
+    </div>
+    <div class="nav">
+      <a href="/">Forside</a>
+      <a href="/statistik.html">Statistik</a>
+      <a href="/admin.html">Admin</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </div>
+  <div class="nav-accent"></div>
+</div>
+<div class="statbar">AI-forbrug – hvem har brugt hvor mange tokens hvornår</div>
+
+<div class="container">
+  <div class="panel">
+    <div class="toolbar">
+      <div class="range">
+        <label for="from">Fra</label><input type="date" id="from">
+        <label for="to">Til</label><input type="date" id="to">
+        <button class="btn" data-preset="1">I dag</button>
+        <button class="btn" data-preset="7">7 dage</button>
+        <button class="btn" data-preset="30">30 dage</button>
+        <button class="btn" data-preset="month">Denne måned</button>
+        <button class="btn" data-preset="lastmonth">Sidste måned</button>
+      </div>
+      <button class="btn" id="refresh">↻ Opdater</button>
+    </div>
+    <div class="note">Der logges kun hvem, hvornår, hvilken funktion og antal tokens/billeder – aldrig hvad der er skrevet eller vedhæftet.</div>
+  </div>
+
+  <div id="content"><div class="panel">Indlæser…</div></div>
+</div>
+
+<script>
+(() => {
+  const TZ = "Europe/Copenhagen";
+  const $ = id => document.getElementById(id);
+  const content = $("content"), fromEl = $("from"), toEl = $("to");
+
+  const pad2 = n => String(n).padStart(2, "0");
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  const fmt = n => Number(n || 0).toLocaleString("da-DK");
+  const kort = n => {                       // 1.234.567 → 1,2 mio.
+    n = Number(n || 0);
+    if (n >= 1e6) return (n / 1e6).toLocaleString("da-DK", { maximumFractionDigits: 1 }) + " mio.";
+    if (n >= 1e4) return Math.round(n / 1e3).toLocaleString("da-DK") + " t.";
+    return fmt(n);
+  };
+  const kr = v => v === null || v === undefined ? "–" : "kr. " + Number(v).toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const todayIso = () => new Intl.DateTimeFormat("sv-SE", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  function addDays(iso, n) {
+    const [y, m, d] = iso.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d)); dt.setUTCDate(dt.getUTCDate() + n);
+    return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`;
+  }
+  const dk = iso => { const [y, m, d] = iso.split("-"); return `${d}-${m}-${y}`; };
+  const dkTime = utc => {
+    const s = new Intl.DateTimeFormat("sv-SE", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(utc));
+    const [d, t] = s.split(" "); return `${dk(d)} ${t}`;
+  };
+
+  const KILDER = { "ai": "AI-siden", "ai-transcribe": "Lyd → tekst", "news-ai": "Nyheder (kort besked)", "sms-ai": "SMS-kontrol" };
+  const OPGAVER = {
+    rewrite: "Ret tekst", improve: "Forbedr", professional: "Professionel", informal: "Uformel", email: "Mail",
+    email_reply: "Svar på mail", summarize: "Opsummer", translate: "Oversæt", explain: "Forklar", bullets: "Punktliste",
+    free: "Fri", image: "Billede", referat: "Referat", lyd: "Lyd", kontrol: "Kontrol", "kort besked": "Kort besked"
+  };
+  const funktion = (kilde, opgave) => `${esc(KILDER[kilde] || kilde)}${opgave ? ` <span class="tag">${esc(OPGAVER[opgave] || opgave)}</span>` : ""}`;
+
+  function setRange(preset) {
+    const t = todayIso();
+    if (preset === "1") { fromEl.value = t; toEl.value = t; }
+    else if (preset === "7") { fromEl.value = addDays(t, -6); toEl.value = t; }
+    else if (preset === "30") { fromEl.value = addDays(t, -29); toEl.value = t; }
+    else if (preset === "month") { fromEl.value = t.slice(0, 8) + "01"; toEl.value = t; }
+    else if (preset === "lastmonth") {
+      const lastPrev = addDays(t.slice(0, 8) + "01", -1);
+      fromEl.value = lastPrev.slice(0, 8) + "01"; toEl.value = lastPrev;
+    }
+    document.querySelectorAll("[data-preset]").forEach(b => b.classList.toggle("on", b.dataset.preset === preset));
+  }
+  document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => { setRange(b.dataset.preset); load(); }));
+  $("refresh").addEventListener("click", load);
+  fromEl.addEventListener("change", () => { setRange(null); load(); });
+  toEl.addEventListener("change", () => { setRange(null); load(); });
+
+  let data = null;
+
+  async function load() {
+    content.style.opacity = ".5";
+    try {
+      const res = await fetch(`/api/ai-forbrug?from=${fromEl.value}&to=${toEl.value}&t=${Date.now()}`, { cache: "no-store" });
+      const j = await res.json().catch(() => ({}));
+      if (res.status === 403) { content.innerHTML = `<div class="panel"><span class="err">Siden kræver rollen portal_admin.</span></div>`; return; }
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      data = j;
+      render();
+    } catch (e) {
+      content.innerHTML = `<div class="panel"><span class="err">Fejl: ${esc(e.message)}</span></div>`;
+    } finally {
+      content.style.opacity = "";
+    }
+  }
+
+  function tokenTitle(r) {
+    return `Input ${fmt(r.input)} (heraf cachet ${fmt(r.cached)}) · Output ${fmt(r.output)} (heraf tænkning ${fmt(r.reasoning)})`;
+  }
+
+  function render() {
+    const d = data, T = d.total;
+    const pris = d.prisSat;
+    const maxDay = Math.max(1, ...d.dage.map(x => x.total));
+    const maxHour = Math.max(1, ...d.timer.map(x => x.total));
+    const maxUser = Math.max(1, ...d.brugere.map(x => x.total));
+    const topDag = d.dage.reduce((a, b) => (b.total > (a?.total || 0) ? b : a), null);
+
+    content.innerHTML = `
+      <div class="panel">
+        <div class="cards">
+          <div class="card"><div class="v">${kort(T.total)}</div><div class="k">tokens i alt</div><div class="s">${fmt(T.total)}</div></div>
+          <div class="card"><div class="v">${fmt(T.kald)}</div><div class="k">AI-kald</div><div class="s">${fmt(d.brugere.length)} brugere</div></div>
+          <div class="card"><div class="v">${kort(T.input)}</div><div class="k">input-tokens</div><div class="s">heraf cachet ${kort(T.cached)}</div></div>
+          <div class="card"><div class="v">${kort(T.output)}</div><div class="k">output-tokens</div><div class="s">heraf tænkning ${kort(T.reasoning)}</div></div>
+          <div class="card"><div class="v">${fmt(T.billeder)}</div><div class="k">billeder lavet</div></div>
+          <div class="card"><div class="v">${pris ? kr(T.kr) : "–"}</div><div class="k">anslået pris</div><div class="s">${pris ? "ud fra priserne i app settings" : "sæt AI_PRIS_INPUT og AI_PRIS_OUTPUT"}</div></div>
+        </div>
+        ${topDag && topDag.total ? `<div class="note">Største dag: <b>${dk(topDag.dag)}</b> med ${fmt(topDag.total)} tokens i ${fmt(topDag.kald)} kald${topDag.billeder ? ` og ${fmt(topDag.billeder)} billeder` : ""}${pris ? ` (${kr(topDag.kr)})` : ""}.</div>` : ""}
+      </div>
+
+      <div class="panel">
+        <h2>Forbrug pr. dag</h2>
+        <div class="days">${d.dage.map(x => `
+          <div class="d${topDag && x.dag === topDag.dag && x.total ? " max" : ""}" title="${dk(x.dag)}: ${fmt(x.total)} tokens · ${fmt(x.kald)} kald${x.billeder ? ` · ${fmt(x.billeder)} billeder` : ""}${pris ? ` · ${kr(x.kr)}` : ""}">
+            <div class="tk" style="height:${(x.total / maxDay) * 100}%"></div>
+          </div>`).join("")}</div>
+        <div class="axis"><span>${dk(d.from)}</span><span>${dk(d.to)}</span></div>
+      </div>
+
+      <div class="grid2">
+        <div class="panel">
+          <h2>Pr. bruger</h2>
+          <input class="user-filter" id="userFilter" type="search" placeholder="Filtrér på bruger…" autocomplete="off">
+          <div class="tbl-wrap"><table class="t">
+            <thead><tr><th>Bruger</th><th class="n">Kald</th><th class="n">Tokens</th><th></th><th class="n">Billeder</th>${pris ? `<th class="n">Pris</th>` : ""}<th class="n">Sidst</th></tr></thead>
+            <tbody id="userBody">${d.brugere.map(b => `
+              <tr data-email="${esc(b.email)}">
+                <td>${esc(b.email)}</td>
+                <td class="n">${fmt(b.kald)}</td>
+                <td class="n" title="${esc(tokenTitle(b))}">${fmt(b.total)}</td>
+                <td style="width:22%"><div class="bar"><span style="width:${(b.total / maxUser) * 100}%"></span></div></td>
+                <td class="n">${b.billeder ? fmt(b.billeder) : ""}</td>
+                ${pris ? `<td class="n">${kr(b.kr)}</td>` : ""}
+                <td class="n">${dkTime(b.sidst)}</td>
+              </tr>`).join("") || `<tr><td colspan="7" class="muted">Intet forbrug i perioden</td></tr>`}</tbody>
+          </table></div>
+        </div>
+
+        <div class="panel">
+          <h2>Pr. funktion</h2>
+          <div class="tbl-wrap"><table class="t">
+            <thead><tr><th>Funktion</th><th class="n">Kald</th><th class="n">Tokens</th><th class="n">Pr. kald</th><th class="n">Billeder</th>${pris ? `<th class="n">Pris</th>` : ""}</tr></thead>
+            <tbody>${d.funktioner.map(f => `
+              <tr>
+                <td>${funktion(f.kilde, f.opgave)}</td>
+                <td class="n">${fmt(f.kald)}</td>
+                <td class="n" title="${esc(tokenTitle(f))}">${fmt(f.total)}</td>
+                <td class="n">${fmt(Math.round(f.total / Math.max(1, f.kald)))}</td>
+                <td class="n">${f.billeder ? fmt(f.billeder) : ""}</td>
+                ${pris ? `<td class="n">${kr(f.kr)}</td>` : ""}
+              </tr>`).join("") || `<tr><td colspan="6" class="muted">Intet forbrug i perioden</td></tr>`}</tbody>
+          </table></div>
+
+          <h2 style="margin-top:18px">Tidspunkt på dagen</h2>
+          <div class="hours">${d.timer.map(h => `<div title="kl. ${pad2(h.time)}: ${fmt(h.total)} tokens · ${fmt(h.kald)} kald" style="height:${(h.total / maxHour) * 100}%"></div>`).join("")}</div>
+          <div class="hours-axis">${d.timer.map(h => `<span>${h.time % 3 === 0 ? pad2(h.time) : ""}</span>`).join("")}</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Største kald</h2>
+        <div class="sub">Opfølgning = beskeden byggede videre på en samtale. Hele samtalen sendes med igen og tæller som input hver gang, så lange samtaler bliver dyre.</div>
+        ${callTable(d.storste, pris, true)}
+      </div>
+
+      <div class="panel">
+        <h2>Seneste kald</h2>
+        <div class="sub">De seneste ${fmt(d.seneste.length)} kald i perioden.</div>
+        ${callTable(d.seneste, pris, false)}
+      </div>`;
+
+    $("userFilter").addEventListener("input", e => {
+      const q = e.target.value.trim().toLowerCase();
+      document.querySelectorAll("#userBody tr[data-email]").forEach(tr => { tr.hidden = q && !tr.dataset.email.includes(q); });
+    });
+  }
+
+  function callTable(list, pris, markHot) {
+    if (!list.length) return `<div class="muted">Ingen kald i perioden</div>`;
+    const hot = markHot ? Math.max(...list.map(r => r.total)) * 0.5 : Infinity;
+    return `<div class="tbl-wrap"><table class="t">
+      <thead><tr><th>Tidspunkt</th><th>Bruger</th><th>Funktion</th><th>Model</th><th class="n">Input</th><th class="n">Output</th><th class="n">I alt</th><th class="n">Billeder</th>${pris ? `<th class="n">Pris</th>` : ""}</tr></thead>
+      <tbody>${list.map(r => `
+        <tr${r.total >= hot ? ` class="hot"` : ""}>
+          <td style="white-space:nowrap">${dkTime(r.tid)}</td>
+          <td>${esc(r.email)}</td>
+          <td>${funktion(r.kilde, r.opgave)}${r.opfoelgning ? ` <span class="tag" title="Byggede videre på en samtale">opfølgning</span>` : ""}</td>
+          <td>${esc(r.model)}</td>
+          <td class="n" title="Heraf cachet ${fmt(r.cached)}">${fmt(r.input)}</td>
+          <td class="n" title="Heraf tænkning ${fmt(r.reasoning)}">${fmt(r.output)}</td>
+          <td class="n"><b>${fmt(r.total)}</b></td>
+          <td class="n">${r.billeder ? fmt(r.billeder) : ""}</td>
+          ${pris ? `<td class="n">${kr(r.kr)}</td>` : ""}
+        </tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+
+  setRange("1");
+  load();
+})();
+</script>
+<!-- Brugsstatistik: sidevisning til statistik.html -->
+<script src="/assets/track.js" defer></script>
+</body>
+</html>

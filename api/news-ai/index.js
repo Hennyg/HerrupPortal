@@ -3,6 +3,7 @@
 //   POST { text, overskrift, maxChars }  →  { summary }
 const fetch = globalThis.fetch;
 const N = require("../_news");
+const { logAi } = require("../_aiLog");   // tokenforbrug pr. kald (ikke indholdet)
 
 function extractOutputText(data) {
   if (typeof data?.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
@@ -52,6 +53,7 @@ module.exports = async function (context, req) {
     let data = null;
     try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
     if (!r.ok) return N.json(context, 502, { error: data?.error?.message || `OpenAI svarede ${r.status}` });
+    await logAi(context, req, { kilde: "news-ai", opgave: "kort besked", model: data.model, usage: data.usage, responseId: data.id });
 
     let summary = extractOutputText(data).replace(/\s*\n+\s*/g, " · ").replace(/^["'“”]+|["'“”]+$/g, "").trim();
     if (!summary) return N.json(context, 502, { error: "AI returnerede ikke noget svar" });

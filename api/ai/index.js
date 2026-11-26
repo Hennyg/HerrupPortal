@@ -1,4 +1,6 @@
 const fetch = globalThis.fetch;
+// Tokenforbrug logges pr. kald (ikke indholdet) – se api/_aiLog.js
+const { logAi } = require("../_aiLog");
 
 function json(context, status, body) {
   context.res = {
@@ -246,7 +248,7 @@ function buildAttachmentContent(list) {
   return { content, textTotal };
 }
 
-async function pollResponse(context, apiKey, id) {
+async function pollResponse(context, req, apiKey, id) {
   const r = await fetch(`https://api.openai.com/v1/responses/${encodeURIComponent(id)}`, {
     headers: { "Authorization": `Bearer ${apiKey}` }
   });
@@ -260,6 +262,19 @@ async function pollResponse(context, apiKey, id) {
 
   const st = data.status;
   if (st === "queued" || st === "in_progress") return json(context, 200, { pending: true, responseId: id, status: st });
+
+  // Færdigt (også afbrudt/fejlet) – log forbruget én gang
+  if (st === "completed" || st === "incomplete" || st === "failed") {
+    await logAi(context, req, {
+      kilde: "ai",
+      opgave: data?.metadata?.opgave || "",
+      opfoelgning: data?.metadata?.opfoelgning === "ja",
+      model: data.model,
+      usage: data.usage,
+      billeder: st === "failed" ? 0 : extractOutputImages(data).length,
+      responseId: id
+    });
+  }
 
   if (st === "completed" || st === "incomplete") {
     let answer = extractOutputText(data);
@@ -303,7 +318,7 @@ module.exports = async function (context, req) {
     const id = validResponseId(req.query.id);
     if (!id) return json(context, 400, { error: "invalid_id", message: "Ugyldigt svar-id." });
     try {
-      return await pollResponse(context, apiKey, id);
+      return await pollResponse(context, req, apiKey, id);
     } catch (e) {
       context.log("AI poll fejl:", e.message);
       return json(context, 500, { error: "ai_failed", message: e.message });
@@ -379,7 +394,9 @@ module.exports = async function (context, req) {
       model: process.env.CHATGTP_AI_MODEL || "gpt-5.6",
       instructions,
       input: [{ role: "user", content }],
-      max_output_tokens: useBackground ? 16000 : 2500
+      max_output_tokens: useBackground ? 16000 : 2500,
+      // Bruges til forbrugsloggen, når et baggrundskald hentes færdigt
+      metadata: { opgave: task, opfoelgning: previousResponseId ? "ja" : "nej" }
     };
     if (allowImages) requestBody.tools = [imageTool()];
     if (previousResponseId) requestBody.previous_response_id = previousResponseId;
@@ -410,13 +427,17 @@ module.exports = async function (context, req) {
       const id = validResponseId(data.id);
       if (!id) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke et svar-id." });
       if (data.status === "completed" || data.status === "incomplete" || data.status === "failed") {
-        return await pollResponse(context, apiKey, id);
+        return await pollResponse(context, req, apiKey, id);
       }
       return json(context, 202, { pending: true, responseId: id, status: data.status });
     }
 
     const answer = extractOutputText(data);
     const outImages = extractOutputImages(data);
+    await logAi(context, req, {
+      kilde: "ai", opgave: task, opfoelgning: !!previousResponseId,
+      model: data.model || requestBody.model, usage: data.usage, billeder: outImages.length, responseId: data.id
+    });
     if (!answer && !outImages.length) return json(context, 502, { error: "empty_response", message: "AI returnerede ikke noget svar." });
 
     return json(context, 200, { answer, images: outImages, responseId: data.id || null });
