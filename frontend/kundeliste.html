@@ -40,6 +40,9 @@
     /* Salmonella på mindst én af kundens adresser */
     .dataTable td.kundenrSal { background:#dc2626; color:#fff !important; font-weight:700; }
     .dataTable td.kundenrSal::before { content:'✖ '; }
+    /* Markering, når musen er over en række: lys grå – salmonella-feltet beholder sin røde farve */
+    .dataTable tbody tr:hover td { background:#f3f4f6; }
+    .dataTable tbody tr:hover td.kundenrSal { background:#b91c1c; color:#fff !important; }
     .listLegend { font-size:13px; color:#4b5563; margin:-4px 0 10px; display:flex; align-items:center; gap:6px 18px; flex-wrap:wrap; }
     .listLegend .lg { display:inline-block; width:14px; height:14px; border-radius:3px; margin-right:6px; vertical-align:-3px; }
     .listLegend .activeFilter { color:var(--red); font-weight:700; }
