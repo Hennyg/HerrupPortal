@@ -38,12 +38,13 @@
     #btnSal.active { background:#fee2e2; border-color:#dc2626; color:#991b1b; font-weight:700; }
     #btnXX.active { background:#fdf2f2; border-color:var(--red); color:var(--red); font-weight:700; }
     /* Salmonella på mindst én af kundens adresser */
-    .dataTable td.kundenrSal { background:#fee2e2; color:#991b1b !important; font-weight:700; }
+    .dataTable td.kundenrSal { background:#dc2626; color:#fff !important; font-weight:700; }
+    .dataTable td.kundenrSal::before { content:'✖ '; }
     .listLegend { font-size:13px; color:#4b5563; margin:-4px 0 10px; display:flex; align-items:center; gap:6px 18px; flex-wrap:wrap; }
     .listLegend .lg { display:inline-block; width:14px; height:14px; border-radius:3px; margin-right:6px; vertical-align:-3px; }
     .listLegend .activeFilter { color:var(--red); font-weight:700; }
     .listLegend .activeFilter[hidden] { display:none; }
-    .listLegend .lgSal { background:#fee2e2; border:1px solid #fca5a5; }
+    .listLegend .lgSal { background:#dc2626; border:1px solid #b91c1c; }
     /* Søgning på serienummer: link direkte til produktet */
     .snHint { display:flex; align-items:center; gap:6px 12px; flex-wrap:wrap; background:#fdf2f2; border:1px solid #f5c2c2;
               border-radius:8px; padding:8px 12px; margin:0 0 10px; font-size:14px; }
