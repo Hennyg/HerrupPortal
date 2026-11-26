@@ -46,6 +46,11 @@
     .btn.danger { color:#991b1b; }
     .btn:disabled { opacity:.5; cursor:default; }
     .rowBtns { white-space:nowrap; text-align:right; }
+    /* Hjælpetekster */
+    .admTable select.hjKey { width:100%; height:32px; border:1px solid #d1d5db; border-radius:6px; padding:0 6px; font:inherit; font-size:14px; background:#fff; }
+    .admTable textarea.hjTekst { width:100%; min-height:58px; border:1px solid #d1d5db; border-radius:6px; padding:6px 8px; font:inherit; font-size:14px; resize:vertical; box-sizing:border-box; }
+    .admTable select.hjKey:focus, .admTable textarea.hjTekst:focus { outline:none; border-color:var(--red); box-shadow:0 0 0 2px rgba(195,10,20,.12); }
+    .admTable td.hjTop { vertical-align:top; }
     .msg { font-size:13px; }
     .msg.ok { color:#15803d; } .msg.err { color:#991b1b; }
     .search { height:34px; border:1px solid #d1d5db; border-radius:8px; padding:0 10px; font:inherit; font-size:14px; min-width:220px; }
@@ -206,6 +211,21 @@
         </div>
 
         <div class="kgList" id="kgList"><span class="muted">Henter…</span></div>
+      </section>
+
+      <!-- Hjælpetekster -->
+      <section class="panel" data-fold="hjaelp">
+        <div class="panelHead">
+          <h2>❔ Hjælpetekster</h2>
+          <span id="hjMsg" class="msg"></span>
+          <input type="search" id="hjSearch" class="search" placeholder="Søg kolonne, knap eller tekst…" autocomplete="off" />
+          <button type="button" class="btn primary" id="btnNyHjaelp">＋ Ny hjælpetekst</button>
+        </div>
+        <p class="muted">Tabellen <code>lch_kundeliste_hjaelpetekst</code>. Vælg en kolonne eller knap og skriv forklaringen. I kundelisten vises en <b>(?)</b> ved overskriften eller knappen – et klik viser teksten. Kolonner får kun (?), når de er med i den visning, brugeren ser. Ændringer slår igennem i kundelisten inden for et par minutter.</p>
+        <table class="admTable">
+          <thead><tr><th style="width:30%">Kolonne / knap</th><th>Hjælpetekst</th><th style="width:1%"></th></tr></thead>
+          <tbody id="hjBody"><tr><td colspan="3" class="muted">Henter…</td></tr></tbody>
+        </table>
       </section>
 
       <!-- Kontraktfarver -->
@@ -630,6 +650,113 @@
       }
     }
 
+    // ── Hjælpetekster ───────────────────────────────────────────────────────
+    // Nøgler: "kol:<kolonne>" (KL_KOLONNER) og "el:<element-id>" (KL_HJAELP_ELEMENTER)
+    let hjaelp = [];                 // [{ id, key, tekst }]
+    let nyHjaelp = null;             // række under oprettelse
+
+    function hjLabel(key) {
+      const [type, k] = String(key).split(':');
+      if (type === 'kol') {
+        const c = KL_KOLONNER.find(x => x.key === k);
+        return c ? `Kolonne: ${c.label}` : `Kolonne: ${k} (findes ikke længere)`;
+      }
+      const el = (window.KL_HJAELP_ELEMENTER || []).find(x => x.id === k);
+      return el ? el.label : `${k} (findes ikke længere)`;
+    }
+
+    function hjOptions(valgt, rowId) {
+      const brugt = new Set(hjaelp.filter(h => h.id !== rowId).map(h => h.key));
+      const opt = (key, label) => `<option value="${esc(key)}"${key === valgt ? ' selected' : ''}${brugt.has(key) && key !== valgt ? ' disabled' : ''}>${esc(label)}${brugt.has(key) && key !== valgt ? ' – har tekst' : ''}</option>`;
+      const grupper = [...new Set(KL_KOLONNER.map(c => c.gruppe))];
+      let html = `<option value="">Vælg…</option>`;
+      html += `<optgroup label="Knapper og felter">${(window.KL_HJAELP_ELEMENTER || []).map(e => opt('el:' + e.id, e.label)).join('')}</optgroup>`;
+      for (const g of grupper) {
+        html += `<optgroup label="Kolonner – ${esc(g)}">${KL_KOLONNER.filter(c => c.gruppe === g).map(c => opt('kol:' + c.key, c.label)).join('')}</optgroup>`;
+      }
+      // Gemt nøgle, der ikke længere findes i listerne
+      if (valgt && !html.includes(`value="${esc(valgt)}"`)) html += `<option value="${esc(valgt)}" selected>${esc(hjLabel(valgt))}</option>`;
+      return html;
+    }
+
+    async function loadHjaelp() {
+      const j = await api('hjaelpetekster');
+      hjaelp = j.items || [];
+      renderHjaelp();
+    }
+
+    function hjRow(h, isNew) {
+      return `<tr data-id="${esc(h.id || '')}"${isNew ? ' class="dirty"' : ''}>
+        <td class="hjTop"><select class="hjKey">${hjOptions(h.key || '', h.id || null)}</select></td>
+        <td class="hjTop"><textarea class="hjTekst" maxlength="4000" placeholder="Forklaring, der vises ved klik på (?)">${esc(h.tekst || '')}</textarea></td>
+        <td class="rowBtns hjTop">
+          <button type="button" class="btn primary" data-act="save"${isNew ? '' : ' disabled'}>Gem</button>
+          <button type="button" class="btn ${isNew ? '' : 'danger'}" data-act="${isNew ? 'cancel' : 'delete'}">${isNew ? 'Annuller' : 'Slet'}</button>
+        </td>
+      </tr>`;
+    }
+
+    function renderHjaelp() {
+      const q = document.getElementById('hjSearch').value.trim().toLowerCase();
+      const list = hjaelp
+        .filter(h => !q || `${hjLabel(h.key)} ${h.tekst}`.toLowerCase().includes(q))
+        .sort((a, b) => hjLabel(a.key).localeCompare(hjLabel(b.key), 'da'));
+      const tb = document.getElementById('hjBody');
+      tb.innerHTML = (nyHjaelp ? hjRow(nyHjaelp, true) : '') +
+        (list.map(h => hjRow(h, false)).join('') ||
+         (nyHjaelp ? '' : `<tr><td colspan="3" class="muted">${q ? 'Ingen match' : 'Ingen hjælpetekster endnu'}</td></tr>`));
+
+      tb.querySelectorAll('tr[data-id]').forEach(tr => {
+        const isNew = !tr.dataset.id;
+        const saveBtn = tr.querySelector('[data-act=save]');
+        const dirty = () => { tr.classList.add('dirty'); saveBtn.disabled = false; };
+        tr.querySelector('.hjKey').addEventListener('change', dirty);
+        tr.querySelector('.hjTekst').addEventListener('input', dirty);
+        saveBtn.onclick = () => saveHjaelp(tr, isNew);
+        const other = tr.querySelector('[data-act=delete],[data-act=cancel]');
+        other.onclick = () => isNew ? (nyHjaelp = null, renderHjaelp()) : deleteHjaelp(tr.dataset.id);
+      });
+      if (nyHjaelp) tb.querySelector('tr.dirty select')?.focus();
+    }
+
+    async function saveHjaelp(tr, isNew) {
+      const key = tr.querySelector('.hjKey').value;
+      const tekst = tr.querySelector('.hjTekst').value.trim();
+      if (!key) { setMsg('hjMsg', 'Vælg en kolonne eller knap', 'err'); return; }
+      if (!tekst) { setMsg('hjMsg', 'Skriv en hjælpetekst', 'err'); return; }
+      tr.querySelectorAll('button').forEach(b => b.disabled = true);
+      setMsg('hjMsg', 'Gemmer…');
+      try {
+        await api('hjaelpetekster', { method: 'POST', id: isNew ? '' : tr.dataset.id, body: { key, tekst } });
+        if (isNew) nyHjaelp = null;
+        await loadHjaelp();
+        setMsg('hjMsg', 'Gemt ✓', 'ok');
+      } catch (e) {
+        setMsg('hjMsg', 'Fejl: ' + e.message, 'err');
+        tr.querySelectorAll('button').forEach(b => b.disabled = false);
+      }
+    }
+
+    async function deleteHjaelp(id) {
+      const h = hjaelp.find(x => x.id === id);
+      if (!confirm(`Slet hjælpeteksten til "${hjLabel(h?.key || '')}"?`)) return;
+      setMsg('hjMsg', 'Sletter…');
+      try {
+        await api('hjaelpetekster', { method: 'DELETE', id });
+        await loadHjaelp();
+        setMsg('hjMsg', 'Slettet ✓', 'ok');
+      } catch (e) {
+        setMsg('hjMsg', 'Fejl: ' + e.message, 'err');
+      }
+    }
+
+    document.getElementById('btnNyHjaelp').onclick = e => {
+      openFold(e.target);
+      if (!nyHjaelp) nyHjaelp = { key: '', tekst: '' };
+      renderHjaelp();
+    };
+    document.getElementById('hjSearch').addEventListener('input', renderHjaelp);
+
     // ── Sammenklappelige sektioner ─────────────────────────────────────────
     // Alle sektioner starter lukkede; hvilke der er åbne, huskes i browseren.
     const FOLD_KEY = 'kundeliste_admin_open';
@@ -700,6 +827,9 @@
       });
       loadAftaler().catch(e => {
         document.getElementById('aftaleBody').innerHTML = `<tr><td colspan="5" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;
+      });
+      loadHjaelp().catch(e => {
+        document.getElementById('hjBody').innerHTML = `<tr><td colspan="3" class="msg err">Fejl: ${esc(e.message)}</td></tr>`;
       });
     })();
   </script>

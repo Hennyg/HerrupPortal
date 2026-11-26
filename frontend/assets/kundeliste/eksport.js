@@ -67,7 +67,16 @@
 
   let produkter = null;          // alle aktive produkter (hentes første gang)
   let optionKeys = [...KL_UDSTYR_KEYS];
-  const optFelt = key => ({ id: 'o:' + key, gruppe: 'Options', label: key, option: key, value: (k, p) => cleanText(p?.udstyr?.[key]) });
+  // Option-nøgler sammenlignes uden hensyn til store/små bogstaver og mellemrum,
+  // så fx "Sand" i data matcher "SAND" i listen.
+  const normKey = k => String(k ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  function udstyrVal(p, key) {
+    if (!p?.udstyr) return '';
+    if (p.udstyr[key] !== undefined) return p.udstyr[key];
+    if (!p._ud) p._ud = new Map(Object.entries(p.udstyr).map(([k, v]) => [normKey(k), v]));
+    return p._ud.get(normKey(key)) ?? '';
+  }
+  const optFelt = key => ({ id: 'o:' + key, gruppe: 'Options', label: key, option: key, value: (k, p) => cleanText(udstyrVal(p, key)) });
 
   // Kemi rabat-data hentes, selv om kolonnerne ikke vises i listen
   async function ensureRbFor() {
@@ -104,6 +113,20 @@
     .exGroup label { display:flex; align-items:flex-start; gap:6px; font-size:13px; padding:2px 0; }
     .exGroup.options { grid-column:1 / -1; }
     .exGroup.options .exOptList { columns:3 220px; }
+    .exGroup h4 .exGroupBtns { display:flex; gap:8px; align-items:center; }
+    .exReqWrap { position:relative; }
+    .exGroup h4 .exReqBtn { color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:1px 6px; background:#fff; }
+    .exGroup h4 .exReqBtn.isSet { color:var(--red); border-color:var(--red); background:#fdf2f2; font-weight:700; }
+    .exReqPop { position:absolute; right:0; top:calc(100% + 4px); z-index:5; background:#fff; border:1px solid var(--border); border-radius:8px;
+                box-shadow:0 10px 30px rgba(0,0,0,.18); min-width:240px; max-width:340px; max-height:300px; overflow:auto; padding:6px 0;
+                text-transform:none; letter-spacing:0; color:#111; font-weight:400; }
+    .exReqPop[hidden] { display:none; }
+    .exReqPop .exReqHead { font-size:12px; color:#6b7280; padding:2px 10px 6px; border-bottom:1px solid #eee; margin-bottom:4px; }
+    .exReqPop label { display:flex; align-items:center; gap:6px; padding:3px 10px; font-size:13px; cursor:pointer; }
+    .exReqPop label:hover { background:#f9fafb; }
+    .exGroup label .exReqMark { color:var(--red); font-weight:700; margin-left:2px; }
+    .exReqRow { font-size:14px; }
+    .exReqRow select { height:32px; border:1px solid #d1d5db; border-radius:7px; padding:0 6px; font:inherit; font-size:14px; }
     .exFoot { display:flex; align-items:center; gap:8px; padding:12px 18px; border-top:1px solid var(--border); flex-wrap:wrap; }
     .exFoot .msg { flex:1; font-size:13px; min-width:200px; }
     .exFoot .msg.ok { color:#15803d; } .exFoot .msg.err { color:#991b1b; }
@@ -136,6 +159,14 @@
             <input type="checkbox" id="exKunMedOption"> Kun produkter, hvor mindst én af de valgte options er udfyldt
           </label>
         </div>
+        <div class="exRow exReqRow" id="exReqRow" hidden>
+          <span><b>Skal være udfyldt:</b> <span id="exReqList"></span></span>
+          <select id="exReqMode" title="Hvordan kravene kombineres">
+            <option value="alle">Alle felterne skal have tekst</option>
+            <option value="mindst">Mindst ét af felterne skal have tekst</option>
+          </select>
+          <button type="button" class="btn" id="exReqClear">Ryd krav</button>
+        </div>
         <div class="exGroups" id="exGroups"></div>
       </div>
       <div class="exFoot">
@@ -150,14 +181,17 @@
 
   // ── Valg (huskes i browseren) ────────────────────────────────────────────
   let valgt = new Set(['k:kundenr', 'k:navn', 'k:omraade']);
+  let krav = new Set();            // felter, der skal have tekst, før linjen kommer med
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || 'null');
     if (s?.felter?.length) valgt = new Set(s.felter);
+    if (Array.isArray(s?.krav)) krav = new Set(s.krav);
+    if (s?.kravMode) $('exReqMode').value = s.kravMode;
     if (s?.niveau) document.querySelector(`input[name=exNiveau][value="${s.niveau}"]`).checked = true;
     if (s?.titel) $('exOverskrift').value = s.titel;
   } catch {}
   function gem() {
-    try { localStorage.setItem(STORE, JSON.stringify({ felter: [...valgt], niveau: niveau(), titel: $('exOverskrift').value })); } catch {}
+    try { localStorage.setItem(STORE, JSON.stringify({ felter: [...valgt], krav: [...krav], kravMode: $('exReqMode').value, niveau: niveau(), titel: $('exOverskrift').value })); } catch {}
   }
   const niveau = () => document.querySelector('input[name=exNiveau]:checked').value;
 
@@ -168,6 +202,18 @@
   function valgteFelter() {
     const prod = niveau() === 'produkt';
     return alleFelter().filter(f => valgt.has(f.id) && (prod || !(f.id.startsWith('p:') || f.id.startsWith('o:'))));
+  }
+
+  // Krav, der kan bruges på det valgte niveau (produkt/options kun ved én linje pr. produkt)
+  function aktiveKrav() {
+    const prod = niveau() === 'produkt';
+    return alleFelter().filter(f => krav.has(f.id) && !f.blank && (prod || !(f.id.startsWith('p:') || f.id.startsWith('o:'))));
+  }
+  function renderKravRow() {
+    const aktive = aktiveKrav();
+    $('exReqRow').hidden = !aktive.length;
+    $('exReqList').textContent = aktive.map(f => f.label).join(', ');
+    $('exReqMode').hidden = aktive.length < 2;
   }
 
   function renderGroups() {
@@ -181,13 +227,54 @@
       ['Tomme kolonner', BLANK, true],
       ['Options', optionKeys.map(optFelt), prod]
     ];
-    $('exGroups').innerHTML = grupper.map(([navn, felter, on]) => `
+    $('exGroups').innerHTML = grupper.map(([navn, felter, on]) => {
+      const kanKrav = on && navn !== 'Tomme kolonner';
+      const nKrav = felter.filter(f => krav.has(f.id)).length;
+      const reqUi = kanKrav ? `
+        <span class="exReqWrap">
+          <button type="button" class="exReqBtn${nKrav ? ' isSet' : ''}" data-req="${esc(navn)}" title="Vælg felter, der skal have tekst, før linjen kommer med">Skal være udfyldt${nKrav ? ` (${nKrav})` : ''} ▾</button>
+          <div class="exReqPop" hidden>
+            <div class="exReqHead">Kun linjer, hvor der står noget i:</div>
+            ${felter.map(f => `<label><input type="checkbox" data-krav="${esc(f.id)}"${krav.has(f.id) ? ' checked' : ''}> ${esc(f.title || f.label)}</label>`).join('')}
+          </div>
+        </span>` : '';
+      return `
       <div class="exGroup${on ? '' : ' disabled'}${navn === 'Options' ? ' options' : ''}" data-g="${esc(navn)}">
-        <h4>${esc(navn)}${on ? `<button type="button" data-all="${esc(navn)}">Markér alle / ingen</button>` : '<span style="text-transform:none;letter-spacing:0">kræver "én linje pr. produkt"</span>'}</h4>
+        <h4>${esc(navn)}${on
+          ? `<span class="exGroupBtns">${reqUi}<button type="button" data-all="${esc(navn)}">Markér alle / ingen</button></span>`
+          : '<span style="text-transform:none;letter-spacing:0">kræver "én linje pr. produkt"</span>'}</h4>
         <div class="${navn === 'Options' ? 'exOptList' : ''}">
-          ${felter.map(f => `<label><input type="checkbox" value="${esc(f.id)}"${valgt.has(f.id) ? ' checked' : ''}${on ? '' : ' disabled'}> ${esc(f.title || f.label)}</label>`).join('')}
+          ${felter.map(f => `<label><input type="checkbox" value="${esc(f.id)}"${valgt.has(f.id) ? ' checked' : ''}${on ? '' : ' disabled'}> ${esc(f.title || f.label)}${krav.has(f.id) && on ? '<span class="exReqMark" title="Skal være udfyldt">*</span>' : ''}</label>`).join('')}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
+    renderKravRow();
+
+    // "Skal være udfyldt"-rullelisterne
+    $('exGroups').querySelectorAll('[data-req]').forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      const pop = b.nextElementSibling;
+      const var_aaben = !pop.hidden;
+      $('exGroups').querySelectorAll('.exReqPop').forEach(p => p.hidden = true);
+      pop.hidden = var_aaben;
+    });
+    $('exGroups').querySelectorAll('.exReqPop').forEach(pop => pop.addEventListener('click', e => e.stopPropagation()));
+    $('exGroups').querySelectorAll('input[data-krav]').forEach(cb => cb.onchange = () => {
+      cb.checked ? krav.add(cb.dataset.krav) : krav.delete(cb.dataset.krav);
+      gem();
+      // Opdater knap, stjerner og kravlinjen uden at lukke rullelisten
+      const grp = cb.closest('.exGroup');
+      const n = grp.querySelectorAll('input[data-krav]:checked').length;
+      const btn = grp.querySelector('.exReqBtn');
+      btn.classList.toggle('isSet', n > 0);
+      btn.textContent = `Skal være udfyldt${n ? ` (${n})` : ''} ▾`;
+      const lbl = grp.querySelector(`input[type=checkbox][value="${CSS.escape(cb.dataset.krav)}"]`)?.closest('label');
+      if (lbl) {
+        lbl.querySelector('.exReqMark')?.remove();
+        if (cb.checked) lbl.insertAdjacentHTML('beforeend', '<span class="exReqMark" title="Skal være udfyldt">*</span>');
+      }
+      renderKravRow();
+    });
     $('exGroups').querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = () => {
       cb.checked ? valgt.add(cb.value) : valgt.delete(cb.value);
       gem();
@@ -221,7 +308,8 @@
     produkter = j.produkter || [];
     // Nye options i data (ikke i listen) kommer med til sidst
     const extra = new Set();
-    produkter.forEach(p => Object.keys(p.udstyr || {}).forEach(k => { if (!optionKeys.includes(k)) extra.add(k); }));
+    const kendte = new Set(optionKeys.map(normKey));
+    produkter.forEach(p => Object.keys(p.udstyr || {}).forEach(k => { if (!kendte.has(normKey(k))) { kendte.add(normKey(k)); extra.add(k); } }));
     if (extra.size) { optionKeys = [...optionKeys, ...[...extra].sort((a, b) => a.localeCompare(b, 'da'))]; renderGroups(); }
     msg('');
     return produkter;
@@ -241,8 +329,20 @@
     const title = $('exOverskrift').value.trim() || 'Kundeliste';
     const kunder = [...filtered];
 
+    const kravFelter = aktiveKrav();
+    if (kravFelter.some(f => f.id.startsWith('k:sa_')) && !saByKunde) {
+      const r = await fetch('/api/kunde-serviceaftaler', { cache: 'no-store' });
+      const j = await r.json().catch(() => ({}));
+      buildSaMap(j.items || []);
+    }
+    if (kravFelter.some(f => f.id.startsWith('k:rb_'))) await ensureRbFor();
+    const alleKrav = $('exReqMode').value !== 'mindst';
+    const harTekst = (f, k, p) => String(f.value(k, p) ?? '').trim() !== '';
+    const opfylder = (k, p) => !kravFelter.length ||
+      (alleKrav ? kravFelter.every(f => harTekst(f, k, p)) : kravFelter.some(f => harTekst(f, k, p)));
+
     if (niveau() === 'kunde') {
-      const rows = udenTomme(fields, kunder.map(k => fields.map(f => f.blank ? '' : f.value(k))));
+      const rows = udenTomme(fields, kunder.filter(k => opfylder(k)).map(k => fields.map(f => f.blank ? '' : f.value(k))));
       return { title, fields, unit: 'kunde', count: rows.length, rows };
     }
 
@@ -256,7 +356,8 @@
       const list = (byNr.get(String(k.kundenr).trim()) || [])
         .slice().sort((a, b) => a.produkt.localeCompare(b.produkt, 'da') || a.serienr.localeCompare(b.serienr, 'da', { numeric: true }));
       for (const p of list) {
-        if (kunMed && !optFields.some(f => String(p.udstyr?.[f.option] ?? '').trim())) continue;
+        if (kunMed && !optFields.some(f => String(udstyrVal(p, f.option) ?? '').trim())) continue;
+        if (!opfylder(k, p)) continue;
         rows.push(fields.map(f => f.blank ? '' : f.value(k, p)));
       }
     }
@@ -406,9 +507,18 @@
   // ── Knapper ──────────────────────────────────────────────────────────────
   document.querySelectorAll('input[name=exNiveau]').forEach(r => r.onchange = () => { gem(); renderGroups(); });
   $('exOverskrift').oninput = gem;
+  $('exReqMode').onchange = gem;
+  $('exReqClear').onclick = () => { krav.clear(); gem(); renderGroups(); };
+  wrap.addEventListener('click', e => {
+    if (!e.target.closest('.exReqWrap')) wrap.querySelectorAll('.exReqPop').forEach(p => p.hidden = true);
+  });
   $('exClose').onclick = close;
   wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !wrap.hidden) close(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || wrap.hidden) return;
+    const openPop = wrap.querySelector('.exReqPop:not([hidden])');
+    if (openPop) openPop.hidden = true; else close();
+  });
   $('exCopy').onclick = () => run($('exCopy'), kopier);
   $('exExcel').onclick = () => run($('exExcel'), excel);
   $('exPrint').onclick = () => run($('exPrint'), udskriv);

@@ -45,3 +45,18 @@ window.KL_KOLONNER = [
 
 // Bruges, når der ingen kolonnegruppe er (eller ingen passer)
 window.KL_STANDARD_KOLONNER = ['kundenr', 'navn', 'omraade', 'kundestatus', 'kontrakt'];
+
+// Knapper og felter i kundelisten, der kan have en hjælpetekst (?).
+// "key" gemmes i Dataverse som "el:<id>" – id'et er elementets id i kundeliste.html.
+// Kolonner gemmes som "kol:<key>" ud fra KL_KOLONNER ovenfor.
+window.KL_HJAELP_ELEMENTER = [
+  { id: 'q',                 label: 'Søgefelt' },
+  { id: 'aktiv',             label: 'Filtrering kunder' },
+  { id: 'kolGruppe',         label: 'Visninger' },
+  { id: 'btnSal',            label: 'Knap: Salmonella' },
+  { id: 'btnXX',             label: 'Knap: Projekt' },
+  { id: 'btnEksport',        label: 'Knap: Udskriv liste' },
+  { id: 'btnRefresh',        label: 'Knap: Opdater' },
+  { id: 'btnServiceaftaler', label: 'Admin-knap: Serviceaftaler' },
+  { id: 'btnRabat',          label: 'Admin-knap: Kemi rabat' }
+];

@@ -17,6 +17,9 @@
 //   POST   ?action=kolonnegrupper[&id=<guid>] body { navn, afdelinger, kolonner, standard }  (uden id = ny)
 //   DELETE ?action=kolonnegrupper&id=<guid>
 //   GET    ?action=afdelinger              → { items: [{ navn, antal }] }  (afdelinger i Entra)
+//   GET    ?action=hjaelpetekster          → { items: [{ id, key, tekst }] }
+//   POST   ?action=hjaelpetekster[&id=<guid>] body { key, tekst }  (uden id = ny)
+//   DELETE ?action=hjaelpetekster&id=<guid>
 
 const N = require("../_news");
 const A = require("../_kundelisteAdmin");
@@ -83,6 +86,13 @@ module.exports = async function (context, req) {
       if (method === "GET")    return N.json(context, 200, { items: await A.listGrupper() });
       if (method === "POST")   return N.json(context, 200, await A.saveGruppe(req.body || {}, id || null));
       if (method === "DELETE") { await A.deleteGruppe(id); return N.json(context, 200, { ok: true }); }
+    }
+    // ── Hjælpetekster ──
+    if (action === "hjaelpetekster") {
+      const id = String(req.query.id || "");
+      if (method === "GET")    return N.json(context, 200, { items: await A.listHjaelp() });
+      if (method === "POST")   return N.json(context, 200, await A.saveHjaelp(req.body || {}, id || null));
+      if (method === "DELETE") { await A.deleteHjaelp(id); return N.json(context, 200, { ok: true }); }
     }
     if (action === "afdelinger" && method === "GET") {
       return N.json(context, 200, { items: await A.entraAfdelinger() });

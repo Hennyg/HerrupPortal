@@ -52,6 +52,13 @@
     @media (max-width: 640px) {
       .navExtra { display: none !important; }
     }
+    /* Overskrifter over rullelisterne i toolbaren */
+    .toolbar { align-items:flex-end; }
+    .tbGroup { display:flex; flex-direction:column; gap:3px; }
+    .tbGroup[hidden] { display:none; }
+    .tbLabel { display:flex; align-items:center; font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; line-height:17px; }
+    .tbLabel .hlp { text-transform:none; }
+    #lastImportText { align-self:center; }
     /* Admin-linje under navbar */
     .adminBar { flex:0 0 auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff;
                 border-bottom:1px solid var(--border); padding:8px 12px; }
@@ -145,6 +152,8 @@
   <main class="pageWrap">
     <section class="toolbar">
       <input id="q" type="search" placeholder="Søg kundenr, navn, postnr., område, status, kontrakt – eller serienr. for at gå til produktet" style="min-width:320px" autocomplete="off" />
+      <div class="tbGroup">
+        <span class="tbLabel" data-hlp-for="aktiv">Filtrering kunder</span>
       <select id="aktiv">
         <option value="true">Aktive</option>
         <option value="">Alle</option>
@@ -153,7 +162,11 @@
         <option value="uniconta">Uniconta aktiv</option>
         <option value="uniconta_inaktiv">Uniconta inaktiv</option>
       </select>
-      <select id="kolGruppe" title="Hvilke kolonner der vises. Automatisk = ud fra din afdeling"></select>
+      </div>
+      <div class="tbGroup" id="kolGruppeWrap">
+        <span class="tbLabel" data-hlp-for="kolGruppe">Visninger</span>
+        <select id="kolGruppe" title="Hvilke kolonner der vises. Automatisk = ud fra din afdeling"></select>
+      </div>
       <button type="button" class="btn" id="btnSal" title="Vis kun kunder med salmonella på mindst én af deres adresser">Salmonella</button>
       <button type="button" class="btn" id="btnXX" title="Vis kun projekter: kunder med produkter, hvor installationsdatoen er xx-xx-xxxx (planlagte projekter, der ikke er aktive endnu)">Projekt</button>
       <div id="lastImportText" class="muted small" style="white-space:nowrap; padding:0 8px;">Sidste import kørt: henter...</div>
@@ -239,6 +252,7 @@
 
   <script src="/assets/kundeliste/common.js"></script>
   <script src="/assets/kundeliste/kolonner.js"></script>
+  <script src="/assets/kundeliste/hjaelp.js"></script>
   <script>
     let rows = [], filtered = [], sortKey = 'navn', sortDir = 1;
     let onlyXX = false;            // knappen "Projekt" (installationsdato xx-xx-xxxx)
@@ -688,7 +702,7 @@
 
     function buildHead() {
       document.getElementById('headRow').innerHTML =
-        activeCols.map(key => `<th class="sortable" data-sort="${key}"><span class="colLabel">${esc(colLabel(key))}</span>${filterControl(key)}</th>`).join('') +
+        activeCols.map(key => `<th class="sortable" data-sort="${key}"><span class="colLabel">${esc(colLabel(key))}${klHelpIcon('kol:' + key, colLabel(key))}</span>${filterControl(key)}</th>`).join('') +
         `<th style="vertical-align:bottom;"><button type="button" class="btn" id="btnClearFilters" style="display:none">Ryd filtre</button></th>`;
 
       document.querySelectorAll('.colFilter').forEach(inp => {
@@ -731,6 +745,9 @@
         const r = await fetch('/api/kundeliste-kolonner', { cache: 'no-store' });
         kolCfg = await r.json();
       } catch { kolCfg = { afdeling: '', gruppeId: null, grupper: [] }; }
+      kolCfg.grupper = kolCfg.grupper || [];
+      window.KL_HJAELP = kolCfg.hjaelp || {};
+      klApplyElementHelp();
       renderKolSelect();
       applyKolonner();
     }
@@ -738,7 +755,7 @@
     function renderKolSelect() {
       const sel = document.getElementById('kolGruppe');
       const auto = kolCfg.grupper.find(g => g.id === kolCfg.gruppeId);
-      sel.hidden = !kolCfg.grupper.length;
+      document.getElementById('kolGruppeWrap').hidden = !kolCfg.grupper.length;
       sel.innerHTML =
         `<option value="">Automatisk${auto ? ` (${esc(auto.navn)})` : ''}</option>` +
         kolCfg.grupper.map(g => `<option value="${esc(g.id)}">${esc(g.navn)}</option>`).join('');

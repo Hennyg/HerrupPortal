@@ -6,6 +6,8 @@
 //   - serviceaftaler  (tabel lch_serviceaftaler) – oprettes fra kundeliste.html
 //   - kolonnegrupper  (tabel lch_kundeliste_kolonnegruppe) – hvilke kolonner
 //                     hver afdeling ser i kundelisten
+//   - hjælpetekster   (tabel lch_kundeliste_hjaelpetekst) – forklaringer bag
+//                     (?) ved kolonneoverskrifter og knapper i kundelisten
 // Alle tabeller ligger i Kundeliste-miljøet (KL_DV_URL) – samme som kunder/produkter.
 
 const N = require("./_news");
@@ -36,6 +38,11 @@ const T = {
     logical: "cr1eb_lch_kundeliste_kolonnegruppe",
     set:     "cr1eb_lch_kundeliste_kolonnegruppes",
     id:      "cr1eb_lch_kundeliste_kolonnegruppeid"
+  },
+  hjaelp: {
+    logical: "cr1eb_lch_kundeliste_hjaelpetekst",
+    id:      "cr1eb_lch_kundeliste_hjaelpetekstid"
+    // "set" slås op i metadata første gang
   },
   produkt: { set: "cr1eb_lch_kundeprodukts" }
 };
@@ -490,8 +497,58 @@ async function retSlutdatoer(udfoer) {
   return { antal: kandidater.length, kandidater: kandidater.slice(0, 200), rettet, fejl };
 }
 
+// ── Hjælpetekster ───────────────────────────────────────────────────────────
+// Tabellen lch_kundeliste_hjaelpetekst:
+//   lch_name          (primær kolonne) nøgle: "kol:<kolonne>" eller "el:<element-id>"
+//   lch_hjaelpetekst  tekst, flere linjer
+const HJ_KEY = /^(kol|el):[A-Za-z0-9_\-]{1,60}$/;
+
+async function listHjaelp() {
+  const set = await entitySet(T.hjaelp);
+  const rows = await fetchAll(`${set}?$select=${T.hjaelp.id},cr1eb_lch_name,cr1eb_lch_hjaelpetekst`);
+  return rows
+    .map(r => ({ id: r[T.hjaelp.id], key: String(r.cr1eb_lch_name || "").trim(), tekst: String(r.cr1eb_lch_hjaelpetekst || "") }))
+    .filter(r => r.key)
+    .sort((a, b) => a.key.localeCompare(b.key, "da"));
+}
+
+// Nøgle → tekst, til kundelisten
+async function hjaelpMap() {
+  const out = {};
+  for (const h of await listHjaelp()) if (h.tekst.trim()) out[h.key] = h.tekst;
+  return out;
+}
+
+async function saveHjaelp(input, id) {
+  const key = String(input?.key || "").trim();
+  const tekst = String(input?.tekst || "").replace(/\r\n/g, "\n").trim().slice(0, 4000);
+  if (!HJ_KEY.test(key)) throw bad("Vælg en kolonne eller knap");
+  if (!tekst) throw bad("Skriv en hjælpetekst");
+  const set = await entitySet(T.hjaelp);
+  const body = { cr1eb_lch_name: key, cr1eb_lch_hjaelpetekst: tekst };
+
+  // Samme nøgle må kun findes én gang
+  const dublet = (await listHjaelp()).find(h => h.key.toLowerCase() === key.toLowerCase() && h.id !== id);
+  if (dublet) throw bad("Der findes allerede en hjælpetekst til den kolonne/knap – ret den i stedet");
+
+  if (id) {
+    if (!GUID.test(id)) throw bad("Ugyldigt id");
+    await dvFetch(`${set}(${id})`, { method: "PATCH", body });
+    return { id };
+  }
+  const created = await dvFetch(set, { method: "POST", body, headers: { Prefer: "return=representation" } });
+  return { id: created?.[T.hjaelp.id] || null };
+}
+
+async function deleteHjaelp(id) {
+  if (!GUID.test(String(id || ""))) throw bad("Ugyldigt id");
+  const set = await entitySet(T.hjaelp);
+  await dvFetch(`${set}(${id})`, { method: "DELETE" });
+}
+
 module.exports = {
   retSlutdatoer,
+  listHjaelp, hjaelpMap, saveHjaelp, deleteHjaelp,
   ADMIN_ROLES, isKundelisteAdmin,
   loadFarver, kontraktTyper, saveFarve,
   listAftaler, createAftale, updateAftale, deleteAftale,
