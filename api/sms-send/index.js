@@ -11,10 +11,21 @@ module.exports = async function (context, req) {
 
   try {
     const b = req.body || {};
-    const { valid, invalid } = S.parseNumbers(b.recipients);
+    const selfTest = b.selfTest === true;
     const msg = String(b.message || "").replace(/\r\n/g, "\n").trim();
     const from = String(b.from || "Lely Center").trim();
-    const test = b.test === true;
+    // "Test til dig selv" sendes rigtigt, men kun til brugerens eget nummer fra Entra.
+    const test = selfTest ? false : b.test === true;
+
+    let valid, invalid;
+    if (selfTest) {
+      const me = await S.getMyPhone(user);
+      if (!me.phone) return S.json(context, 400, { error: "Der er intet gyldigt mobilnummer på din bruger i Entra" });
+      valid = [me.phone];
+      invalid = [];
+    } else {
+      ({ valid, invalid } = S.parseNumbers(b.recipients));
+    }
 
     if (!valid.length) return S.json(context, 400, { error: "Ingen gyldige modtagere" });
     if (valid.length > MAX_RECIPIENTS) return S.json(context, 400, { error: `Maks ${MAX_RECIPIENTS} modtagere pr. forsendelse` });
@@ -32,7 +43,7 @@ module.exports = async function (context, req) {
     const antalSms = result.smsCount || valid.length * info.parts;
     const status = result.fatalError
       ? "Fejl"
-      : (result.errors.length ? "Delvist sendt" : (test ? "Test OK" : "Sendt"));
+      : (result.errors.length ? "Delvist sendt" : (test ? "Test OK" : (selfTest ? "Test til mig selv" : "Sendt")));
 
     // Log — fejl her må ikke skjule, at SMS'en faktisk er sendt.
     let logError = null;
@@ -63,6 +74,8 @@ module.exports = async function (context, req) {
       ok: !result.fatalError,
       status,
       test,
+      selfTest,
+      selfPhone: selfTest ? valid[0] : undefined,
       recipients: valid.length,
       skippedInvalid: invalid,
       okCount: result.okCount,

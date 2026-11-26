@@ -183,6 +183,8 @@ async function requireAccess(context, req, { admin = false } = {}) {
     } catch { /* ikke kritisk */ }
   }
   if (!user.name) user.name = user.email;
+  user.isAdmin = user.roles.some(r => ADMIN_ROLES.includes(r));
+  user.graphToken = token;
   return user;
 }
 
@@ -279,6 +281,26 @@ async function sveveBalance() {
   return { count: Number.isFinite(n) && txt.match(/\d/) ? n : null, raw: txt.slice(0, 500) };
 }
 
+// Bestil flere SMS'er på kontoen. Sveve svarer med en kort tekst.
+async function sveveOrder(count) {
+  const { user, passwd } = sveveCredentials();
+  const url = `${SVEVE_BASE}/SMS/AccountAdm?` + new URLSearchParams({ cmd: "order_sms", count: String(count), user, passwd });
+  const r = await fetch(url);
+  const txt = (await r.text()).trim();
+  if (!r.ok) throw new Error(`Sveve svarede HTTP ${r.status}: ${txt.slice(0, 200)}`);
+  return { raw: txt.slice(0, 500) };
+}
+
+// Brugerens eget mobilnummer fra Entra (mobilePhone, ellers første businessPhone).
+async function getMyPhone(user) {
+  if (!user?.userId) return { phone: "", raw: "" };
+  const token = user.graphToken || await graphToken();
+  const u = await graphJson(token, `users/${user.userId}?$select=mobilePhone,businessPhones`);
+  const raw = u.mobilePhone || (u.businessPhones || [])[0] || "";
+  const { valid } = parseNumbers([raw]);
+  return { phone: valid[0] || "", raw };
+}
+
 function formatTitle(date) {
   // Dansk tid i titlen, fx "SMS 24-09-2026 14:30" (selve tidspunktet gemmes i "sendt").
   const parts = Object.fromEntries(
@@ -294,6 +316,6 @@ module.exports = {
   TABLE, IDCOL, COL, SMS_PRICE, ADMIN_ROLES,
   json, getPrincipal, requireAccess, graphToken, graphJson,
   parseNumbers, smsInfo,
-  sveveSend, sveveBalance,
+  sveveSend, sveveBalance, sveveOrder, getMyPhone,
   dvFetch, formatTitle
 };

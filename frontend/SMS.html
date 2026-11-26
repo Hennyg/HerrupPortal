@@ -70,6 +70,33 @@
   .smsDetailMeta dt{ font-weight:600; color:#374151; }
   .smsDetailMeta dd{ margin:0; }
 
+  /* Tæller, AI-knap, test til dig selv */
+  .smsCount{ white-space:normal; text-align:right; }
+  .smsSelf{ display:flex; flex-direction:column; gap:4px; }
+  .smsSelf .btn{ width:100%; }
+  .smsSelf .muted{ font-size:.82rem; }
+
+  /* AI-forslag */
+  .aiList{ display:flex; flex-direction:column; gap:10px; }
+  .aiItem{ border:1px solid #e5e7eb; border-radius:10px; padding:.7rem .85rem; }
+  .aiItem.done{ background:#f0fdf4; border-color:#bbf7d0; }
+  .aiItem.rejected{ background:#f8fafc; opacity:.65; }
+  .aiItem.stale{ background:#fffbeb; border-color:#fde68a; }
+  .aiHead{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+  .aiReason{ font-size:.88rem; color:#374151; margin-bottom:6px; }
+  .aiDiff{ font-size:.9rem; white-space:pre-wrap; word-break:break-word; background:#f8fafc; border-radius:8px; padding:.45rem .6rem; }
+  .aiDiff del{ color:#991b1b; background:#fee2e2; text-decoration:line-through; padding:0 2px; border-radius:3px; }
+  .aiDiff ins{ color:#166534; background:#dcfce7; text-decoration:none; padding:0 2px; border-radius:3px; }
+  .aiActions{ display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
+  .aiStatus{ font-size:.8rem; font-weight:600; }
+  .badge.tegn{ background:#fee2e2; color:#991b1b; }
+  .badge.sprog{ background:#e0f2fe; color:#075985; }
+  .aiFoot{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-top:14px; }
+
+  /* Bestil SMS */
+  .orderBox{ display:flex; flex-direction:column; gap:12px; }
+  .orderBox .field{ max-width:200px; font-size:1.05rem; }
+
   .noAccess{ text-align:center; padding:2.5rem 1rem; }
   .noAccess h2{ color:var(--heading); margin:0 0 .5rem; }
 </style>
@@ -85,6 +112,7 @@
     <div class="nav">
       <span id="userLine" class="muted" style="color:#fff;opacity:.9">Henter bruger...</span>
       <span class="sep">|</span>
+      <a href="#" id="orderLink" style="display:none">Bestil SMS</a>
       <a href="/">← Til portal</a>
       <a href="/logout">Log ud</a>
     </div>
@@ -121,10 +149,14 @@
           <div class="smsCol">
             <div class="smsColHead">
               <h2>Besked</h2>
-              <span class="smsCount"><strong id="msgLen">0</strong> tegn · <strong id="msgParts">0</strong> SMS pr. modtager</span>
+              <span class="smsCount"><strong id="msgLen">0</strong> tegn · <strong id="msgParts">0</strong> SMS pr. modtager · <strong id="msgLeft">160</strong> tegn til næste SMS</span>
             </div>
             <textarea id="message" class="smsText" placeholder="Skriv din besked her."></textarea>
             <div id="msgWarn" class="smsWarn"></div>
+            <div class="smsRow">
+              <button type="button" id="aiBtn" class="btn" disabled>Kontrollér tekst med AI</button>
+              <span class="muted" id="aiMsg"></span>
+            </div>
           </div>
 
           <div class="smsCol">
@@ -136,6 +168,11 @@
             </div>
 
             <label class="smsToggle"><input type="checkbox" id="testMode" checked /> Test (sender ikke rigtigt)</label>
+
+            <div class="smsSelf">
+              <button type="button" id="selfBtn" class="btn" disabled>Test til dig selv</button>
+              <span class="muted" id="selfInfo">Henter dit nummer…</span>
+            </div>
 
             <div class="smsSummary" id="summary">
               <div>Pris i alt: <span class="big" id="sumPrice">kr. 0,00</span></div>
@@ -168,6 +205,7 @@
           </div>
           <div class="smsRow">
             <label class="smsToggle" style="font-weight:500"><input type="checkbox" id="histHideTest" /> Skjul test</label>
+            <label class="smsToggle" style="font-weight:500;display:none" id="histAllWrap"><input type="checkbox" id="histAll" /> Vis alle brugere</label>
             <span class="muted" id="histCount"></span>
             <button type="button" class="btn" id="histReload">Opdatér</button>
           </div>
@@ -211,7 +249,49 @@
   </div>
 </div>
 
-<script src="/assets/sms.js?v=20260924-3"></script>
+<!-- AI-kontrol af tekst -->
+<div id="aiOverlay" class="smsOverlay" hidden>
+  <div class="smsModal" role="dialog" aria-modal="true" aria-labelledby="aiTitle">
+    <div class="smsModalHeader">
+      <div class="smsModalTitle" id="aiTitle">Kontrol af tekst</div>
+      <button type="button" class="smsCloseBtn" id="aiClose" aria-label="Luk">✕</button>
+    </div>
+    <div id="aiInfo" class="muted" style="margin-bottom:12px"></div>
+    <div id="aiList" class="aiList"></div>
+    <div class="aiFoot">
+      <span class="muted" id="aiCountLine"></span>
+      <div class="smsRow">
+        <button type="button" class="btn primary" id="aiApproveAll">Godkend alle</button>
+        <button type="button" class="btn" id="aiClose2">Luk</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bestil SMS (admin) -->
+<div id="orderOverlay" class="smsOverlay" hidden>
+  <div class="smsModal" role="dialog" aria-modal="true" aria-labelledby="orderTitle" style="width:min(480px,96vw)">
+    <div class="smsModalHeader">
+      <div class="smsModalTitle" id="orderTitle">Bestil nye SMS'er</div>
+      <button type="button" class="smsCloseBtn" id="orderClose" aria-label="Luk">✕</button>
+    </div>
+    <div class="orderBox">
+      <div>Saldo nu: <strong id="orderBalance">–</strong></div>
+      <div class="formRow">
+        <label for="orderCount">Antal SMS'er der skal bestilles</label>
+        <input id="orderCount" class="field" type="text" inputmode="numeric" value="5000" autocomplete="off" />
+      </div>
+      <div class="muted" id="orderPrice"></div>
+      <div id="orderResult" class="smsResult"></div>
+    </div>
+    <div class="formActions" style="margin-top:14px">
+      <button type="button" class="btn primary" id="orderSend">Bestil</button>
+      <button type="button" class="btn" id="orderClose2">Annullér</button>
+    </div>
+  </div>
+</div>
+
+<script src="/assets/sms.js?v=20261126-1"></script>
   <!-- Brugsstatistik: sidevisning til statistik.html -->
   <script src="/assets/track.js" defer></script>
 </body>

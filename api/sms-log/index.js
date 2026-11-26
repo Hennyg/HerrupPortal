@@ -1,5 +1,6 @@
 // /api/sms-log/index.js
 // Historik over sendte SMS'er fra Dataverse. ?top=200 (maks 1000)
+// Brugeren ser kun sine egne forsendelser. Admin kan se alle med ?all=1.
 const S = require("../_sms");
 const C = S.COL;
 
@@ -8,9 +9,18 @@ module.exports = async function (context, req) {
   if (!user) return;
   try {
     const top = Math.min(Math.max(parseInt(req.query.top, 10) || 200, 1), 1000);
+    const all = user.isAdmin && String(req.query.all || "") === "1";
     const select = [S.IDCOL, C.titel, C.modtagere, C.besked, C.afsender, C.afsenderMail, C.fra,
       C.test, C.antalSms, C.antalModtagere, C.sendt, C.status, "createdon"].join(",");
-    const data = await S.dvFetch(`${S.TABLE}?$select=${select}&$orderby=${C.sendt} desc,createdon desc&$top=${top}`);
+
+    let filter = "";
+    if (!all) {
+      const mail = String(user.email || "").replace(/'/g, "''");
+      if (!mail) return S.json(context, 200, { items: [], price: S.SMS_PRICE, all: false, isAdmin: user.isAdmin });
+      filter = `&$filter=${encodeURIComponent(`${C.afsenderMail} eq '${mail}'`)}`;
+    }
+
+    const data = await S.dvFetch(`${S.TABLE}?$select=${select}${filter}&$orderby=${C.sendt} desc,createdon desc&$top=${top}`);
     const items = (data?.value || []).map(r => ({
       id: r[S.IDCOL],
       titel: r[C.titel] || "",
@@ -25,7 +35,7 @@ module.exports = async function (context, req) {
       sendt: r[C.sendt] || r.createdon || null,
       status: r[C.status] || ""
     }));
-    return S.json(context, 200, { items, price: S.SMS_PRICE });
+    return S.json(context, 200, { items, price: S.SMS_PRICE, all, isAdmin: user.isAdmin });
   } catch (e) {
     context.log.error("sms-log:", e);
     return S.json(context, 500, { error: e.message });
