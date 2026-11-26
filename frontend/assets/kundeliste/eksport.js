@@ -268,19 +268,19 @@
       const btn = grp.querySelector('.exReqBtn');
       btn.classList.toggle('isSet', n > 0);
       btn.textContent = `Skal være udfyldt${n ? ` (${n})` : ''} ▾`;
-      const lbl = grp.querySelector(`input[type=checkbox][value="${CSS.escape(cb.dataset.krav)}"]`)?.closest('label');
+      const lbl = [...grp.querySelectorAll('input[type=checkbox]:not([data-krav])')].find(i => i.value === cb.dataset.krav)?.closest('label');
       if (lbl) {
         lbl.querySelector('.exReqMark')?.remove();
         if (cb.checked) lbl.insertAdjacentHTML('beforeend', '<span class="exReqMark" title="Skal være udfyldt">*</span>');
       }
       renderKravRow();
     });
-    $('exGroups').querySelectorAll('input[type=checkbox]').forEach(cb => cb.onchange = () => {
+    $('exGroups').querySelectorAll('input[type=checkbox]:not([data-krav])').forEach(cb => cb.onchange = () => {
       cb.checked ? valgt.add(cb.value) : valgt.delete(cb.value);
       gem();
     });
     $('exGroups').querySelectorAll('[data-all]').forEach(b => b.onclick = () => {
-      const boxes = [...b.closest('.exGroup').querySelectorAll('input[type=checkbox]')];
+      const boxes = [...b.closest('.exGroup').querySelectorAll('input[type=checkbox]:not([data-krav])')];
       const alle = boxes.every(cb => cb.checked);
       boxes.forEach(cb => { cb.checked = !alle; alle ? valgt.delete(cb.value) : valgt.add(cb.value); });
       gem();
