@@ -63,21 +63,30 @@
     /* Klik på en adresse filtrerer produkterne (klik igen = alle adresser) */
     .adrBox.clickable { cursor:pointer; transition:background .15s, box-shadow .15s; }
     .adrBox.clickable:hover { background:#f9fafb; box-shadow:0 0 0 1px #e5e7eb; }
-    .adrBox.salRed.clickable:hover   { background:#fee2e2; }
-    .adrBox.salGreen.clickable:hover { background:#dcfce7; }
-    .adrBox.selected { box-shadow:0 0 0 2px var(--red); }
-    .adrBox.salRed   { border-color:#dc2626; background:#fef2f2; }
-    .adrBox.salGreen { border-color:#16a34a; background:#f0fdf4; }
+    /* Fuld farve på hele feltet + et symbol foran adressen, så status også kan
+       ses af farveblinde (✖ salmonella, ✔ fri, ? ingen CHR) */
+    .adrBox.salRed   { border-color:#b91c1c; background:#dc2626; color:#fff; }
+    .adrBox.salGreen { border-color:#166534; background:#15803d; color:#fff; }
+    .adrBox.salRed.clickable:hover   { background:#b91c1c; }
+    .adrBox.salGreen.clickable:hover { background:#166534; }
+    .adrBox.salRed .adrChr, .adrBox.salGreen .adrChr,
+    .adrBox.salRed .adrRaw, .adrBox.salGreen .adrRaw { color:#fff !important; opacity:.95; }
+    .adrBox.salRed > b:first-child::before   { content:'✖ '; }
+    .adrBox.salGreen > b:first-child::before { content:'✔ '; }
+    .adrBox.salNone > b:first-child::before  { content:'? '; }
+    .adrBox.selected { box-shadow:0 0 0 3px #111827; }
     .adrChr { font-size:12px; color:#4b5563; margin-top:4px; }
     .adrLegend { border-top:1px solid #eee; margin-top:12px; padding-top:8px; font-size:12px; color:#374151; display:grid; gap:4px; }
-    .adrLegend .lg { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-2px; border:2px solid; }
-    .adrLegend .lgRed   { border-color:#dc2626; background:#fef2f2; }
-    .adrLegend .lgGreen { border-color:#16a34a; background:#f0fdf4; }
-    .adrLegend .lgYellow { border-color:#eab308; background:#fefce8; }
+    .adrLegend .lg { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:3px; margin-right:6px;
+                     vertical-align:-3px; border:2px solid; font-size:10px; font-weight:700; line-height:1; }
+    .adrLegend .lgRed   { border-color:#b91c1c; background:#dc2626; color:#fff; }
+    .adrLegend .lgGreen { border-color:#166534; background:#15803d; color:#fff; }
+    .adrLegend .lgYellow { border-color:#ca8a04; background:#facc15; color:#111827; }
     /* Adresse uden besætning i CHR-registeret */
-    .adrBox.salNone { border-color:#eab308; background:#fefce8; }
-    .adrBox.salNone.clickable:hover { background:#fef9c3; }
-    .adrNoChr { font-size:12px; color:#854d0e; margin-top:4px; }
+    .adrBox.salNone { border-color:#ca8a04; background:#facc15; color:#111827; }
+    .adrBox.salNone.clickable:hover { background:#eab308; }
+    .adrNoChr { font-size:12px; color:#713f12; margin-top:4px; font-weight:600; }
+    .adrBox.salNone .adrRaw { color:#111827 !important; }
     .adrUnmatched { margin-top:4px; color:#4b5563; }
     .txtRed { color:#b91c1c; font-weight:600; } .txtGreen { color:#15803d; font-weight:600; }
     .salDate { font-size:11px; color:#6b7280; }
@@ -543,9 +552,9 @@ function salAdrLegend(adresser){
   const skjulte = (state.adresserAlle || []).filter(a => !adresser.some(v => v.adressekey === a.adressekey));
   const unmatched = salSort(sal.list.filter(h => !adresser.some(a => herdMatchesAddress(h, a)) && !skjulte.some(a => herdMatchesAddress(h, a))));
   return `<div class="adrLegend">
-    <div><span class="lg lgRed"></span>Rød ramme: salmonella på en besætning (CHR) på adressen</div>
-    <div><span class="lg lgGreen"></span>Grøn ramme: besætningen på adressen er fri</div>
-    <div><span class="lg lgYellow"></span>Gul ramme: ingen CHR-nummer på adressen</div>
+    <div><span class="lg lgRed">✖</span>Rød: salmonella på en besætning (CHR) på adressen</div>
+    <div><span class="lg lgGreen">✔</span>Grøn: besætningen på adressen er fri</div>
+    <div><span class="lg lgYellow">?</span>Gul: ingen CHR-nummer på adressen</div>
     ${unmatched.length ? `<div class="adrUnmatched">Kunne ikke kobles til en adresse:<br>${unmatched.map(h => {
       const adr = [h.adresse, [h.postnr, h.by].filter(Boolean).join(' ')].filter(Boolean).join(', ');
       // Viser hvad besætningstabellen har som ejendoms- og brugeradresse, så man
