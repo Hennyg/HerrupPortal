@@ -56,6 +56,11 @@
     @media (max-width: 900px) { #summary.cards { grid-template-columns: 1fr; } }
     .salLine { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px; }
     .salLine .badge { font-size:13px; padding:4px 10px; }
+    /* Fuld farve + symbol i Salmonella-feltet, så status også kan ses af farveblinde */
+    .salLine .badge.ok  { background:#15803d; border-color:#166534; color:#fff; }
+    .salLine .badge.err { background:#dc2626; border-color:#b91c1c; color:#fff; }
+    .salLine .badge.ok::before  { content:'✔ '; }
+    .salLine .badge.err::before { content:'✖ '; }
     .salLine .chrNr { font-size:11px; color:#6b7280; min-width:62px; }
 
     /* Adresser markeret efter salmonellastatus på besætningen (CHR) */
