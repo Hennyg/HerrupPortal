@@ -14,6 +14,10 @@
            vertical-align:middle; flex:0 0 auto; height:17px !important; }
     .hlp:hover { background:var(--red, #a00018) !important; color:#fff; }
     .hlpWrap { display:inline-flex; align-items:center; }
+    /* (?) som lille badge i knappens øverste højre hjørne */
+    .hlpHost { position:relative; overflow:visible !important; }
+    .hlp.hlpBadge { position:absolute; top:-8px; right:-8px; margin:0; width:17px; height:17px; box-sizing:border-box;
+                    box-shadow:0 1px 3px rgba(0,0,0,.2); z-index:2; }
     .hlpPop { position:fixed; z-index:300; max-width:340px; background:#fff; border:1px solid #e5e7eb; border-top:4px solid var(--red, #a00018);
               border-radius:8px; box-shadow:0 12px 32px rgba(0,0,0,.2); padding:10px 12px; font-size:13px; line-height:1.45; color:#111; }
     .hlpPop[hidden] { display:none; }
@@ -36,9 +40,13 @@
   const escAttr = s => String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 
   // HTML til en (?)-knap – tom streng, hvis nøglen ikke har nogen tekst
-  window.klHelpIcon = function (key, title) {
+  // badge = true: en <span> der lægges inde i en knap (en knap må ikke ligge i en knap)
+  window.klHelpIcon = function (key, title, badge = false) {
     if (!String(window.KL_HJAELP[key] || '').trim()) return '';
-    return `<button type="button" class="hlp" data-hlp="${escAttr(key)}" data-hlp-title="${escAttr(title || '')}" aria-label="Hjælp: ${escAttr(title || '')}" title="Forklaring">?</button>`;
+    const attrs = `data-hlp="${escAttr(key)}" data-hlp-title="${escAttr(title || '')}" aria-label="Hjælp: ${escAttr(title || '')}" title="Forklaring"`;
+    return badge
+      ? `<span class="hlp hlpBadge" role="button" tabindex="0" ${attrs}>?</span>`
+      : `<button type="button" class="hlp" ${attrs}>?</button>`;
   };
 
   // Sæt (?) ved knapper og felter. Har elementet en overskrift
@@ -51,8 +59,14 @@
       const html = window.klHelpIcon('el:' + id, label);
       if (!html) return;
       const heading = document.querySelector(`[data-hlp-for="${id}"]`);
-      if (heading) heading.insertAdjacentHTML('beforeend', html);
-      else el.insertAdjacentHTML('afterend', html);
+      if (heading) { heading.insertAdjacentHTML('beforeend', html); return; }
+      if (el.tagName === 'BUTTON' || el.tagName === 'A') {
+        // Som badge i knappens hjørne
+        el.classList.add('hlpHost');
+        el.insertAdjacentHTML('beforeend', window.klHelpIcon('el:' + id, label, true));
+        return;
+      }
+      el.insertAdjacentHTML('afterend', html);
     });
   };
 
@@ -80,7 +94,12 @@
     if (btn) { e.preventDefault(); e.stopPropagation(); show(btn); return; }
     if (!pop.hidden && (e.target.closest('.hlpX') || !e.target.closest('.hlpPop'))) hide();
   }, true);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) hide(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !pop.hidden) { hide(); return; }
+    // Badge (span) skal kunne åbnes med tastaturet
+    const b = e.target.closest?.('.hlpBadge');
+    if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); show(b); }
+  }, true);
   window.addEventListener('resize', hide);
   document.addEventListener('scroll', hide, true);
 })();
