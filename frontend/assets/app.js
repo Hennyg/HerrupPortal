@@ -1016,6 +1016,28 @@ function renderSections(items, myFavItems) {
     }
   } catch (e) { console.warn("visSom:", e); }
 
+  // Under "Vis som" er admin-linket (og dermed Vis som-menuen) skjult, fordi
+  // rollerne er den simulerede brugers. Vis derfor altid en bjælke med en
+  // knap tilbage til egen visning.
+  try {
+    const simNow = sessionStorage.getItem("hpVisSom");
+    if (simNow && !document.getElementById("visSomBar")) {
+      const bar = document.createElement("div");
+      bar.id = "visSomBar";
+      bar.setAttribute("role", "status");
+      bar.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:1000;display:flex;align-items:center;gap:12px;" +
+        "background:#111827;color:#fff;padding:10px 12px 10px 16px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:.92rem;max-width:calc(100vw - 24px)";
+      const txt = document.createElement("span");
+      txt.textContent = `👁 ${shownUser}`;
+      const btn = document.createElement("a");
+      btn.href = "/?visSom=mig";
+      btn.textContent = "Tilbage til mig";
+      btn.style.cssText = "background:#fff;color:#111827;border-radius:999px;padding:6px 14px;font-weight:700;text-decoration:none;white-space:nowrap";
+      bar.append(txt, btn);
+      document.body.appendChild(bar);
+    }
+  } catch { /* ingen bjælke */ }
+
   if (userLine) userLine.textContent = shownUser;
 
   const adminLink = document.getElementById("adminLink");
