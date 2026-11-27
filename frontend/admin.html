@@ -143,7 +143,19 @@
 .tipStatus.on{ background:#dcfce7; color:#166534; }
 .tipStatus.off{ background:#f3f4f6; color:#6b7280; }
 @media (max-width:700px){ #tipForm{ grid-template-columns:1fr; } #tipForm .formRow--full,#tipForm .formActions{ grid-column:auto; } .tipModal{ width:100%; } }
-  </style>
+  
+  /* Tile øverst til højre (AI-forbrug) */
+  .adminHeadRow { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+  .adminTile { display:flex; align-items:center; gap:12px; padding:12px 16px; min-width:220px; background:#fff;
+               border:1px solid #e5e7eb; border-left:4px solid var(--red, #c30a14); border-radius:10px;
+               box-shadow:0 2px 6px rgba(0,0,0,.06); color:inherit; text-decoration:none; margin-bottom:12px; }
+  .adminTile:hover { box-shadow:0 4px 14px rgba(0,0,0,.12); transform:translateY(-1px); }
+  .adminTile:focus-visible { outline:3px solid rgba(195,10,20,.35); outline-offset:2px; }
+  .adminTileIcon { font-size:1.7rem; line-height:1; }
+  .adminTileText { display:flex; flex-direction:column; }
+  .adminTileText b { font-size:1rem; color:var(--heading, #111827); }
+  .adminTileText span { font-size:.82rem; color:#6b7280; }
+</style>
 </head>
 
 <body class="adminPage">
@@ -233,8 +245,19 @@
   </div>
 
   <div class="container" style="padding-top:1.5rem">
-    <h1 class="adminTitle">Opret / redigér link</h1>
-    <div class="muted adminSub">Tilføj / redigér / fjern apps og links</div>
+    <div class="adminHeadRow">
+      <div>
+        <h1 class="adminTitle">Opret / redigér link</h1>
+        <div class="muted adminSub">Tilføj / redigér / fjern apps og links</div>
+      </div>
+      <a class="adminTile" href="/ai-forbrug.html" title="Hvem har brugt hvor mange AI-tokens hvornår">
+        <span class="adminTileIcon" aria-hidden="true">🤖</span>
+        <span class="adminTileText">
+          <b>AI-forbrug</b>
+          <span>Tokens pr. bruger og dag</span>
+        </span>
+      </a>
+    </div>
 
     <div class="panel">
       <form id="form" class="adminForm" autocomplete="off">
