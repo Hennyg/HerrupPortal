@@ -9,7 +9,9 @@
 //   cr175_lch_kilde, cr175_lch_opgave, cr175_lch_model,
 //   cr175_lch_inputtokens, cr175_lch_cachedtokens, cr175_lch_outputtokens,
 //   cr175_lch_reasoningtokens, cr175_lch_totaltokens, cr175_lch_billeder,
-//   cr175_lch_opfoelgning (Ja/Nej), cr175_lch_responseid
+//   cr175_lch_opfoelgning, cr175_lch_responseid
+// Tabellen er oprettet med cachedtokens og reasoningtokens som tekst og
+// opfoelgning som heltal (1 = opfølgning, 0 = ny samtale) – det skrives sådan.
 //
 // Logningen må aldrig få selve AI-kaldet til at fejle.
 
@@ -84,12 +86,12 @@ async function logAi(context, req, info = {}) {
         cr175_lch_opgave: cut(info.opgave || "", 50),
         cr175_lch_model: cut(info.model || "", 100),
         cr175_lch_inputtokens: u.input,
-        cr175_lch_cachedtokens: u.cached,
+        cr175_lch_cachedtokens: String(u.cached),
         cr175_lch_outputtokens: u.output,
-        cr175_lch_reasoningtokens: u.reasoning,
+        cr175_lch_reasoningtokens: String(u.reasoning),
         cr175_lch_totaltokens: u.total,
         cr175_lch_billeder: billeder,
-        cr175_lch_opfoelgning: info.opfoelgning === true,
+        cr175_lch_opfoelgning: info.opfoelgning === true ? 1 : 0,
         cr175_lch_responseid: rid
       }
     });

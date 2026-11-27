@@ -118,7 +118,7 @@ module.exports = async function (context, req) {
         reasoning: Number(x.cr175_lch_reasoningtokens) || 0,
         total: Number(x.cr175_lch_totaltokens) || 0,
         billeder: Number(x.cr175_lch_billeder) || 0,
-        opfoelgning: x.cr175_lch_opfoelgning === true
+        opfoelgning: x.cr175_lch_opfoelgning === true || Number(x.cr175_lch_opfoelgning) === 1
       };
       r.kr = kr(r, p);
       return r;
