@@ -8,12 +8,17 @@
 // Et felt, der er tomt, tæller som ikke udfyldt.
 // Kun aktive medlemmer af gruppen "Alle - lely center herrup" tælles med
 // (samme gruppe som personalelisten på herrup.html).
+//
+// GET /api/private-status?list=1  (kun portal_admin og portal_ledelsen)
+// → { list: { "<mail>": { complete, adresse, noed } } } til prikkerne på herrup.html.
+// Kun ja/nej pr. felt – aldrig selve oplysningerne.
 
 const N = require("../_news");
 const M = require("../_medarbejder");
 const { F } = M;
 
 const GROUP_NAME = "Alle - lely center herrup";
+const LIST_ROLES = ["portal_admin", "portal_ledelsen"];
 const CACHE_MS = 5 * 60 * 1000;
 
 let cache = { at: 0, data: null };
@@ -97,6 +102,22 @@ module.exports = async function (context, req) {
   if (!me) return N.json(context, 401, { error: "Ikke logget ind" });
 
   try {
+    // Status pr. medarbejder – kun for admin og ledelse
+    if (String(req.query?.list || "") === "1") {
+      let roles = [];
+      try { roles = await N.lookupRoles(me); } catch (e) { return N.json(context, 500, { error: `Kunne ikke slå roller op: ${e.message}` }); }
+      if (!roles.some(r => LIST_ROLES.includes(String(r).toLowerCase()))) {
+        return N.json(context, 403, { error: "Kræver portal_admin eller portal_ledelsen" });
+      }
+      const d = await loadStatus();
+      const list = {};
+      for (const mail of d.members) {
+        const s = d.byMail.get(mail) || { adresse: false, noed: false };
+        list[mail] = { complete: !!(s.adresse && s.noed), adresse: !!s.adresse, noed: !!s.noed };
+      }
+      return N.json(context, 200, { list, updated: d.updated });
+    }
+
     const d = await loadStatus();
     const myMail = String(me.email || "").trim().toLowerCase();
     const mine = d.byMail.get(myMail) || { adresse: false, telefon: false, noed: false };

@@ -93,6 +93,11 @@
     .avatar:hover { box-shadow:0 0 0 3px rgba(133,12,24,.3); }
     .avatar img { width:36px; height:36px; object-fit:cover; border-radius:50%; }
     .nameCell { display:flex; align-items:center; gap:.6rem; }
+    /* Prik: personlige oplysninger udfyldt (kun portal_admin / portal_ledelsen) */
+    .privDot { width:10px; height:10px; min-width:10px; border-radius:50%; display:inline-block; }
+    .privDot.ok  { background:#16a34a; box-shadow:0 0 0 2px #dcfce7; }
+    .privDot.mis { background:#dc2626; box-shadow:0 0 0 2px #fee2e2; }
+    .privDot.na  { background:transparent; }
     /* Arbejdsmiljø (AMR/AML) - Entra "Employee Type" */
     .amr-star { width:14px; flex-shrink:0; color:#c30a14; font-size:1rem; line-height:1; text-align:center; cursor:help; }
     .modal-amr { color:#c30a14; font-weight:600; white-space:nowrap; }
@@ -998,6 +1003,24 @@
   <script src="/assets/entraCache.js?v=20260925-warm"></script>
   <script>
     let allUsers = [];
+    // Personlige oplysninger pr. mail – hentes kun, hvis man er portal_admin/portal_ledelsen
+    let privStatus = null;
+    (async function loadPrivStatus() {
+      try {
+        const r = await fetch("/api/private-status?list=1", { cache: "no-store" });
+        if (!r.ok) return;                       // 403 = ingen adgang – så vises ingen prikker
+        privStatus = (await r.json()).list || {};
+        if (allUsers.length) renderTable();
+      } catch { /* ingen prikker */ }
+    })();
+    function privDotHTML(u) {
+      if (!privStatus) return "";
+      const s = privStatus[(u.mail || "").toLowerCase()] || privStatus[(u.userPrincipalName || "").toLowerCase()];
+      if (!s) return `<span class="privDot na" title="Ikke med i gruppen &quot;Alle - lely center herrup&quot;"></span>`;
+      if (s.complete) return `<span class="privDot ok" title="Har udfyldt personlige oplysninger"></span>`;
+      const mangler = [!s.adresse && "privat adresse", !s.noed && "nødkontakt"].filter(Boolean).join(" og ");
+      return `<span class="privDot mis" title="Mangler ${esc(mangler)}"></span>`;
+    }
     let byId     = new Map();
     let sortCol  = "displayName";
     let sortDir  = 1;
@@ -1799,6 +1822,7 @@
         const amr = amrRole(u);
         return `<tr>
           <td><div class="nameCell">
+            ${privDotHTML(u)}
             <span class="amr-star"${amr ? ` title="${esc(amr)}"` : ""}>${amr ? "★" : ""}</span>
             <div class="avatar" onclick="openModal('${esc(u.id)}')" title="Se detaljer">${av}</div>
             <div style="cursor:pointer" onclick="openModal('${esc(u.id)}')">${esc(u.displayName||"–")}</div>
