@@ -389,9 +389,11 @@ module.exports = async function (context, req) {
       return json(context, 200, {
         found: true,
         privatMail:    emp.cr1eb_lch_privat_mail    || null,
-        privatTlf:     telefonVises ? (emp.cr1eb_lch_privat_tlf     || null) : null,
-        privatAdresse: adresseVises ? (emp.cr1eb_lch_privat_adresse || null) : null,
-        privatPostby:  adresseVises ? (emp.cr1eb_lch_privat_postby  || null) : null,
+        // Skjulte felter sendes stadig til personen selv og admin – ellers står
+        // redigeringsfelterne tomme, og et gem sletter den gemte adresse/telefon.
+        privatTlf:     (telefonVises || isSelf || isAdmin) ? (emp.cr1eb_lch_privat_tlf     || null) : null,
+        privatAdresse: (adresseVises || isSelf || isAdmin) ? (emp.cr1eb_lch_privat_adresse || null) : null,
+        privatPostby:  (adresseVises || isSelf || isAdmin) ? (emp.cr1eb_lch_privat_postby  || null) : null,
         telefonVises,
         adresseVises,
         noedKontakter:   noedVisibleToMe ? noedKontakterAll : [],
@@ -492,6 +494,3 @@ module.exports = async function (context, req) {
     return json(context, 500, { error: e.message });
   }
 };
-
-
-

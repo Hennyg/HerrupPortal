@@ -2082,7 +2082,10 @@ if (window.updateHeaderStatus) {
 
     function renderPrivateView(d) {
       const valueOrHidden = (value, visesFlag) => {
-        if (!visesFlag) return `<span class="hidden-value">vises ikke</span>`;
+        // Personen selv og admin får værdien med, selv om den er skjult for kolleger
+        if (!visesFlag) return value
+          ? `${esc(value)} <span class="hidden-value">(vises ikke for kolleger)</span>`
+          : `<span class="hidden-value">vises ikke</span>`;
         return esc(value || "–");
       };
 
